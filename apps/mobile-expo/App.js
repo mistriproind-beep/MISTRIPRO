@@ -681,17 +681,13 @@ function MainApp() {
 
           {/* Primary Action Buttons */}
           <View style={styles.signInActionsGroup}>
-            {/* 1. Black Continue with Google (with official Google logo) */}
+            {/* 1. Black Continue with Google */}
             <TouchableOpacity
               style={styles.authBlackButton}
               onPress={() => setCurrentScreen('ROLE_SELECT')}
               activeOpacity={0.85}
             >
-              <Image
-                source={require('./assets/google_logo.png')}
-                style={{ width: 22, height: 22, marginRight: 12 }}
-                resizeMode="contain"
-              />
+              <Text style={styles.authGoogleG}>G</Text>
               <Text style={styles.authBlackButtonText}>{t.continueGoogle}</Text>
             </TouchableOpacity>
 
@@ -2007,9 +2003,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 8,
   },
-  authGoogleLogoImage: {
-    width: 22,
-    height: 22,
+  authGoogleG: {
+    fontFamily: 'Satoshi-Black',
+    fontSize: 20,
+    color: '#4285F4',
     marginRight: 12,
   },
   authBlackButtonText: {
