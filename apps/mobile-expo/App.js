@@ -26,6 +26,9 @@ import {
   Search,
   MapPin,
   CheckCircle2,
+  FileCheck,
+  UploadCloud,
+  Camera,
   ChevronRight,
   ShieldCheck,
   Clock,
@@ -75,7 +78,7 @@ const I18N = {
     devLogin: '⚡ Dev Test Login (abc / 1234)',
     termsNotice: 'By continuing, you confirm that you have read and agreed to the Terms of Service and consent to the Privacy Policy.',
     chooseRoleTitle: 'Choose your role',
-    chooseRoleSub: 'How would you like to use MISTRI PRO as a:',
+    chooseRoleSub: 'How would you like to use MISTRI PRO as:\nSelect your account experience below',
     customerRole: 'Customer',
     customerDesc: 'Post requirements, get competitive bids, and hire verified skilled mistris.',
     workerRole: 'Worker / Mistri',
@@ -447,11 +450,27 @@ function MainApp() {
     'Satoshi-Black': require('./assets/fonts/Satoshi-Black.ttf'),
   });
 
-  // Navigation State: 'SPLASH' | 'LANGUAGE' | 'SIGN_IN' | 'ROLE_SELECT' | 'MAIN'
+  // Navigation State: 'SPLASH' | 'LANGUAGE' | 'SIGN_IN' | 'ROLE_SELECT' | 'CUSTOMER_ONBOARDING' | 'CUSTOMER_READY' | 'WORKER_ONBOARDING' | 'WORKER_UNDER_REVIEW' | 'MAIN'
   const [currentScreen, setCurrentScreen] = useState('SPLASH');
   const [lang, setLang] = useState('en');
   const [role, setRole] = useState('CUSTOMER'); // 'CUSTOMER' | 'WORKER'
   const [activeTab, setActiveTab] = useState('HOME'); // 'HOME' | 'WORK' | 'REVIEWS' | 'PROFILE'
+
+  // Customer Onboarding Form State
+  const [custPhoto, setCustPhoto] = useState(null);
+  const [custName, setCustName] = useState('Ramesh Sharma');
+  const [custMobile, setCustMobile] = useState('+91 98290 12345');
+  const [custAddress, setCustAddress] = useState('Plot 42, Vaishali Nagar, Jaipur');
+
+  // Worker Onboarding Form State
+  const [workerPhoto, setWorkerPhoto] = useState(null);
+  const [workerName, setWorkerName] = useState('Ram Singh Mistri');
+  const [workerMobile, setWorkerMobile] = useState('+91 94140 88990');
+  const [workerAltMobile, setWorkerAltMobile] = useState('+91 98280 11223');
+  const [workerAddress, setWorkerAddress] = useState('Ward 12, Mansarovar, Jaipur, Rajasthan');
+  const [workerSkills, setWorkerSkills] = useState(['Mason (राजमिस्त्री)', 'Tiles & Marble']);
+  const [aadhaarFront, setAadhaarFront] = useState(true);
+  const [aadhaarBack, setAadhaarBack] = useState(true);
 
   // Dev Login form state
   const [showDevForm, setShowDevForm] = useState(false);
@@ -485,6 +504,16 @@ function MainApp() {
       const timer = setTimeout(() => {
         setCurrentScreen('LANGUAGE');
       }, 3500);
+      return () => clearTimeout(timer);
+    }
+  }, [currentScreen]);
+
+  // Auto transition for Customer Ready loading screen (4 seconds)
+  useEffect(() => {
+    if (currentScreen === 'CUSTOMER_READY') {
+      const timer = setTimeout(() => {
+        setCurrentScreen('MAIN');
+      }, 4000);
       return () => clearTimeout(timer);
     }
   }, [currentScreen]);
@@ -742,7 +771,7 @@ function MainApp() {
               style={[styles.roleCard, role === 'CUSTOMER' && styles.roleCardActive]}
               onPress={() => {
                 setRole('CUSTOMER');
-                setCurrentScreen('MAIN');
+                setCurrentScreen('CUSTOMER_ONBOARDING');
               }}
               activeOpacity={0.85}
             >
@@ -766,7 +795,7 @@ function MainApp() {
               style={[styles.roleCard, role === 'WORKER' && styles.roleCardActiveWorker]}
               onPress={() => {
                 setRole('WORKER');
-                setCurrentScreen('MAIN');
+                setCurrentScreen('WORKER_ONBOARDING');
               }}
               activeOpacity={0.85}
             >
@@ -797,6 +826,385 @@ function MainApp() {
   }
 
   // -------------------------------------------------------------
+
+  // -------------------------------------------------------------
+  // SCREEN 4A: CUSTOMER ONBOARDING FORM
+  // -------------------------------------------------------------
+  if (currentScreen === 'CUSTOMER_ONBOARDING') {
+    return (
+      <SafeAreaView style={styles.formSafeArea}>
+        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+        <View style={styles.formHeader}>
+          <TouchableOpacity
+            style={styles.formBackBtn}
+            onPress={() => setCurrentScreen('ROLE_SELECT')}
+            activeOpacity={0.7}
+          >
+            <ChevronRight size={22} color="#0F172A" style={{ transform: [{ rotate: '180deg' }] }} />
+          </TouchableOpacity>
+          <Text style={styles.formHeaderTitle}>Customer Profile Setup</Text>
+          <View style={{ width: 40 }} />
+        </View>
+
+        <ScrollView
+          contentContainerStyle={[styles.formScrollContent, { paddingBottom: insets.bottom + 30 }]}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Photo Picker */}
+          <View style={styles.photoUploadCenter}>
+            <TouchableOpacity
+              style={styles.photoPickerCircle}
+              onPress={() => setCustPhoto('custom_photo_selected')}
+              activeOpacity={0.8}
+            >
+              {custPhoto ? (
+                <View style={styles.photoSelectedCircle}>
+                  <Text style={styles.photoSelectedInitials}>RS</Text>
+                  <View style={styles.photoCheckBadge}>
+                    <Check size={12} color="#FFFFFF" strokeWidth={3} />
+                  </View>
+                </View>
+              ) : (
+                <View style={styles.photoPlaceholderWrap}>
+                  <Camera size={28} color="#4F46E5" />
+                  <Text style={styles.photoUploadPrompt}>Add Photo</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+            <Text style={styles.photoHelpText}>Upload profile photo for verified booking</Text>
+          </View>
+
+          {/* Form Fields */}
+          <View style={styles.formFieldsGroup}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.formLabel}>Full Customer Name *</Text>
+              <TextInput
+                style={styles.formTextInput}
+                placeholder="Enter full name"
+                placeholderTextColor="#94A3B8"
+                value={custName}
+                onChangeText={setCustName}
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.formLabel}>Mobile Number *</Text>
+              <TextInput
+                style={styles.formTextInput}
+                placeholder="Enter 10-digit mobile number"
+                placeholderTextColor="#94A3B8"
+                keyboardType="phone-pad"
+                value={custMobile}
+                onChangeText={setCustMobile}
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.formLabel}>Complete Address / Location *</Text>
+              <TextInput
+                style={[styles.formTextInput, { height: 80, textAlignVertical: 'top', paddingTop: 12 }]}
+                placeholder="House / Plot No, Street, Landmark, City"
+                placeholderTextColor="#94A3B8"
+                multiline
+                value={custAddress}
+                onChangeText={setCustAddress}
+              />
+            </View>
+          </View>
+
+          {/* Save Button */}
+          <TouchableOpacity
+            style={styles.formSubmitBtn}
+            onPress={() => {
+              if (!custName.trim() || !custMobile.trim() || !custAddress.trim()) {
+                Alert.alert('Required Fields', 'Please fill in your name, mobile, and address.');
+                return;
+              }
+              setCurrentScreen('CUSTOMER_READY');
+            }}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.formSubmitBtnText}>Save & Continue →</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  // -------------------------------------------------------------
+  // SCREEN 4B: CUSTOMER READY LOADING SCREEN (4s Timer)
+  // -------------------------------------------------------------
+  if (currentScreen === 'CUSTOMER_READY') {
+    return (
+      <View style={styles.loaderCenterScreen}>
+        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+        <View style={styles.loaderCardContent}>
+          <LottieView
+            source={require('./assets/customer_ready_lottie.json')}
+            autoPlay
+            loop
+            style={styles.readyLottieView}
+          />
+          <Text style={styles.readyHeadline}>Setting Up Mistri Pro for You</Text>
+          <Text style={styles.readySubtext}>
+            Personalizing certified mistris, contractors, and local pricing in your area...
+          </Text>
+          <View style={styles.readyPillBadge}>
+            <ActivityIndicator size="small" color="#4F46E5" />
+            <Text style={styles.readyPillText}>Readying your workspace...</Text>
+          </View>
+        </View>
+      </View>
+    );
+  }
+
+  // -------------------------------------------------------------
+  // SCREEN 4C: WORKER ONBOARDING FORM
+  // -------------------------------------------------------------
+  if (currentScreen === 'WORKER_ONBOARDING') {
+    const availableSkillsList = [
+      'Mason (राजमिस्त्री)',
+      'Plumber (प्लंबर)',
+      'Electrician (बिजली)',
+      'Carpenter (बढ़ई)',
+      'Painter (पेंटर)',
+      'Tiles & Marble',
+      'Welder / Fabricator',
+      'POP False Ceiling',
+      'Demolition Labour',
+    ];
+
+    const toggleSkill = (sk) => {
+      if (workerSkills.includes(sk)) {
+        setWorkerSkills(workerSkills.filter((s) => s !== sk));
+      } else {
+        setWorkerSkills([...workerSkills, sk]);
+      }
+    };
+
+    return (
+      <SafeAreaView style={styles.formSafeArea}>
+        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+        <View style={styles.formHeader}>
+          <TouchableOpacity
+            style={styles.formBackBtn}
+            onPress={() => setCurrentScreen('ROLE_SELECT')}
+            activeOpacity={0.7}
+          >
+            <ChevronRight size={22} color="#0F172A" style={{ transform: [{ rotate: '180deg' }] }} />
+          </TouchableOpacity>
+          <Text style={styles.formHeaderTitle}>Worker KYC Registration</Text>
+          <View style={{ width: 40 }} />
+        </View>
+
+        <ScrollView
+          contentContainerStyle={[styles.formScrollContent, { paddingBottom: insets.bottom + 40 }]}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Worker Photo Picker */}
+          <View style={styles.photoUploadCenter}>
+            <TouchableOpacity
+              style={styles.photoPickerCircle}
+              onPress={() => setWorkerPhoto('worker_photo_ok')}
+              activeOpacity={0.8}
+            >
+              {workerPhoto ? (
+                <View style={[styles.photoSelectedCircle, { backgroundColor: '#16A34A' }]}>
+                  <Text style={styles.photoSelectedInitials}>RS</Text>
+                  <View style={styles.photoCheckBadge}>
+                    <Check size={12} color="#FFFFFF" strokeWidth={3} />
+                  </View>
+                </View>
+              ) : (
+                <View style={styles.photoPlaceholderWrap}>
+                  <Camera size={28} color="#16A34A" />
+                  <Text style={[styles.photoUploadPrompt, { color: '#16A34A' }]}>Mistri Photo</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+            <Text style={styles.photoHelpText}>Clear passport size photo for government ID check</Text>
+          </View>
+
+          {/* Form Fields */}
+          <View style={styles.formFieldsGroup}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.formLabel}>Full Mistri / Worker Name *</Text>
+              <TextInput
+                style={styles.formTextInput}
+                placeholder="e.g. Ram Singh Mistri"
+                placeholderTextColor="#94A3B8"
+                value={workerName}
+                onChangeText={setWorkerName}
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.formLabel}>Primary Mobile Number *</Text>
+              <TextInput
+                style={styles.formTextInput}
+                placeholder="10-digit registered number"
+                placeholderTextColor="#94A3B8"
+                keyboardType="phone-pad"
+                value={workerMobile}
+                onChangeText={setWorkerMobile}
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.formLabel}>Alternate Mobile Number (Optional)</Text>
+              <TextInput
+                style={styles.formTextInput}
+                placeholder="Emergency or family number"
+                placeholderTextColor="#94A3B8"
+                keyboardType="phone-pad"
+                value={workerAltMobile}
+                onChangeText={setWorkerAltMobile}
+              />
+            </View>
+
+            {/* Drag & Multi-Select Skills Section */}
+            <View style={styles.inputGroup}>
+              <View style={styles.skillSectionTitleRow}>
+                <Text style={styles.formLabel}>Skills & Trade (Select Multiple) *</Text>
+                <Text style={styles.skillCountPill}>{workerSkills.length} Selected</Text>
+              </View>
+              <View style={styles.skillsChipsWrap}>
+                {availableSkillsList.map((sk) => {
+                  const isChecked = workerSkills.includes(sk);
+                  return (
+                    <TouchableOpacity
+                      key={sk}
+                      style={[styles.skillToggleChip, isChecked && styles.skillToggleChipActive]}
+                      onPress={() => toggleSkill(sk)}
+                      activeOpacity={0.75}
+                    >
+                      <View style={[styles.skillCheckCircle, isChecked && styles.skillCheckCircleActive]}>
+                        {isChecked && <Check size={10} color="#FFFFFF" strokeWidth={3} />}
+                      </View>
+                      <Text style={[styles.skillToggleText, isChecked && styles.skillToggleTextActive]}>
+                        {sk}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.formLabel}>Complete Residential Address *</Text>
+              <TextInput
+                style={[styles.formTextInput, { height: 75, textAlignVertical: 'top', paddingTop: 10 }]}
+                placeholder="Village / Town, Ward No, District, PIN code"
+                placeholderTextColor="#94A3B8"
+                multiline
+                value={workerAddress}
+                onChangeText={setWorkerAddress}
+              />
+            </View>
+
+            {/* Aadhaar Card Verification (Both Sides) */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.formLabel}>Government ID Verification (Aadhaar Both Sides) *</Text>
+              <View style={styles.aadhaarCardsRow}>
+                <TouchableOpacity
+                  style={[styles.aadhaarCardBox, aadhaarFront && styles.aadhaarCardBoxActive]}
+                  onPress={() => setAadhaarFront(!aadhaarFront)}
+                  activeOpacity={0.8}
+                >
+                  <UploadCloud size={24} color={aadhaarFront ? '#16A34A' : '#64748B'} />
+                  <Text style={[styles.aadhaarBoxTitle, aadhaarFront && { color: '#166534' }]}>
+                    Aadhaar Front {aadhaarFront && '✓'}
+                  </Text>
+                  <Text style={styles.aadhaarBoxSub}>Photo & Name side</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.aadhaarCardBox, aadhaarBack && styles.aadhaarCardBoxActive]}
+                  onPress={() => setAadhaarBack(!aadhaarBack)}
+                  activeOpacity={0.8}
+                >
+                  <UploadCloud size={24} color={aadhaarBack ? '#16A34A' : '#64748B'} />
+                  <Text style={[styles.aadhaarBoxTitle, aadhaarBack && { color: '#166534' }]}>
+                    Aadhaar Back {aadhaarBack && '✓'}
+                  </Text>
+                  <Text style={styles.aadhaarBoxSub}>Address side</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+
+          {/* Submit Application Button */}
+          <TouchableOpacity
+            style={[styles.formSubmitBtn, { backgroundColor: '#16A34A' }]}
+            onPress={() => {
+              if (!workerName.trim() || !workerMobile.trim() || workerSkills.length === 0) {
+                Alert.alert('Required Fields', 'Please fill name, mobile, and select at least one skill.');
+                return;
+              }
+              setCurrentScreen('WORKER_UNDER_REVIEW');
+            }}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.formSubmitBtnText}>Submit KYC Application 📋</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  // -------------------------------------------------------------
+  // SCREEN 4D: WORKER APPLICATION SUBMITTED & UNDER REVIEW
+  // -------------------------------------------------------------
+  if (currentScreen === 'WORKER_UNDER_REVIEW') {
+    return (
+      <View style={styles.loaderCenterScreen}>
+        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+        <View style={styles.loaderCardContent}>
+          <LottieView
+            source={require('./assets/worker_review_lottie.json')}
+            autoPlay
+            loop
+            style={styles.reviewLottieView}
+          />
+          <Text style={styles.reviewHeadline}>Application Submitted!</Text>
+          <Text style={styles.reviewSubtext}>
+            Your KYC application is currently under review by the Mistri Pro compliance team.
+          </Text>
+
+          <View style={styles.reviewStatusBox}>
+            <View style={styles.reviewStatusRow}>
+              <CheckCircle2 size={18} color="#16A34A" />
+              <Text style={styles.reviewStatusText}>Profile Details Received</Text>
+            </View>
+            <View style={styles.reviewStatusRow}>
+              <CheckCircle2 size={18} color="#16A34A" />
+              <Text style={styles.reviewStatusText}>Aadhaar Documents Uploaded</Text>
+            </View>
+            <View style={styles.reviewStatusRow}>
+              <ActivityIndicator size="small" color="#D97706" />
+              <Text style={[styles.reviewStatusText, { color: '#B45309', fontWeight: '700' }]}>
+                Aadhaar Verification Pending (Est. 2-4 hrs)
+              </Text>
+            </View>
+          </View>
+
+          <Text style={styles.reviewNoticeFooter}>
+            Once approved, you will get SMS confirmation and your Worker App tools will unlock automatically.
+          </Text>
+
+          {/* Explore Demo Home / Preview */}
+          <TouchableOpacity
+            style={styles.previewHomeBtn}
+            onPress={() => setCurrentScreen('MAIN')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.previewHomeBtnText}>Preview Dashboard (Demo Mode) →</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
   // SCREEN 5: MAIN APP (FIONIX + CHOOSINGHER ULTRA POLISHED UX)
   // -------------------------------------------------------------
   return (
@@ -3381,5 +3789,334 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 10,
     marginVertical: 4,
+  },
+
+
+  // FORM & ONBOARDING STYLES
+  formSafeArea: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  formHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  formBackBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  formHeaderTitle: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 17,
+    color: '#0F172A',
+  },
+  formScrollContent: {
+    paddingHorizontal: 22,
+    paddingTop: 18,
+  },
+  photoUploadCenter: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  photoPickerCircle: {
+    width: 86,
+    height: 86,
+    borderRadius: 43,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 2,
+    borderColor: '#E2E8F0',
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  photoPlaceholderWrap: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  photoUploadPrompt: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 11,
+    color: '#4F46E5',
+  },
+  photoSelectedCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#4F46E5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  photoSelectedInitials: {
+    fontFamily: 'Satoshi-Black',
+    fontSize: 26,
+    color: '#FFFFFF',
+  },
+  photoCheckBadge: {
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#16A34A',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  photoHelpText: {
+    fontFamily: 'Satoshi-Regular',
+    fontSize: 12,
+    color: '#64748B',
+  },
+  formFieldsGroup: {
+    gap: 16,
+    marginBottom: 28,
+  },
+  inputGroup: {},
+  formLabel: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 13,
+    color: '#0F172A',
+    marginBottom: 8,
+  },
+  formTextInput: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1.2,
+    borderColor: '#E2E8F0',
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    fontFamily: 'Satoshi-Medium',
+    fontSize: 14,
+    color: '#0F172A',
+  },
+  formSubmitBtn: {
+    backgroundColor: '#0F172A',
+    paddingVertical: 16,
+    borderRadius: 16,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+  },
+  formSubmitBtnText: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 15,
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
+  },
+
+  // SKILLS CHIPS & AADHAAR
+  skillSectionTitleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  skillCountPill: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 11,
+    color: '#16A34A',
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  skillsChipsWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  skillToggleChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+  },
+  skillToggleChipActive: {
+    backgroundColor: '#F0FDF4',
+    borderColor: '#16A34A',
+  },
+  skillCheckCircle: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: '#94A3B8',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  skillCheckCircleActive: {
+    backgroundColor: '#16A34A',
+    borderColor: '#16A34A',
+  },
+  skillToggleText: {
+    fontFamily: 'Satoshi-Medium',
+    fontSize: 12,
+    color: '#475569',
+  },
+  skillToggleTextActive: {
+    fontFamily: 'Satoshi-Bold',
+    color: '#166534',
+  },
+  aadhaarCardsRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  aadhaarCardBox: {
+    flex: 1,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderRadius: 16,
+    padding: 14,
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+  },
+  aadhaarCardBoxActive: {
+    borderColor: '#16A34A',
+    backgroundColor: '#F0FDF4',
+  },
+  aadhaarBoxTitle: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 12,
+    color: '#0F172A',
+    marginTop: 6,
+    marginBottom: 2,
+  },
+  aadhaarBoxSub: {
+    fontFamily: 'Satoshi-Regular',
+    fontSize: 10,
+    color: '#64748B',
+  },
+
+  // LOADER / READY & REVIEW SCREEN
+  loaderCenterScreen: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 28,
+  },
+  loaderCardContent: {
+    alignItems: 'center',
+    width: '100%',
+  },
+  readyLottieView: {
+    width: 240,
+    height: 240,
+    marginBottom: 10,
+  },
+  readyHeadline: {
+    fontFamily: 'Satoshi-Black',
+    fontSize: 24,
+    color: '#0F172A',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  readySubtext: {
+    fontFamily: 'Satoshi-Regular',
+    fontSize: 14,
+    lineHeight: 21,
+    color: '#64748B',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  readyPillBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+  },
+  readyPillText: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 12,
+    color: '#4F46E5',
+  },
+
+  reviewLottieView: {
+    width: 220,
+    height: 220,
+    marginBottom: 6,
+  },
+  reviewHeadline: {
+    fontFamily: 'Satoshi-Black',
+    fontSize: 26,
+    color: '#0F172A',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  reviewSubtext: {
+    fontFamily: 'Satoshi-Regular',
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#64748B',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  reviewStatusBox: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 18,
+    padding: 16,
+    width: '100%',
+    gap: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 18,
+  },
+  reviewStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  reviewStatusText: {
+    fontFamily: 'Satoshi-Medium',
+    fontSize: 13,
+    color: '#1E293B',
+  },
+  reviewNoticeFooter: {
+    fontFamily: 'Satoshi-Regular',
+    fontSize: 12,
+    color: '#94A3B8',
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 24,
+  },
+  previewHomeBtn: {
+    backgroundColor: '#0F172A',
+    paddingVertical: 14,
+    paddingHorizontal: 22,
+    borderRadius: 16,
+    width: '100%',
+    alignItems: 'center',
+  },
+  previewHomeBtnText: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 14,
+    color: '#FFFFFF',
   },
 });
