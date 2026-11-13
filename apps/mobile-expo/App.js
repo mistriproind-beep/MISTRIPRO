@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFonts } from 'expo-font';
+import LottieView from 'lottie-react-native';
 import {
   Home,
   Briefcase,
@@ -664,11 +665,14 @@ function MainApp() {
           contentContainerStyle={[styles.signInContent, { paddingBottom: Math.max(insets.bottom + 20, 30) }]}
           showsVerticalScrollIndicator={false}
         >
-          {/* Top Green/Indigo User-Plus Icon */}
-          <View style={styles.signInIconWrapper}>
-            <View style={styles.signInIconOuter}>
-              <UserPlus size={36} color="#16A34A" strokeWidth={2.2} />
-            </View>
+          {/* Top Animated Lottie Graphics */}
+          <View style={styles.signInLottieWrapper}>
+            <LottieView
+              source={require('./assets/login_lottie.json')}
+              autoPlay
+              loop
+              style={styles.signInLottieView}
+            />
           </View>
 
           {/* Heading and subtext */}
@@ -1990,18 +1994,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  signInIconWrapper: {
-    marginBottom: 28,
-  },
-  signInIconOuter: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#F0FDF4',
-    borderWidth: 2,
-    borderColor: '#DCFCE7',
-    justifyContent: 'center',
+  signInLottieWrapper: {
+    width: 160,
+    height: 160,
     alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  signInLottieView: {
+    width: 160,
+    height: 160,
   },
   signInMainHeading: {
     fontFamily: 'Satoshi-Bold',
