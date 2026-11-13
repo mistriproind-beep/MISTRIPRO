@@ -689,7 +689,7 @@ function MainApp() {
             >
               <Image
                 source={require('./assets/google_logo.png')}
-                style={styles.authGoogleLogoImage}
+                style={{ width: 22, height: 22, marginRight: 12 }}
                 resizeMode="contain"
               />
               <Text style={styles.authBlackButtonText}>{t.continueGoogle}</Text>
@@ -2007,11 +2007,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 8,
   },
-  authGoogleG: {
-    fontFamily: 'Satoshi-Black',
-    fontSize: 20,
-    color: '#4285F4',
-    marginRight: 10,
+  authGoogleLogoImage: {
+    width: 22,
+    height: 22,
+    marginRight: 12,
   },
   authBlackButtonText: {
     fontFamily: 'Satoshi-Medium',
