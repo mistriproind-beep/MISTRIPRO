@@ -457,25 +457,36 @@ export default function App() {
 
 function MainApp() {
   const insets = useSafeAreaInsets();
-  // Generic Image Picker from Phone Gallery
+  // Instant Image Picker (Zero Lag & Direct Gallery Opening)
   const pickImage = async (setImageUri) => {
     try {
-      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!permissionResult.granted) {
-        Alert.alert('Permission Required', 'Mistri Pro needs access to your camera roll to upload photos.');
-        return;
-      }
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [4, 3],
-        quality: 0.8,
+        mediaTypes: ['images'],
+        allowsEditing: false, // Disabling crop/editing screen removes the 2-3s freeze lag on iOS/Android
+        quality: 0.7,
       });
       if (!result.canceled && result.assets && result.assets.length > 0) {
         setImageUri(result.assets[0].uri);
       }
     } catch (err) {
-      Alert.alert('Upload Error', 'Could not access photo library: ' + err.message);
+      // Fallback permission request only if blocked
+      try {
+        const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (perm.granted) {
+          const res = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ['images'],
+            allowsEditing: false,
+            quality: 0.7,
+          });
+          if (!res.canceled && res.assets && res.assets.length > 0) {
+            setImageUri(res.assets[0].uri);
+          }
+        } else {
+          Alert.alert('Permission Needed', 'Please allow photo library access from Settings to upload.');
+        }
+      } catch (e) {
+        console.log('Image picker error:', e);
+      }
     }
   };
 
