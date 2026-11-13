@@ -593,14 +593,14 @@ function MainApp() {
         <StatusBar barStyle="light-content" backgroundColor="#1E50C8" />
         <View style={styles.langScreenBackground} />
 
-        {/* Top Minimal Branding */}
+        {/* Top Minimal Branding with official mistripro logo */}
         <View style={styles.langTopBranding}>
           <Image
-            source={require('./assets/logo.png')}
-            style={styles.langSmallLogo}
+            source={require('./assets/splash_logo.png')}
+            style={styles.langSplashLogo}
             resizeMode="contain"
           />
-          <Text style={styles.langBrandTitle}>{t.appName}</Text>
+          <Text style={styles.langBrandSub}>{t.tagline}</Text>
         </View>
 
         {/* Laundrify Slide-up White Sheet */}
@@ -1835,19 +1835,28 @@ const styles = StyleSheet.create({
   },
   langTopBranding: {
     alignItems: 'center',
-    marginBottom: 40,
+    justifyContent: 'center',
+    marginBottom: 32,
+    paddingHorizontal: 20,
   },
-  langSmallLogo: {
-    width: 48,
-    height: 48,
-    tintColor: '#FFFFFF',
+  langSplashLogo: {
+    width: 260,
+    height: 75,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
   },
-  langBrandTitle: {
-    fontFamily: 'Satoshi-Bold',
-    fontSize: 22,
-    color: '#FFFFFF',
-    letterSpacing: 1.2,
+  langBrandSub: {
+    fontFamily: 'Satoshi-Medium',
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.9)',
+    letterSpacing: 0.5,
   },
   langBottomSheet: {
     backgroundColor: '#FFFFFF',
