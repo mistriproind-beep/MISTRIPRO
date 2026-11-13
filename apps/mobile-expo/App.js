@@ -21,7 +21,6 @@ import {
   User,
   Bell,
   Search,
-  Filter,
   MapPin,
   CheckCircle2,
   ChevronRight,
@@ -34,11 +33,10 @@ import {
   Calendar,
   ThumbsUp,
   CreditCard,
-  Phone,
-  MessageSquare,
-  Eye,
   Check,
   RotateCcw,
+  Sparkles,
+  Award,
 } from 'lucide-react-native';
 
 const { width } = Dimensions.get('window');
@@ -48,25 +46,25 @@ const I18N = {
   en: {
     appName: 'MISTRI PRO',
     tagline: 'Skilled Hands. Trusted Work.',
-    hello: 'Hello',
-    location: 'Jaipur, Rajasthan',
-    activeProject: 'Active Project',
-    postRequirement: 'Post Requirement',
-    trackShipping: 'Track Site Progress',
+    hello: 'Good morning',
+    location: 'Vaishali Nagar, Jaipur',
+    activeProject: 'ACTIVE REQUIREMENT',
+    postRequirement: '+ Post Requirement',
+    trackShipping: 'Track Progress →',
     searchPlaceholder: 'Search masons, carpenters, plumbers...',
     currentTracking: 'Current Work Progress',
     trackingId: 'Tender ID',
-    statusInTransit: 'Work In Progress',
+    statusInTransit: 'WORK IN PROGRESS',
     recentActivities: 'Top Verified Workers Nearby',
-    seeAll: 'See all',
+    seeAll: 'View all',
     vacanciesLeft: 'vacancies left',
-    bidNow: 'View & Apply',
-    selectWorker: 'Select Worker',
-    hired: 'Hired',
-    balance: 'Total Recorded Earnings',
+    bidNow: 'Apply for Job',
+    selectWorker: 'Hire Worker',
+    hired: 'Worker Hired',
+    balance: 'RECORDED EARNINGS',
     topUp: 'Ledger',
     findJobs: 'Find Nearby Jobs',
-    trackBids: 'Track My Bids',
+    trackBids: 'My Bids (4)',
     weeklyStatus: 'Weekly Site Performance',
     hoursWorked: '36 hrs',
     homeTab: 'Home',
@@ -75,19 +73,19 @@ const I18N = {
     reviewTab: 'Reviews',
     profileTab: 'Profile',
     customerRole: 'Customer',
-    workerRole: 'Worker (मिस्त्री)',
+    workerRole: 'Skilled Worker',
     switchRole: 'Switch Persona',
-    verifiedBadge: 'KYC Verified',
+    verifiedBadge: 'Verified Worker',
   },
   hi: {
     appName: 'मिस्त्री प्रो',
     tagline: 'कुशल हाथ। विश्वसनीय कार्य।',
-    hello: 'नमस्ते',
-    location: 'जयपुर, राजस्थान',
-    activeProject: 'सक्रिय कार्य',
+    hello: 'शुभ प्रभात',
+    location: 'वैशाली नगर, जयपुर',
+    activeProject: 'सक्रिय कार्य आवश्यकता',
     postRequirement: '+ नया काम पोस्ट करें',
-    trackShipping: 'साइट प्रगति देखें',
-    searchPlaceholder: 'कारीगर, बढ़ई, प्लंबर खोजें...',
+    trackShipping: 'कार्य प्रगति देखें →',
+    searchPlaceholder: 'राजमिस्त्री, बढ़ई, प्लंबर खोजें...',
     currentTracking: 'चल रही कार्य प्रगति',
     trackingId: 'टेंडर आईडी',
     statusInTransit: 'कार्य प्रगति पर',
@@ -96,11 +94,11 @@ const I18N = {
     vacanciesLeft: 'पद रिक्त',
     bidNow: 'आवेदन करें',
     selectWorker: 'कारीगर चुनें',
-    hired: 'चयनित',
+    hired: 'चयनित कारीगर',
     balance: 'कुल दर्ज कमाई',
     topUp: 'लेजर',
     findJobs: 'आसपास काम खोजें',
-    trackBids: 'मेरे आवेदन',
+    trackBids: 'मेरे आवेदन (4)',
     weeklyStatus: 'साप्ताहिक कार्य प्रदर्शन',
     hoursWorked: '36 घंटे',
     homeTab: 'होम',
@@ -116,11 +114,11 @@ const I18N = {
   gu: {
     appName: 'મિસ્ત્રી પ્રો',
     tagline: 'કુશળ હાથ. વિશ્વસનીય કામ.',
-    hello: 'નમસ્તે',
+    hello: 'શુભ સવાર',
     location: 'જયપુર, રાજસ્થાન',
     activeProject: 'ચાલુ પ્રોજેક્ટ',
     postRequirement: '+ કામ પોસ્ટ કરો',
-    trackShipping: 'કામની પ્રગતિ',
+    trackShipping: 'પ્રગતિ જુઓ →',
     searchPlaceholder: 'કડિયા, સુથાર, પ્લમ્બર શોધો...',
     currentTracking: 'કામ ની પ્રગતિ',
     trackingId: 'ટેન્ડર આઈડી',
@@ -150,11 +148,11 @@ const I18N = {
   mr: {
     appName: 'मिस्त्री प्रो',
     tagline: 'कुशल हात. विश्वासार्ह काम.',
-    hello: 'नमस्कार',
+    hello: 'शुभ सकाळ',
     location: 'जयपूर, राजस्थान',
     activeProject: 'सक्रिय प्रकल्प',
     postRequirement: '+ काम पोस्ट करा',
-    trackShipping: 'प्रगती तपासा',
+    trackShipping: 'प्रगती तपासा →',
     searchPlaceholder: 'गवंडी, सुतार, प्लंबर शोधा...',
     currentTracking: 'कामाची सद्यस्थिती',
     trackingId: 'निविदा आयडी',
@@ -184,14 +182,14 @@ const I18N = {
 };
 
 const CATEGORIES = [
-  { id: '1', name: 'Mason\nराजमिस्त्री', icon: '🧱', count: '32 nearby', bg: '#EFF6FF' },
-  { id: '2', name: 'Labour\nमजदूर', icon: '👷', count: '54 nearby', bg: '#FEF3C7' },
-  { id: '3', name: 'Carpenter\nबढ़ई', icon: '🪚', count: '18 nearby', bg: '#FDF2F8' },
-  { id: '4', name: 'Plumber\nप्लंबर', icon: '🔧', count: '21 nearby', bg: '#F0FDF4' },
-  { id: '5', name: 'Electrician\nइलेक्ट्रीशियन', icon: '⚡', count: '29 nearby', bg: '#FFFBEB' },
-  { id: '6', name: 'Tiles\nफ्लोरिंग', icon: '◻️', count: '14 nearby', bg: '#F5F3FF' },
-  { id: '7', name: 'Painter\nपेंटर', icon: '🎨', count: '25 nearby', bg: '#F1F5F9' },
-  { id: '8', name: 'False Ceiling\nपीओपी', icon: '🏛️', count: '11 nearby', bg: '#FEF2F2' },
+  { id: '1', name: 'Mason\nराजमिस्त्री', icon: '🧱', count: '32 verified', bg: '#EFF6FF', border: '#DBEAFE' },
+  { id: '2', name: 'Labour\nमजदूर', icon: '👷', count: '54 verified', bg: '#FEF3C7', border: '#FDE68A' },
+  { id: '3', name: 'Carpenter\nबढ़ई', icon: '🪚', count: '18 verified', bg: '#FDF2F8', border: '#FCE7F3' },
+  { id: '4', name: 'Plumber\nप्लंबर', icon: '🔧', count: '21 verified', bg: '#F0FDF4', border: '#DCFCE7' },
+  { id: '5', name: 'Electrician\nइलेक्ट्रीशियन', icon: '⚡', count: '29 verified', bg: '#FFFBEB', border: '#FEF3C7' },
+  { id: '6', name: 'Tiles\nफ्लोरिंग', icon: '◻️', count: '14 verified', bg: '#F5F3FF', border: '#EDE9FE' },
+  { id: '7', name: 'Painter\nपेंटर', icon: '🎨', count: '25 verified', bg: '#F1F5F9', border: '#E2E8F0' },
+  { id: '8', name: 'False Ceiling\nपीओपी', icon: '🏛️', count: '11 verified', bg: '#FEF2F2', border: '#FEE2E2' },
 ];
 
 export default function App() {
@@ -234,14 +232,14 @@ export default function App() {
     setRole(next);
   };
 
-  // Top App Bar (Victogramm / Fionix reference)
+  // 1. TOP APP BAR (Ultra-clean Google / Material 3 Style)
+  // Per user instruction:
+  // - REMOVED app logo from header
+  // - REMOVED role switch from header (strictly in Profile tab now)
+  // - Clear larger legible fonts & icons
   const renderTopBar = () => (
     <View style={styles.topBar}>
-      <View style={styles.userProfileRow}>
-        <Image
-          source={require('./assets/logo.png')}
-          style={{ width: 38, height: 38, borderRadius: 12, marginRight: 10 }}
-        />
+      <View style={styles.topBarLeft}>
         <View style={styles.avatarWrapper}>
           <Image
             source={{
@@ -254,113 +252,123 @@ export default function App() {
           />
           <View style={styles.onlineDot} />
         </View>
-        <View style={{ marginLeft: 10 }}>
-          <Text style={styles.greetingText}>
-            {t.hello}, <Text style={styles.userNameText}>{role === 'CUSTOMER' ? 'RAMESH' : 'RAJESH'}</Text>
+
+        <View style={{ marginLeft: 12 }}>
+          <Text style={styles.greetingSub}>{t.hello},</Text>
+          <Text style={styles.greetingName}>
+            {role === 'CUSTOMER' ? 'Ramesh Sharma' : 'Rajesh Kumar'}
           </Text>
           <View style={styles.locationPill}>
-            <MapPin size={11} color="#6366F1" />
+            <MapPin size={13} color="#4F46E5" />
             <Text style={styles.locationText}>{t.location}</Text>
           </View>
         </View>
       </View>
 
-      <View style={styles.topRightActions}>
-        <TouchableOpacity style={styles.langPill} onPress={toggleLang}>
-          <Text style={styles.langPillText}>{lang.toUpperCase()}</Text>
+      <View style={styles.topBarRight}>
+        <TouchableOpacity style={styles.langPillBtn} onPress={toggleLang} activeOpacity={0.7}>
+          <Text style={styles.langPillText}>{lang.toUpperCase()} 🌐</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.roleToggleBadge}
-          onPress={toggleRole}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.roleToggleText}>
-            {role === 'CUSTOMER' ? '👷 Worker' : '🏠 Customer'}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.iconCircleBtn}>
-          <Bell size={18} color="#0F172A" />
+
+        <TouchableOpacity style={styles.notifCircleBtn} activeOpacity={0.7}>
+          <Bell size={20} color="#0F172A" />
           <View style={styles.notifBadge} />
         </TouchableOpacity>
       </View>
     </View>
   );
 
-  // Bottom Floating Dock Menu Navigation (Victogramm Reference 1)
-  const renderBottomDock = () => (
-    <View style={styles.dockContainer}>
-      <View style={styles.dockBar}>
-        {/* 1. HOME TAB */}
+  // 2. FIXED SOLID BOTTOM NAVIGATION BAR (Google / High-End Quality)
+  // Rock-solid fixed bottom bar that never obscures page content
+  const renderBottomNav = () => (
+    <View style={styles.bottomNavWrapper}>
+      <View style={styles.bottomNavBar}>
+        {/* TAB 1: HOME */}
         <TouchableOpacity
-          style={[styles.dockItem, activeTab === 'HOME' && styles.dockItemActive]}
+          style={[styles.navItem, activeTab === 'HOME' && styles.navItemActive]}
           onPress={() => setActiveTab('HOME')}
+          activeOpacity={0.8}
         >
           <Home
-            size={20}
+            size={22}
             color={activeTab === 'HOME' ? '#FFFFFF' : '#64748B'}
             strokeWidth={activeTab === 'HOME' ? 2.5 : 2}
           />
-          {activeTab === 'HOME' && <Text style={styles.dockLabelActive}>{t.homeTab}</Text>}
+          <Text style={[styles.navLabel, activeTab === 'HOME' && styles.navLabelActive]}>
+            {t.homeTab}
+          </Text>
         </TouchableOpacity>
 
-        {/* 2. WORK / PROJECTS TAB */}
+        {/* TAB 2: WORK */}
         <TouchableOpacity
-          style={[styles.dockItem, activeTab === 'WORK' && styles.dockItemActive]}
+          style={[styles.navItem, activeTab === 'WORK' && styles.navItemActive]}
           onPress={() => setActiveTab('WORK')}
+          activeOpacity={0.8}
         >
           <Briefcase
-            size={20}
+            size={22}
             color={activeTab === 'WORK' ? '#FFFFFF' : '#64748B'}
             strokeWidth={activeTab === 'WORK' ? 2.5 : 2}
           />
-          {activeTab === 'WORK' && <Text style={styles.dockLabelActive}>{t.workTab}</Text>}
+          <Text style={[styles.navLabel, activeTab === 'WORK' && styles.navLabelActive]}>
+            {t.workTab}
+          </Text>
         </TouchableOpacity>
 
-        {/* 3. POST / TENDER CENTER ACTION */}
+        {/* CENTER ACTION: POST / TENDER */}
         <TouchableOpacity
-          style={styles.dockCenterBtn}
+          style={styles.navCenterBtn}
           onPress={() => {
             setPostStep(1);
             setPostModalVisible(true);
           }}
           activeOpacity={0.85}
         >
-          <Plus size={24} color="#FFFFFF" strokeWidth={2.5} />
+          <Plus size={26} color="#FFFFFF" strokeWidth={2.8} />
         </TouchableOpacity>
 
-        {/* 4. REVIEWS TAB */}
+        {/* TAB 4: REVIEWS */}
         <TouchableOpacity
-          style={[styles.dockItem, activeTab === 'REVIEWS' && styles.dockItemActive]}
+          style={[styles.navItem, activeTab === 'REVIEWS' && styles.navItemActive]}
           onPress={() => setActiveTab('REVIEWS')}
+          activeOpacity={0.8}
         >
           <Star
-            size={20}
+            size={22}
             color={activeTab === 'REVIEWS' ? '#FFFFFF' : '#64748B'}
             strokeWidth={activeTab === 'REVIEWS' ? 2.5 : 2}
           />
-          {activeTab === 'REVIEWS' && <Text style={styles.dockLabelActive}>{t.reviewTab}</Text>}
+          <Text style={[styles.navLabel, activeTab === 'REVIEWS' && styles.navLabelActive]}>
+            {t.reviewTab}
+          </Text>
         </TouchableOpacity>
 
-        {/* 5. PROFILE TAB */}
+        {/* TAB 5: PROFILE */}
         <TouchableOpacity
-          style={[styles.dockItem, activeTab === 'PROFILE' && styles.dockItemActive]}
+          style={[styles.navItem, activeTab === 'PROFILE' && styles.navItemActive]}
           onPress={() => setActiveTab('PROFILE')}
+          activeOpacity={0.8}
         >
           <User
-            size={20}
+            size={22}
             color={activeTab === 'PROFILE' ? '#FFFFFF' : '#64748B'}
             strokeWidth={activeTab === 'PROFILE' ? 2.5 : 2}
           />
-          {activeTab === 'PROFILE' && <Text style={styles.dockLabelActive}>{t.profileTab}</Text>}
+          <Text style={[styles.navLabel, activeTab === 'PROFILE' && styles.navLabelActive]}>
+            {t.profileTab}
+          </Text>
         </TouchableOpacity>
       </View>
     </View>
   );
 
-  // TAB 1: HOME SCREEN (Customer & Worker)
+  // 3. TAB 1: HOME SCREEN (Customer & Worker)
   const renderHomeScreen = () => (
-    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 110 }}>
-      {/* Sleek Dark Hero Card (Victogramm / Fionix reference) */}
+    <ScrollView
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={{ paddingBottom: 110 }}
+    >
+      {/* Sleek Dark Hero Card */}
       <View style={styles.heroCard}>
         {role === 'CUSTOMER' ? (
           <>
@@ -368,6 +376,7 @@ export default function App() {
               <View>
                 <Text style={styles.heroSubText}>{t.activeProject}</Text>
                 <Text style={styles.heroMainText}>MISTRI-26110001</Text>
+                <Text style={styles.heroProjectName}>Bathroom Renovation & Plastering</Text>
               </View>
               <TouchableOpacity
                 style={styles.heroWhitePill}
@@ -375,6 +384,7 @@ export default function App() {
                   setPostStep(1);
                   setPostModalVisible(true);
                 }}
+                activeOpacity={0.8}
               >
                 <Text style={styles.heroWhitePillText}>+ New Tender</Text>
               </TouchableOpacity>
@@ -388,7 +398,7 @@ export default function App() {
               <View style={styles.heroDivider} />
               <View style={styles.heroStatItem}>
                 <Text style={styles.heroStatValue}>₹50,000</Text>
-                <Text style={styles.heroStatLabel}>Project Budget</Text>
+                <Text style={styles.heroStatLabel}>Budget (Negotiable)</Text>
               </View>
               <View style={styles.heroDivider} />
               <View style={styles.heroStatItem}>
@@ -404,15 +414,18 @@ export default function App() {
                   setPostStep(1);
                   setPostModalVisible(true);
                 }}
+                activeOpacity={0.8}
               >
-                <Plus size={16} color="#0F172A" />
+                <Plus size={18} color="#0F172A" strokeWidth={2.5} />
                 <Text style={styles.heroActionText}>{t.postRequirement}</Text>
               </TouchableOpacity>
+
               <TouchableOpacity
-                style={[styles.heroActionBtn, { backgroundColor: 'rgba(255,255,255,0.12)' }]}
+                style={[styles.heroActionBtn, { backgroundColor: 'rgba(255,255,255,0.14)' }]}
                 onPress={() => setActiveTab('WORK')}
+                activeOpacity={0.8}
               >
-                <TrendingUp size={16} color="#FFFFFF" />
+                <TrendingUp size={18} color="#FFFFFF" strokeWidth={2.5} />
                 <Text style={[styles.heroActionText, { color: '#FFFFFF' }]}>{t.trackShipping}</Text>
               </TouchableOpacity>
             </View>
@@ -422,12 +435,14 @@ export default function App() {
             <View style={styles.heroTopRow}>
               <View>
                 <Text style={styles.heroSubText}>{t.balance}</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Text style={styles.heroMainText}>₹28,500.00</Text>
-                  <Eye size={18} color="#94A3B8" />
-                </View>
+                <Text style={styles.heroMainText}>₹28,500.00</Text>
+                <Text style={styles.heroProjectName}>Verified Mason & Team Leader</Text>
               </View>
-              <TouchableOpacity style={styles.heroWhitePill} onPress={() => setActiveTab('WORK')}>
+              <TouchableOpacity
+                style={styles.heroWhitePill}
+                onPress={() => setActiveTab('WORK')}
+                activeOpacity={0.8}
+              >
                 <Text style={styles.heroWhitePillText}>{t.topUp}</Text>
               </TouchableOpacity>
             </View>
@@ -444,21 +459,27 @@ export default function App() {
               </View>
               <View style={styles.heroDivider} />
               <View style={styles.heroStatItem}>
-                <Text style={[styles.heroStatValue, { color: '#4ADE80' }]}>4.9 ★</Text>
+                <Text style={[styles.heroStatValue, { color: '#4ADE80' }]}>★ 4.9</Text>
                 <Text style={styles.heroStatLabel}>Reputation</Text>
               </View>
             </View>
 
             <View style={styles.heroActionsRow}>
-              <TouchableOpacity style={styles.heroActionBtn} onPress={() => setActiveTab('WORK')}>
-                <Search size={16} color="#0F172A" />
+              <TouchableOpacity
+                style={styles.heroActionBtn}
+                onPress={() => setActiveTab('WORK')}
+                activeOpacity={0.8}
+              >
+                <Search size={18} color="#0F172A" strokeWidth={2.5} />
                 <Text style={styles.heroActionText}>{t.findJobs}</Text>
               </TouchableOpacity>
+
               <TouchableOpacity
-                style={[styles.heroActionBtn, { backgroundColor: 'rgba(255,255,255,0.12)' }]}
+                style={[styles.heroActionBtn, { backgroundColor: 'rgba(255,255,255,0.14)' }]}
                 onPress={() => setActiveTab('WORK')}
+                activeOpacity={0.8}
               >
-                <Briefcase size={16} color="#FFFFFF" />
+                <Briefcase size={18} color="#FFFFFF" strokeWidth={2.5} />
                 <Text style={[styles.heroActionText, { color: '#FFFFFF' }]}>{t.trackBids}</Text>
               </TouchableOpacity>
             </View>
@@ -466,10 +487,10 @@ export default function App() {
         )}
       </View>
 
-      {/* Clean Search Bar with Filter (Victogramm Reference 1) */}
+      {/* Clean Google-Tier Search Bar */}
       <View style={styles.searchRow}>
         <View style={styles.searchBar}>
-          <Search size={18} color="#64748B" />
+          <Search size={20} color="#64748B" />
           <TextInput
             placeholder={t.searchPlaceholder}
             placeholderTextColor="#94A3B8"
@@ -478,31 +499,36 @@ export default function App() {
             onChangeText={setSearchQuery}
           />
         </View>
-        <TouchableOpacity style={styles.filterBtn}>
-          <SlidersHorizontal size={18} color="#0F172A" />
+        <TouchableOpacity style={styles.filterBtn} activeOpacity={0.7}>
+          <SlidersHorizontal size={20} color="#0F172A" />
         </TouchableOpacity>
       </View>
 
-      {/* Service Categories (Clean Tiles with icons) */}
+      {/* Service Categories (Horizontal scroll with ample padding) */}
       <View style={styles.sectionWrap}>
         <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>Explore Categories</Text>
-          <TouchableOpacity onPress={() => setActiveTab('WORK')}>
-            <Text style={styles.sectionSeeAll}>{t.seeAll}</Text>
+          <Text style={styles.sectionTitle}>Explore Services</Text>
+          <TouchableOpacity onPress={() => setActiveTab('WORK')} activeOpacity={0.7}>
+            <Text style={styles.sectionSeeAll}>{t.seeAll} →</Text>
           </TouchableOpacity>
         </View>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.catScroll}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.catScroll}
+        >
           {CATEGORIES.map((c) => (
             <TouchableOpacity
               key={c.id}
-              style={[styles.catCardNew, { backgroundColor: c.bg }]}
+              style={[styles.catCard, { backgroundColor: c.bg, borderColor: c.border }]}
               onPress={() => {
                 setPostStep(1);
                 setPostModalVisible(true);
               }}
+              activeOpacity={0.8}
             >
-              <Text style={{ fontSize: 26 }}>{c.icon}</Text>
+              <Text style={{ fontSize: 32 }}>{c.icon}</Text>
               <Text style={styles.catCardName}>{c.name}</Text>
               <Text style={styles.catCardCount}>{c.count}</Text>
             </TouchableOpacity>
@@ -510,17 +536,18 @@ export default function App() {
         </ScrollView>
       </View>
 
-      {/* Live Work Tracking Progress (Directly inspired by Reference 1 - Current Tracking) */}
+      {/* 4. CURRENT WORK PROGRESS (PERFECTLY ALIGNED TIMELINE) */}
+      {/* Directly inspired by Reference 1 (@victogramm) with centered circle nodes & connecting lines */}
       <View style={styles.sectionWrap}>
         <View style={styles.sectionHeaderRow}>
           <Text style={styles.sectionTitle}>{t.currentTracking}</Text>
-          <TouchableOpacity onPress={() => setActiveTab('WORK')}>
-            <Text style={styles.sectionSeeAll}>{t.seeAll}</Text>
+          <TouchableOpacity onPress={() => setActiveTab('WORK')} activeOpacity={0.7}>
+            <Text style={styles.sectionSeeAll}>{t.seeAll} →</Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.trackingCard}>
-          <View style={styles.trackingTop}>
+          <View style={styles.trackingTopRow}>
             <View>
               <Text style={styles.trackingLabel}>{t.trackingId}:</Text>
               <Text style={styles.trackingCode}>MISTRI-26110001</Text>
@@ -530,74 +557,88 @@ export default function App() {
             </View>
           </View>
 
-          <View style={styles.routeRow}>
+          <View style={styles.projectInfoRow}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.routeLabel}>Project</Text>
-              <Text style={styles.routeName}>Bathroom Renovation</Text>
-              <Text style={styles.routeDate}>16 Nov 2026</Text>
+              <Text style={styles.projectInfoLabel}>Project Requirement</Text>
+              <Text style={styles.projectInfoTitle}>Bathroom Renovation</Text>
+              <Text style={styles.projectInfoDate}>3 Masons, 5 Labourers needed</Text>
             </View>
             <View style={{ flex: 1, alignItems: 'flex-end' }}>
-              <Text style={styles.routeLabel}>Site Location</Text>
-              <Text style={styles.routeName}>Vaishali Nagar, Jaipur</Text>
-              <Text style={styles.routeDate}>30 Days Duration</Text>
+              <Text style={styles.projectInfoLabel}>Site Location</Text>
+              <Text style={styles.projectInfoTitle}>Vaishali Nagar, Jaipur</Text>
+              <Text style={styles.projectInfoDate}>30 Days Duration</Text>
             </View>
           </View>
 
-          {/* Stepper Timeline (Reference 1) */}
-          <View style={styles.timelineRow}>
-            <View style={styles.timelineStep}>
-              <View style={[styles.timelineCircle, styles.timelineCircleDone]}>
-                <Check size={12} color="#FFFFFF" strokeWidth={3} />
-              </View>
-              <Text style={styles.timelineStepLabel}>Posted</Text>
-              <Text style={styles.timelineStepTime}>₹299 Paid</Text>
+          {/* Stepper Timeline: Pixel-Perfect Node Alignment */}
+          <View style={styles.stepperContainer}>
+            {/* Background Connector Lines (Precisely Centered behind nodes) */}
+            <View style={styles.connectorTrack}>
+              <View style={[styles.connectorSegment, styles.connectorDone]} />
+              <View style={[styles.connectorSegment, styles.connectorDone]} />
+              <View style={[styles.connectorSegment, styles.connectorPending]} />
             </View>
 
-            <View style={[styles.timelineLine, styles.timelineLineDone]} />
-
-            <View style={styles.timelineStep}>
-              <View style={[styles.timelineCircle, styles.timelineCircleDone]}>
-                <Check size={12} color="#FFFFFF" strokeWidth={3} />
+            {/* Stepper Nodes */}
+            <View style={styles.nodesRow}>
+              {/* Node 1: Posted */}
+              <View style={styles.nodeColumn}>
+                <View style={[styles.nodeCircle, styles.nodeCircleDone]}>
+                  <Check size={14} color="#FFFFFF" strokeWidth={3} />
+                </View>
+                <Text style={styles.nodeTitle}>Posted</Text>
+                <Text style={styles.nodeSub}>₹299 Paid</Text>
               </View>
-              <Text style={styles.timelineStepLabel}>Matched</Text>
-              <Text style={styles.timelineStepTime}>Wave 1 (0-5km)</Text>
-            </View>
 
-            <View style={[styles.timelineLine, styles.timelineLineDone]} />
-
-            <View style={styles.timelineStep}>
-              <View style={[styles.timelineCircle, styles.timelineCircleActive]}>
-                <View style={styles.timelineInnerDot} />
+              {/* Node 2: Matched */}
+              <View style={styles.nodeColumn}>
+                <View style={[styles.nodeCircle, styles.nodeCircleDone]}>
+                  <Check size={14} color="#FFFFFF" strokeWidth={3} />
+                </View>
+                <Text style={styles.nodeTitle}>Matched</Text>
+                <Text style={styles.nodeSub}>Wave 1 (0-5km)</Text>
               </View>
-              <Text style={[styles.timelineStepLabel, { color: '#6366F1', fontWeight: 'bold' }]}>
-                In Work
-              </Text>
-              <Text style={styles.timelineStepTime}>3 of 4 Hired</Text>
-            </View>
 
-            <View style={styles.timelineLine} />
-
-            <View style={styles.timelineStep}>
-              <View style={styles.timelineCircle}>
-                <View style={styles.timelineEmptyDot} />
+              {/* Node 3: In Work (Active) */}
+              <View style={styles.nodeColumn}>
+                <View style={[styles.nodeCircle, styles.nodeCircleActive]}>
+                  <View style={styles.nodePulseInner} />
+                </View>
+                <Text style={[styles.nodeTitle, { color: '#4F46E5', fontWeight: '800' }]}>
+                  In Work
+                </Text>
+                <Text style={styles.nodeSub}>3 Hired</Text>
               </View>
-              <Text style={styles.timelineStepLabel}>Complete</Text>
-              <Text style={styles.timelineStepTime}>Approval</Text>
+
+              {/* Node 4: Completed */}
+              <View style={styles.nodeColumn}>
+                <View style={[styles.nodeCircle, styles.nodeCirclePending]}>
+                  <View style={styles.nodePendingDot} />
+                </View>
+                <Text style={styles.nodeTitle}>Completed</Text>
+                <Text style={styles.nodeSub}>Approval</Text>
+              </View>
             </View>
           </View>
 
-          <TouchableOpacity style={styles.trackDetailsBtn} onPress={() => setActiveTab('WORK')}>
-            <Text style={styles.trackDetailsBtnText}>View Requirement Vacancies & Manage →</Text>
+          <TouchableOpacity
+            style={styles.manageTenderBtn}
+            onPress={() => setActiveTab('WORK')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.manageTenderBtnText}>
+              Manage Vacancies & Site Appointments →
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Top Verified Workers Nearby / Applications */}
+      {/* 5. TOP VERIFIED WORKERS NEARBY (ORGANIZED & PERFECTLY ALIGNED) */}
       <View style={styles.sectionWrap}>
         <View style={styles.sectionHeaderRow}>
           <Text style={styles.sectionTitle}>{t.recentActivities}</Text>
-          <TouchableOpacity onPress={() => setActiveTab('WORK')}>
-            <Text style={styles.sectionSeeAll}>{t.seeAll}</Text>
+          <TouchableOpacity onPress={() => setActiveTab('WORK')} activeOpacity={0.7}>
+            <Text style={styles.sectionSeeAll}>{t.seeAll} →</Text>
           </TouchableOpacity>
         </View>
 
@@ -608,21 +649,23 @@ export default function App() {
             skill: 'Mason (राजमिस्त्री)',
             exp: '8 Years Exp',
             dist: '4.5 km away',
-            wage: '₹900/day',
+            wage: '₹900 / day',
             rating: '4.9',
-            reviews: '84',
-            img: 'https://images.unsplash.com/photo-1541888946425-d0fbb18f156b?w=200',
+            reviews: '84 jobs done',
+            img: 'https://images.unsplash.com/photo-1541888946425-d0fbb18f156b?w=240',
+            specialties: 'Brickwork • Plaster • Granite Skirting',
           },
           {
             id: '2',
             name: 'Mohan Lal Suthar',
-            skill: 'Carpenter (बढ़ई)',
+            skill: 'Carpenter / Furniture (बढ़ई)',
             exp: '12 Years Exp',
             dist: '6.0 km away',
-            wage: '₹1,100/day',
+            wage: '₹1,100 / day',
             rating: '4.8',
-            reviews: '62',
-            img: 'https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=200',
+            reviews: '62 jobs done',
+            img: 'https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=240',
+            specialties: 'Modular Kitchen • Door & Window Framing',
           },
           {
             id: '3',
@@ -630,55 +673,89 @@ export default function App() {
             skill: 'Construction Labour (मजदूर)',
             exp: '5 Years Exp',
             dist: '2.8 km away',
-            wage: '₹600/day',
+            wage: '₹600 / day',
             rating: '5.0',
-            reviews: '41',
-            img: 'https://images.unsplash.com/photo-1581094794329-c8112a89af12?w=200',
+            reviews: '41 jobs done',
+            img: 'https://images.unsplash.com/photo-1581094794329-c8112a89af12?w=240',
+            specialties: 'Material Transport • Concrete Mixing Assistance',
           },
         ].map((worker) => {
           const isSelected = selectedWorkers.includes(worker.name);
           return (
-            <View key={worker.id} style={styles.workerListItem}>
-              <Image source={{ uri: worker.img }} style={styles.workerThumb} />
-              <View style={{ flex: 1, marginLeft: 12 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Text style={styles.workerName}>{worker.name}</Text>
-                  <ShieldCheck size={14} color="#16A34A" />
+            <View key={worker.id} style={styles.workerCardOrganized}>
+              {/* Card Header Row */}
+              <View style={styles.workerCardTop}>
+                <Image source={{ uri: worker.img }} style={styles.workerAvatarLarge} />
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={styles.workerNameText}>{worker.name}</Text>
+                    <ShieldCheck size={16} color="#16A34A" />
+                  </View>
+                  <Text style={styles.workerSkillText}>{worker.skill}</Text>
+                  <View style={styles.workerRatingRow}>
+                    <Star size={14} color="#F59E0B" fill="#F59E0B" />
+                    <Text style={styles.workerRatingNum}>{worker.rating}</Text>
+                    <Text style={styles.workerReviewsCount}>({worker.reviews})</Text>
+                  </View>
                 </View>
-                <Text style={styles.workerSkill}>{worker.skill}</Text>
-                <View style={styles.workerMetaRow}>
-                  <Text style={styles.workerMeta}>{worker.exp}</Text>
-                  <Text style={styles.workerMeta}>•</Text>
-                  <Text style={styles.workerMeta}>📍 {worker.dist}</Text>
-                  <Text style={styles.workerMeta}>•</Text>
-                  <Text style={styles.workerRating}>★ {worker.rating}</Text>
+
+                <View style={styles.wageTag}>
+                  <Text style={styles.wageTagLabel}>Rate</Text>
+                  <Text style={styles.wageTagAmount}>{worker.wage}</Text>
                 </View>
               </View>
 
-              <View style={{ alignItems: 'flex-end', gap: 6 }}>
-                <Text style={styles.workerWage}>{worker.wage}</Text>
+              {/* Tags & Meta Chips */}
+              <View style={styles.chipsRow}>
+                <View style={styles.metaChip}>
+                  <Text style={styles.metaChipText}>⏱ {worker.exp}</Text>
+                </View>
+                <View style={styles.metaChip}>
+                  <Text style={styles.metaChipText}>📍 {worker.dist}</Text>
+                </View>
+                <View style={[styles.metaChip, { backgroundColor: '#EEF2FF' }]}>
+                  <Text style={[styles.metaChipText, { color: '#4F46E5', fontWeight: '700' }]}>
+                    Govt KYC Verified
+                  </Text>
+                </View>
+              </View>
+
+              <Text style={styles.workerSpecialtiesText}>{worker.specialties}</Text>
+
+              {/* Action Button Row */}
+              <View style={styles.workerCardBottom}>
                 {role === 'CUSTOMER' ? (
                   <TouchableOpacity
-                    style={[styles.actionPillBtn, isSelected && styles.actionPillBtnSelected]}
+                    style={[styles.hireWorkerBtn, isSelected && styles.hireWorkerBtnSelected]}
                     onPress={() => {
                       if (isSelected) {
                         setSelectedWorkers(selectedWorkers.filter((w) => w !== worker.name));
                       } else {
                         setSelectedWorkers([...selectedWorkers, worker.name]);
-                        Alert.alert('Worker Hired! 🎉', `${worker.name} assigned to MISTRI-26110001.`);
+                        Alert.alert(
+                          'Worker Hired! 🎉',
+                          `${worker.name} assigned to MISTRI-26110001. Private contact numbers unlocked.`
+                        );
                       }
                     }}
+                    activeOpacity={0.8}
                   >
-                    <Text style={[styles.actionPillBtnText, isSelected && { color: '#16A34A' }]}>
+                    <Text
+                      style={[
+                        styles.hireWorkerBtnText,
+                        isSelected && { color: '#16A34A', fontWeight: '800' },
+                      ]}
+                    >
                       {isSelected ? '✓ ' + t.hired : t.selectWorker}
                     </Text>
                   </TouchableOpacity>
                 ) : (
                   <TouchableOpacity
-                    style={styles.actionPillBtn}
+                    style={styles.hireWorkerBtn}
                     onPress={() => setBidModalVisible(true)}
+                    activeOpacity={0.8}
                   >
-                    <Text style={styles.actionPillBtnText}>{t.bidNow}</Text>
+                    <Text style={styles.hireWorkerBtnText}>{t.bidNow}</Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -689,21 +766,24 @@ export default function App() {
     </ScrollView>
   );
 
-  // TAB 2: WORK SCREEN (Projects & Tenders Vacancy Matrix & Timeline)
+  // 4. TAB 2: WORK SCREEN (Vacancy Matrix & Progress Tracking)
   const renderWorkScreen = () => (
-    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 110 }}>
+    <ScrollView
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={{ paddingBottom: 110 }}
+    >
       <View style={styles.pageHeaderPad}>
-        <Text style={styles.pageMainHeading}>Project Management & Work Tenders</Text>
+        <Text style={styles.pageMainHeading}>Project Management</Text>
         <Text style={styles.pageSubHeading}>
-          Track requirements, vacancies, site visits, and completion approvals.
+          Manage construction tenders, vacancy quotas, site visits, and completion approvals.
         </Text>
       </View>
 
       {/* Project Card with Vacancies Breakdown */}
       <View style={styles.projectDetailCard}>
-        <View style={styles.trackingTop}>
+        <View style={styles.trackingTopRow}>
           <View>
-            <Text style={styles.trackingLabel}>Tender ID</Text>
+            <Text style={styles.trackingLabel}>Tender Reference Code</Text>
             <Text style={styles.trackingCode}>MISTRI-26110001</Text>
           </View>
           <View style={styles.statusPillBlue}>
@@ -714,14 +794,15 @@ export default function App() {
         <Text style={styles.projectDetailTitle}>Residential Bathroom Renovation & Plastering</Text>
         <Text style={styles.projectDetailLoc}>📍 Plot 42, Officers Campus, Sirsi Road, Jaipur</Text>
 
+        {/* Vacancy Management Matrix */}
         <View style={styles.vacancyMatrixBox}>
-          <Text style={styles.vacancyMatrixHeading}>VACANCY MATRIX</Text>
+          <Text style={styles.vacancyMatrixHeading}>VACANCY MANAGEMENT MATRIX</Text>
 
           {/* Mason Vacancy */}
           <View style={styles.vacancyRow}>
             <View style={{ flex: 1 }}>
               <Text style={styles.vacancySkillTitle}>Mason (राजमिस्त्री)</Text>
-              <Text style={styles.vacancyCounts}>3 Required • 2 Hired • 1 Remaining</Text>
+              <Text style={styles.vacancyCounts}>3 Required • 2 Hired • 1 Vacancy Left</Text>
             </View>
             <View style={styles.vacancyBadgeYellow}>
               <Text style={styles.vacancyBadgeYellowText}>1 Vacancy Open</Text>
@@ -732,7 +813,7 @@ export default function App() {
           <View style={[styles.vacancyRow, { borderBottomWidth: 0, marginTop: 8 }]}>
             <View style={{ flex: 1 }}>
               <Text style={styles.vacancySkillTitle}>Construction Labour (मजदूर)</Text>
-              <Text style={styles.vacancyCounts}>5 Required • 1 Hired • 4 Remaining</Text>
+              <Text style={styles.vacancyCounts}>5 Required • 1 Hired • 4 Vacancies Left</Text>
             </View>
             <View style={styles.vacancyBadgeYellow}>
               <Text style={styles.vacancyBadgeYellowText}>4 Vacancies Open</Text>
@@ -740,7 +821,7 @@ export default function App() {
           </View>
         </View>
 
-        {/* Work Progress Log (Inspired by Reference 1 - Delivery Details & Updates) */}
+        {/* On-Site Activity Timeline (Reference 1) */}
         <View style={styles.workUpdatesLog}>
           <Text style={styles.vacancyMatrixHeading}>ON-SITE ACTIVITY TIMELINE</Text>
 
@@ -748,9 +829,11 @@ export default function App() {
             <View style={styles.logCheck}>
               <Check size={12} color="#16A34A" strokeWidth={3} />
             </View>
-            <View style={{ flex: 1, marginLeft: 10 }}>
-              <Text style={styles.logTime}>09:30 AM • 16 Nov</Text>
-              <Text style={styles.logDesc}>Rajesh Kumar (Mason) checked in on-site & began floor leveling.</Text>
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text style={styles.logTime}>09:30 AM • 16 Nov 2026</Text>
+              <Text style={styles.logDesc}>
+                Rajesh Kumar (Mason) arrived on-site and initiated floor leveling.
+              </Text>
             </View>
           </View>
 
@@ -758,19 +841,23 @@ export default function App() {
             <View style={styles.logCheck}>
               <Check size={12} color="#16A34A" strokeWidth={3} />
             </View>
-            <View style={{ flex: 1, marginLeft: 10 }}>
-              <Text style={styles.logTime}>01:15 PM • 16 Nov</Text>
-              <Text style={styles.logDesc}>Wall plastering completed. 2 site inspection photos uploaded.</Text>
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text style={styles.logTime}>01:15 PM • 16 Nov 2026</Text>
+              <Text style={styles.logDesc}>
+                Wall plastering completed. 2 site inspection photos uploaded.
+              </Text>
             </View>
           </View>
 
           <View style={[styles.logItem, { borderLeftWidth: 0 }]}>
-            <View style={[styles.logCheck, { backgroundColor: '#EEF2FF', borderColor: '#6366F1' }]}>
-              <Clock size={12} color="#6366F1" />
+            <View style={[styles.logCheck, { backgroundColor: '#EEF2FF', borderColor: '#4F46E5' }]}>
+              <Clock size={12} color="#4F46E5" />
             </View>
-            <View style={{ flex: 1, marginLeft: 10 }}>
-              <Text style={styles.logTime}>04:30 PM • 16 Nov</Text>
-              <Text style={styles.logDesc}>Vitrified tile laying in progress. Awaiting customer sign-off.</Text>
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text style={styles.logTime}>04:30 PM • 16 Nov 2026</Text>
+              <Text style={styles.logDesc}>
+                Vitrified tile laying in progress. Awaiting customer sign-off.
+              </Text>
             </View>
           </View>
         </View>
@@ -779,21 +866,26 @@ export default function App() {
           <TouchableOpacity
             style={styles.projectPrimaryBtn}
             onPress={() => {
-              Alert.alert('Site Visit Requested', 'Visit proposal sent to Rajesh Kumar for 17 Nov, 10:00 AM.');
+              Alert.alert('Site Visit Scheduled 📅', 'Visit proposed to Rajesh Kumar for 17 Nov, 10:00 AM.');
             }}
+            activeOpacity={0.8}
           >
-            <Calendar size={16} color="#FFFFFF" />
+            <Calendar size={18} color="#FFFFFF" />
             <Text style={styles.projectPrimaryBtnText}>Schedule Site Visit</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.projectSecondaryBtn}
             onPress={() => {
-              Alert.alert('Work Approved! ✅', 'Task closed successfully. You can now submit a verified review.');
+              Alert.alert(
+                'Work Approved! ✅',
+                'Task completed successfully. You can now leave a verified review.'
+              );
               setActiveTab('REVIEWS');
             }}
+            activeOpacity={0.8}
           >
-            <ThumbsUp size={16} color="#0F172A" />
+            <ThumbsUp size={18} color="#0F172A" />
             <Text style={styles.projectSecondaryBtnText}>Approve Completion</Text>
           </TouchableOpacity>
         </View>
@@ -801,13 +893,16 @@ export default function App() {
     </ScrollView>
   );
 
-  // TAB 3: REVIEWS & REPUTATION SCREEN
+  // 5. TAB 3: REVIEWS & REPUTATION SCREEN
   const renderReviewsScreen = () => (
-    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 110 }}>
+    <ScrollView
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={{ paddingBottom: 110 }}
+    >
       <View style={styles.pageHeaderPad}>
-        <Text style={styles.pageMainHeading}>Ratings & Worker Reputation</Text>
+        <Text style={styles.pageMainHeading}>Ratings & Reviews</Text>
         <Text style={styles.pageSubHeading}>
-          Verified customer feedback and workmanship ratings for completed tasks.
+          Verified customer feedback and worker reputation for completed jobs.
         </Text>
       </View>
 
@@ -817,15 +912,15 @@ export default function App() {
           <Text style={styles.scoreBigNumber}>4.9</Text>
           <View style={styles.starsRow}>
             {[1, 2, 3, 4, 5].map((s) => (
-              <Star key={s} size={16} color="#F59E0B" fill="#F59E0B" />
+              <Star key={s} size={18} color="#F59E0B" fill="#F59E0B" />
             ))}
           </View>
-          <Text style={styles.scoreBasedText}>148 Verified Jobs</Text>
+          <Text style={styles.scoreBasedText}>148 Verified Ratings</Text>
         </View>
 
         <View style={styles.scoreBarsCol}>
           <View style={styles.barItem}>
-            <Text style={styles.barLabel}>Work Quality</Text>
+            <Text style={styles.barLabel}>Quality</Text>
             <View style={styles.barTrack}>
               <View style={[styles.barFill, { width: '96%' }]} />
             </View>
@@ -848,12 +943,13 @@ export default function App() {
         </View>
       </View>
 
-      <View style={{ paddingHorizontal: 16, marginTop: 12 }}>
+      <View style={{ paddingHorizontal: 16, marginTop: 14 }}>
         <TouchableOpacity
           style={styles.writeReviewBannerBtn}
           onPress={() => setReviewModalVisible(true)}
+          activeOpacity={0.85}
         >
-          <Star size={18} color="#FFFFFF" fill="#FFFFFF" />
+          <Star size={20} color="#FFFFFF" fill="#FFFFFF" />
           <Text style={styles.writeReviewBannerBtnText}>+ Rate & Review a Completed Job</Text>
         </TouchableOpacity>
       </View>
@@ -897,7 +993,7 @@ export default function App() {
                   {[1, 2, 3, 4, 5].map((s) => (
                     <Star
                       key={s}
-                      size={14}
+                      size={15}
                       color="#F59E0B"
                       fill={s <= rev.rating ? '#F59E0B' : 'transparent'}
                     />
@@ -922,14 +1018,45 @@ export default function App() {
     </ScrollView>
   );
 
-  // TAB 4: PROFILE & SETTINGS SCREEN
+  // 6. TAB 4: PROFILE & SETTINGS (ROLE SWITCH RESIDES HERE!)
   const renderProfileScreen = () => (
-    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 110 }}>
+    <ScrollView
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={{ paddingBottom: 110 }}
+    >
       <View style={styles.pageHeaderPad}>
         <Text style={styles.pageMainHeading}>Account & Preferences</Text>
         <Text style={styles.pageSubHeading}>
-          Manage verified identity, language preference, and switch roles.
+          Manage verified profile, switch personas, and change language.
         </Text>
+      </View>
+
+      {/* Role Switcher Box (Placed specifically in Profile per request) */}
+      <View style={styles.personaSwitchBox}>
+        <View style={styles.personaSwitchTop}>
+          <View style={styles.personaBadge}>
+            <Text style={styles.personaBadgeText}>ACTIVE ACCOUNT MODE</Text>
+          </View>
+          <Text style={styles.personaTitle}>
+            {role === 'CUSTOMER' ? 'Customer (Hiring Mode)' : 'Worker (Bidding Mode)'}
+          </Text>
+          <Text style={styles.personaDesc}>
+            {role === 'CUSTOMER'
+              ? 'You can post work requirements, review applicant profiles, and hire verified workers.'
+              : 'You can discover nearby construction jobs, bid daily wages, and track earnings.'}
+          </Text>
+        </View>
+
+        <TouchableOpacity
+          style={styles.switchPersonaBtn}
+          onPress={toggleRole}
+          activeOpacity={0.85}
+        >
+          <RotateCcw size={18} color="#FFFFFF" strokeWidth={2.5} />
+          <Text style={styles.switchPersonaBtnText}>
+            Switch to {role === 'CUSTOMER' ? 'Worker Persona 👷' : 'Customer Persona 🏠'}
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {/* User Card */}
@@ -940,8 +1067,10 @@ export default function App() {
         />
         <View style={{ flex: 1, marginLeft: 16 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Text style={styles.profileName}>{role === 'CUSTOMER' ? 'Ramesh Sharma' : 'Rajesh Kumar'}</Text>
-            <ShieldCheck size={18} color="#16A34A" />
+            <Text style={styles.profileName}>
+              {role === 'CUSTOMER' ? 'Ramesh Sharma' : 'Rajesh Kumar'}
+            </Text>
+            <ShieldCheck size={20} color="#16A34A" />
           </View>
           <Text style={styles.profilePhone}>+91 98290 12345</Text>
           <View style={styles.roleTagPill}>
@@ -952,33 +1081,22 @@ export default function App() {
         </View>
       </View>
 
-      {/* Switch Persona Card */}
+      {/* Settings Rows */}
       <View style={styles.sectionWrap}>
         <View style={styles.settingsBlock}>
-          <TouchableOpacity style={styles.settingsRow} onPress={toggleRole}>
-            <View style={styles.settingsIconBox}>
-              <RotateCcw size={20} color="#6366F1" />
-            </View>
-            <View style={{ flex: 1, marginLeft: 12 }}>
-              <Text style={styles.settingsTitle}>Switch to {role === 'CUSTOMER' ? 'Worker Persona' : 'Customer Persona'}</Text>
-              <Text style={styles.settingsSub}>Currently active: {role === 'CUSTOMER' ? 'Customer (Hiring)' : 'Worker (Bidding)'}</Text>
-            </View>
-            <ChevronRight size={18} color="#94A3B8" />
-          </TouchableOpacity>
-
-          <View style={styles.settingsDivider} />
-
           {/* Language Selector */}
-          <TouchableOpacity style={styles.settingsRow} onPress={toggleLang}>
+          <TouchableOpacity style={styles.settingsRow} onPress={toggleLang} activeOpacity={0.7}>
             <View style={styles.settingsIconBox}>
-              <Text style={{ fontSize: 18 }}>🌐</Text>
+              <Text style={{ fontSize: 20 }}>🌐</Text>
             </View>
-            <View style={{ flex: 1, marginLeft: 12 }}>
-              <Text style={styles.settingsTitle}>Change App Language</Text>
-              <Text style={styles.settingsSub}>Current: {lang === 'en' ? 'English' : lang === 'hi' ? 'हिंदी (Hindi)' : lang === 'gu' ? 'ગુજરાતી (Gujarati)' : 'मराठी (Marathi)'}</Text>
+            <View style={{ flex: 1, marginLeft: 14 }}>
+              <Text style={styles.settingsTitle}>App Language / भाषा</Text>
+              <Text style={styles.settingsSub}>
+                Current: {lang === 'en' ? 'English' : lang === 'hi' ? 'हिंदी (Hindi)' : lang === 'gu' ? 'ગુજરાતી (Gujarati)' : 'मराठी (Marathi)'}
+              </Text>
             </View>
             <View style={styles.langPill}>
-              <Text style={styles.langPillText}>TAP TO TOGGLE</Text>
+              <Text style={styles.langPillText}>TAP TO CHANGE</Text>
             </View>
           </TouchableOpacity>
 
@@ -987,10 +1105,10 @@ export default function App() {
           {/* KYC Status Details */}
           <View style={styles.settingsRow}>
             <View style={styles.settingsIconBox}>
-              <ShieldCheck size={20} color="#16A34A" />
+              <ShieldCheck size={22} color="#16A34A" />
             </View>
-            <View style={{ flex: 1, marginLeft: 12 }}>
-              <Text style={styles.settingsTitle}>Govt ID & Verification Status</Text>
+            <View style={{ flex: 1, marginLeft: 14 }}>
+              <Text style={styles.settingsTitle}>Government ID & KYC Status</Text>
               <Text style={styles.settingsSub}>Aadhaar Masked: XXXX-XXXX-4912 • Approved</Text>
             </View>
             <View style={styles.statusPillGreen}>
@@ -1003,13 +1121,13 @@ export default function App() {
           {/* Platform Invoices */}
           <View style={styles.settingsRow}>
             <View style={styles.settingsIconBox}>
-              <CreditCard size={20} color="#0F172A" />
+              <CreditCard size={22} color="#0F172A" />
             </View>
-            <View style={{ flex: 1, marginLeft: 12 }}>
+            <View style={{ flex: 1, marginLeft: 14 }}>
               <Text style={styles.settingsTitle}>Platform Request Listing Fees (₹299)</Text>
               <Text style={styles.settingsSub}>Razorpay Order: order_mp_26110001 (Paid)</Text>
             </View>
-            <ArrowUpRight size={18} color="#94A3B8" />
+            <ArrowUpRight size={20} color="#94A3B8" />
           </View>
         </View>
       </View>
@@ -1024,7 +1142,7 @@ export default function App() {
         {/* Global Top App Bar */}
         {renderTopBar()}
 
-        {/* Main Content Area Based on Active Tab */}
+        {/* Main Content Based on Active Tab */}
         <View style={{ flex: 1 }}>
           {activeTab === 'HOME' && renderHomeScreen()}
           {activeTab === 'WORK' && renderWorkScreen()}
@@ -1032,10 +1150,10 @@ export default function App() {
           {activeTab === 'PROFILE' && renderProfileScreen()}
         </View>
 
-        {/* Floating Bottom Dock Navigation */}
-        {renderBottomDock()}
+        {/* Fixed Bottom Navigation Dock */}
+        {renderBottomNav()}
 
-        {/* 6-STEP TENDER CREATION MODAL WITH ₹299 RAZORPAY SUMMARY */}
+        {/* 6-STEP TENDER CREATION MODAL */}
         <Modal visible={postModalVisible} animationType="slide" transparent>
           <View style={styles.modalBackdrop}>
             <View style={styles.modalCardLarge}>
@@ -1048,12 +1166,12 @@ export default function App() {
                   style={styles.modalCloseCircle}
                   onPress={() => setPostModalVisible(false)}
                 >
-                  <X size={18} color="#64748B" />
+                  <X size={20} color="#64748B" />
                 </TouchableOpacity>
               </View>
 
               <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 420 }}>
-                {/* Step 1: Title & Description */}
+                {/* Step 1: Info */}
                 {postStep === 1 && (
                   <View style={styles.stepContent}>
                     <Text style={styles.stepLabel}>Project Title *</Text>
@@ -1062,9 +1180,9 @@ export default function App() {
                       value={tenderTitle}
                       onChangeText={setTenderTitle}
                     />
-                    <Text style={[styles.stepLabel, { marginTop: 12 }]}>Work Description *</Text>
+                    <Text style={[styles.stepLabel, { marginTop: 14 }]}>Work Description *</Text>
                     <TextInput
-                      style={[styles.textInputBox, { height: 90 }]}
+                      style={[styles.textInputBox, { height: 95 }]}
                       multiline
                       placeholder="Describe the renovation, wall dimensions, materials needed..."
                       placeholderTextColor="#94A3B8"
@@ -1082,12 +1200,12 @@ export default function App() {
                       onChangeText={setTenderAddress}
                     />
                     <View style={styles.gpsConfirmCard}>
-                      <MapPin size={20} color="#6366F1" />
-                      <View style={{ marginLeft: 10 }}>
-                        <Text style={{ fontWeight: 'bold', color: '#0F172A', fontSize: 13 }}>
-                          GPS Coordinates Attached
+                      <MapPin size={22} color="#4F46E5" />
+                      <View style={{ marginLeft: 12 }}>
+                        <Text style={{ fontWeight: '800', color: '#0F172A', fontSize: 14 }}>
+                          GPS Location Attached
                         </Text>
-                        <Text style={{ fontSize: 12, color: '#64748B' }}>
+                        <Text style={{ fontSize: 13, color: '#64748B', marginTop: 2 }}>
                           Jaipur (26.9124° N, 75.7873° E) • Matching Waves 0-5 km
                         </Text>
                       </View>
@@ -1095,7 +1213,7 @@ export default function App() {
                   </View>
                 )}
 
-                {/* Step 3: Vacancies Counter */}
+                {/* Step 3: Vacancies */}
                 {postStep === 3 && (
                   <View style={styles.stepContent}>
                     <Text style={styles.stepLabel}>Specify Required Workers *</Text>
@@ -1122,7 +1240,7 @@ export default function App() {
                       </View>
                     </View>
 
-                    <View style={[styles.counterRow, { marginTop: 12 }]}>
+                    <View style={[styles.counterRow, { marginTop: 14 }]}>
                       <View>
                         <Text style={styles.counterTitle}>Construction Labour (मजदूर)</Text>
                         <Text style={styles.counterSub}>Material transport & mixing</Text>
@@ -1156,17 +1274,17 @@ export default function App() {
                       onChangeText={setTenderBudget}
                       keyboardType="numeric"
                     />
-                    <Text style={[styles.stepLabel, { marginTop: 12 }]}>Expected Duration</Text>
+                    <Text style={[styles.stepLabel, { marginTop: 14 }]}>Expected Duration</Text>
                     <TextInput style={styles.textInputBox} placeholder="e.g. 30 days" />
                   </View>
                 )}
 
-                {/* Step 5: Contact Coordinates */}
+                {/* Step 5: Contact */}
                 {postStep === 5 && (
                   <View style={styles.stepContent}>
                     <Text style={styles.stepLabel}>Customer Contact Name *</Text>
                     <TextInput style={styles.textInputBox} placeholder="Ramesh Sharma" />
-                    <Text style={[styles.stepLabel, { marginTop: 12 }]}>Verified Mobile *</Text>
+                    <Text style={[styles.stepLabel, { marginTop: 14 }]}>Verified Mobile *</Text>
                     <TextInput style={styles.textInputBox} placeholder="+91 98290 12345" />
                   </View>
                 )}
@@ -1186,14 +1304,14 @@ export default function App() {
                       <View style={styles.summaryDivider} />
 
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Text style={{ fontWeight: 'bold', fontSize: 14, color: '#0F172A' }}>
+                        <Text style={{ fontWeight: '800', fontSize: 15, color: '#0F172A' }}>
                           Platform Request Fee:
                         </Text>
-                        <Text style={{ fontWeight: '900', fontSize: 24, color: '#6366F1' }}>
+                        <Text style={{ fontWeight: '900', fontSize: 26, color: '#4F46E5' }}>
                           ₹299
                         </Text>
                       </View>
-                      <Text style={{ fontSize: 11, color: '#64748B', marginTop: 4 }}>
+                      <Text style={{ fontSize: 12, color: '#64748B', marginTop: 4 }}>
                         Server-verified Razorpay signature required before publishing.
                       </Text>
                     </View>
@@ -1223,7 +1341,7 @@ export default function App() {
                   }}
                 >
                   <Text style={styles.modalNextBtnText}>
-                    {postStep === 6 ? 'Pay ₹299 & Publish Tender 💳' : 'Continue →'}
+                    {postStep === 6 ? 'Pay ₹299 & Publish 💳' : 'Continue →'}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -1231,12 +1349,12 @@ export default function App() {
           </View>
         </Modal>
 
-        {/* PAYMENT SUCCESS CONFIRMATION MODAL */}
+        {/* PAYMENT SUCCESS MODAL */}
         <Modal visible={paymentSuccessModal} animationType="fade" transparent>
           <View style={styles.modalBackdrop}>
             <View style={styles.successDialogCard}>
               <View style={styles.successCircle}>
-                <CheckCircle2 size={36} color="#16A34A" />
+                <CheckCircle2 size={40} color="#16A34A" />
               </View>
               <Text style={styles.successHeading}>₹299 Payment Verified!</Text>
               <Text style={styles.successSub}>
@@ -1263,7 +1381,7 @@ export default function App() {
               <View style={styles.modalHeaderRow}>
                 <Text style={styles.modalHeading}>Submit Daily Wage Proposal</Text>
                 <TouchableOpacity onPress={() => setBidModalVisible(false)}>
-                  <X size={18} color="#64748B" />
+                  <X size={20} color="#64748B" />
                 </TouchableOpacity>
               </View>
 
@@ -1279,16 +1397,16 @@ export default function App() {
                 keyboardType="numeric"
               />
 
-              <Text style={[styles.stepLabel, { marginTop: 12 }]}>Cover Message / Experience *</Text>
+              <Text style={[styles.stepLabel, { marginTop: 14 }]}>Cover Message / Experience *</Text>
               <TextInput
-                style={[styles.textInputBox, { height: 80 }]}
+                style={[styles.textInputBox, { height: 90 }]}
                 multiline
                 placeholder="8 years experience in brickwork and tile laying in Jaipur."
                 placeholderTextColor="#94A3B8"
               />
 
               <TouchableOpacity
-                style={[styles.modalNextBtn, { marginTop: 20 }]}
+                style={[styles.modalNextBtn, { marginTop: 22 }]}
                 onPress={() => {
                   setBidModalVisible(false);
                   Alert.alert(
@@ -1310,7 +1428,7 @@ export default function App() {
               <View style={styles.modalHeaderRow}>
                 <Text style={styles.modalHeading}>Rate Worker Performance</Text>
                 <TouchableOpacity onPress={() => setReviewModalVisible(false)}>
-                  <X size={18} color="#64748B" />
+                  <X size={20} color="#64748B" />
                 </TouchableOpacity>
               </View>
 
@@ -1318,11 +1436,11 @@ export default function App() {
                 Worker: Rajesh Kumar (Mason) • Bathroom Renovation
               </Text>
 
-              <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 12, marginVertical: 20 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 14, marginVertical: 20 }}>
                 {[1, 2, 3, 4, 5].map((star) => (
                   <TouchableOpacity key={star} onPress={() => setSelectedRating(star)}>
                     <Star
-                      size={32}
+                      size={36}
                       color="#F59E0B"
                       fill={star <= selectedRating ? '#F59E0B' : 'transparent'}
                     />
@@ -1332,14 +1450,14 @@ export default function App() {
 
               <Text style={styles.stepLabel}>Review Comment *</Text>
               <TextInput
-                style={[styles.textInputBox, { height: 90 }]}
+                style={[styles.textInputBox, { height: 95 }]}
                 multiline
                 placeholder="Share your experience regarding punctuality, masonry quality, and behaviour..."
                 placeholderTextColor="#94A3B8"
               />
 
               <TouchableOpacity
-                style={[styles.modalNextBtn, { marginTop: 20 }]}
+                style={[styles.modalNextBtn, { marginTop: 22 }]}
                 onPress={() => {
                   setReviewModalVisible(false);
                   Alert.alert('Review Submitted! ⭐', 'Thank you for building trusted worker reputation.');
@@ -1355,23 +1473,25 @@ export default function App() {
   );
 }
 
-// STYLESHEET (Ultra-clean modern aesthetics inspired by Image 1 & Image 2)
+// STYLESHEET (Google / Material 3 Proportions & Polished Aesthetics)
 const styles = StyleSheet.create({
   rootContainer: {
     flex: 1,
     backgroundColor: '#F8FAFC',
   },
 
-  // Top Bar
+  // 1. Top App Bar
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 18,
-    paddingVertical: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
     backgroundColor: '#F8FAFC',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
   },
-  userProfileRow: {
+  topBarLeft: {
     flexDirection: 'row',
     alignItems: 'center',
   },
@@ -1379,76 +1499,68 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   avatarImg: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     backgroundColor: '#E2E8F0',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
   },
   onlineDot: {
     position: 'absolute',
     bottom: 0,
     right: 0,
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+    width: 13,
+    height: 13,
+    borderRadius: 6.5,
     backgroundColor: '#22C55E',
     borderWidth: 2,
     borderColor: '#FFFFFF',
   },
-  greetingText: {
-    fontSize: 13,
+  greetingSub: {
+    fontSize: 12,
     color: '#64748B',
     fontWeight: '500',
   },
-  userNameText: {
-    fontSize: 15,
+  greetingName: {
+    fontSize: 17,
     fontWeight: '800',
     color: '#0F172A',
+    marginTop: 1,
   },
   locationPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
+    gap: 4,
     marginTop: 2,
   },
   locationText: {
-    fontSize: 11,
+    fontSize: 12,
     color: '#64748B',
     fontWeight: '500',
   },
-  topRightActions: {
+  topBarRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
   },
-  langPill: {
+  langPillBtn: {
     backgroundColor: '#EEF2FF',
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: '#E0E7FF',
   },
   langPillText: {
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '800',
     color: '#4F46E5',
   },
-  roleToggleBadge: {
-    backgroundColor: '#0F172A',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 14,
-  },
-  roleToggleText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  iconCircleBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+  notifCircleBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#E2E8F0',
@@ -1458,21 +1570,80 @@ const styles = StyleSheet.create({
   },
   notifBadge: {
     position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
+    top: 10,
+    right: 10,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
     backgroundColor: '#EF4444',
   },
 
-  // Dark Hero Card (Inspired by Image 1 & 2)
+  // 2. Fixed Solid Bottom Navigation Bar
+  bottomNavWrapper: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  bottomNavBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    height: 72,
+  },
+  navItem: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    minWidth: 58,
+  },
+  navItemActive: {
+    backgroundColor: '#0F172A',
+  },
+  navLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#64748B',
+    marginTop: 4,
+  },
+  navLabelActive: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+  },
+  navCenterBtn: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#4F46E5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#4F46E5',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 6,
+    marginTop: -16,
+  },
+
+  // 3. Dark Hero Card
   heroCard: {
     backgroundColor: '#0F172A',
     marginHorizontal: 16,
-    marginTop: 6,
+    marginTop: 14,
     borderRadius: 24,
-    padding: 20,
+    padding: 22,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.12,
@@ -1487,19 +1658,25 @@ const styles = StyleSheet.create({
   heroSubText: {
     fontSize: 12,
     color: '#94A3B8',
-    fontWeight: '500',
+    fontWeight: '600',
+    letterSpacing: 0.5,
   },
   heroMainText: {
-    fontSize: 22,
-    fontWeight: '800',
+    fontSize: 24,
+    fontWeight: '900',
     color: '#FFFFFF',
     marginTop: 2,
     letterSpacing: 0.5,
   },
+  heroProjectName: {
+    fontSize: 13,
+    color: '#CBD5E1',
+    marginTop: 3,
+  },
   heroWhitePill: {
     backgroundColor: '#FFFFFF',
     paddingHorizontal: 14,
-    paddingVertical: 7,
+    paddingVertical: 8,
     borderRadius: 16,
   },
   heroWhitePillText: {
@@ -1511,9 +1688,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderRadius: 16,
-    paddingVertical: 12,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderRadius: 18,
+    paddingVertical: 14,
     paddingHorizontal: 16,
     marginTop: 18,
   },
@@ -1522,23 +1699,23 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   heroStatValue: {
-    fontSize: 14,
-    fontWeight: '800',
+    fontSize: 16,
+    fontWeight: '900',
     color: '#FFFFFF',
   },
   heroStatLabel: {
-    fontSize: 10,
+    fontSize: 11,
     color: '#94A3B8',
-    marginTop: 2,
+    marginTop: 3,
   },
   heroDivider: {
     width: 1,
-    height: 24,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    height: 26,
+    backgroundColor: 'rgba(255,255,255,0.12)',
   },
   heroActionsRow: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 12,
     marginTop: 18,
   },
   heroActionBtn: {
@@ -1547,116 +1724,117 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#FFFFFF',
-    paddingVertical: 12,
-    borderRadius: 14,
-    gap: 6,
+    paddingVertical: 14,
+    borderRadius: 16,
+    gap: 8,
   },
   heroActionText: {
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: 13,
+    fontWeight: '800',
     color: '#0F172A',
   },
 
-  // Search & Filter
+  // 4. Search & Filter Bar
   searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
     marginTop: 16,
-    gap: 10,
+    gap: 12,
   },
   searchBar: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    height: 48,
-    borderWidth: 1,
+    borderRadius: 18,
+    paddingHorizontal: 16,
+    height: 52,
+    borderWidth: 1.5,
     borderColor: '#E2E8F0',
-    gap: 8,
+    gap: 10,
   },
   searchInput: {
     flex: 1,
-    fontSize: 13,
+    fontSize: 14,
     color: '#0F172A',
   },
   filterBtn: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
+    width: 52,
+    height: 52,
+    borderRadius: 18,
     backgroundColor: '#FFFFFF',
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: '#E2E8F0',
     alignItems: 'center',
     justifyContent: 'center',
   },
 
-  // Section Headers & Wraps
+  // 5. Section Headers & Wraps
   sectionWrap: {
     paddingHorizontal: 16,
-    marginTop: 24,
+    marginTop: 26,
   },
   sectionHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 14,
   },
   sectionTitle: {
-    fontSize: 17,
-    fontWeight: '800',
+    fontSize: 18,
+    fontWeight: '900',
     color: '#0F172A',
+    letterSpacing: -0.2,
   },
   sectionSeeAll: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
-    color: '#6366F1',
+    color: '#4F46E5',
   },
 
-  // Categories Horizontal Scroll
+  // Categories Scroll
   catScroll: {
-    gap: 10,
+    gap: 12,
   },
-  catCardNew: {
-    width: 100,
-    height: 105,
-    borderRadius: 18,
+  catCard: {
+    width: 110,
+    height: 118,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 10,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+    padding: 12,
+    borderWidth: 1.5,
   },
   catCardName: {
-    fontSize: 10,
-    fontWeight: '700',
+    fontSize: 11,
+    fontWeight: '800',
     color: '#0F172A',
     textAlign: 'center',
-    marginTop: 4,
-    lineHeight: 13,
+    marginTop: 6,
+    lineHeight: 14,
   },
   catCardCount: {
-    fontSize: 9,
+    fontSize: 10,
     color: '#64748B',
-    marginTop: 2,
+    marginTop: 3,
+    fontWeight: '500',
   },
 
-  // Current Tracking Card (Image 1)
+  // 6. Current Tracking Card
   trackingCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 24,
-    padding: 18,
-    borderWidth: 1,
+    padding: 20,
+    borderWidth: 1.5,
     borderColor: '#E2E8F0',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
     elevation: 2,
   },
-  trackingTop: {
+  trackingTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
@@ -1664,254 +1842,327 @@ const styles = StyleSheet.create({
   trackingLabel: {
     fontSize: 11,
     color: '#64748B',
+    fontWeight: '500',
   },
   trackingCode: {
-    fontSize: 15,
-    fontWeight: '800',
+    fontSize: 17,
+    fontWeight: '900',
     color: '#0F172A',
     fontFamily: 'monospace',
-    marginTop: 1,
+    marginTop: 2,
   },
   statusPillBlue: {
     backgroundColor: '#EEF2FF',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 14,
   },
   statusPillBlueText: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '800',
     color: '#4F46E5',
   },
-  routeRow: {
+  projectInfoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 14,
-    paddingBottom: 14,
+    marginTop: 16,
+    paddingBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
   },
-  routeLabel: {
-    fontSize: 10,
+  projectInfoLabel: {
+    fontSize: 11,
     color: '#94A3B8',
+    fontWeight: '500',
   },
-  routeName: {
-    fontSize: 13,
-    fontWeight: '700',
+  projectInfoTitle: {
+    fontSize: 14,
+    fontWeight: '800',
     color: '#0F172A',
     marginTop: 2,
   },
-  routeDate: {
-    fontSize: 11,
+  projectInfoDate: {
+    fontSize: 12,
     color: '#64748B',
     marginTop: 2,
   },
 
-  // Stepper Timeline (Image 1)
-  timelineRow: {
+  // Stepper Timeline: Perfect Alignment Architecture
+  stepperContainer: {
+    marginTop: 22,
+    position: 'relative',
+    paddingHorizontal: 6,
+  },
+  connectorTrack: {
+    position: 'absolute',
+    top: 13, // Exactly centers with 26dp circles
+    left: 36,
+    right: 36,
+    height: 3,
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 16,
   },
-  timelineStep: {
-    alignItems: 'center',
-    width: 65,
+  connectorSegment: {
+    flex: 1,
+    height: 3,
   },
-  timelineCircle: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: '#E2E8F0',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  timelineCircleDone: {
+  connectorDone: {
     backgroundColor: '#0F172A',
   },
-  timelineCircleActive: {
-    backgroundColor: '#EEF2FF',
+  connectorPending: {
+    backgroundColor: '#E2E8F0',
+  },
+  nodesRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  nodeColumn: {
+    alignItems: 'center',
+    width: 72,
+  },
+  nodeCircle: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
     borderWidth: 2,
-    borderColor: '#6366F1',
+    borderColor: '#E2E8F0',
   },
-  timelineInnerDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#6366F1',
+  nodeCircleDone: {
+    backgroundColor: '#0F172A',
+    borderColor: '#0F172A',
   },
-  timelineEmptyDot: {
+  nodeCircleActive: {
+    backgroundColor: '#EEF2FF',
+    borderColor: '#4F46E5',
+    borderWidth: 2.5,
+  },
+  nodeCirclePending: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#CBD5E1',
+  },
+  nodePulseInner: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#4F46E5',
+  },
+  nodePendingDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
     backgroundColor: '#CBD5E1',
   },
-  timelineLine: {
-    flex: 1,
-    height: 2,
-    backgroundColor: '#E2E8F0',
-    marginHorizontal: -4,
-    marginBottom: 24,
-  },
-  timelineLineDone: {
-    backgroundColor: '#0F172A',
-  },
-  timelineStepLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#0F172A',
-    marginTop: 6,
-    textAlign: 'center',
-  },
-  timelineStepTime: {
-    fontSize: 9,
-    color: '#94A3B8',
-    marginTop: 1,
-    textAlign: 'center',
-  },
-  trackDetailsBtn: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 14,
-    paddingVertical: 10,
-    alignItems: 'center',
-    marginTop: 16,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  trackDetailsBtnText: {
+  nodeTitle: {
     fontSize: 12,
     fontWeight: '700',
+    color: '#0F172A',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  nodeSub: {
+    fontSize: 10,
+    color: '#94A3B8',
+    marginTop: 2,
+    textAlign: 'center',
+  },
+
+  manageTenderBtn: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginTop: 18,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+  },
+  manageTenderBtnText: {
+    fontSize: 13,
+    fontWeight: '800',
     color: '#4F46E5',
   },
 
-  // Workers List
-  workerListItem: {
+  // 7. Top Verified Workers Nearby (Organized & Aligned)
+  workerCardOrganized: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 18,
+    marginBottom: 14,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  workerCardTop: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 14,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
   },
-  workerThumb: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
+  workerAvatarLarge: {
+    width: 56,
+    height: 56,
+    borderRadius: 18,
     backgroundColor: '#E2E8F0',
   },
-  workerName: {
-    fontSize: 14,
-    fontWeight: '800',
+  workerNameText: {
+    fontSize: 16,
+    fontWeight: '900',
     color: '#0F172A',
   },
-  workerSkill: {
-    fontSize: 12,
-    color: '#64748B',
+  workerSkillText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#4F46E5',
     marginTop: 2,
   },
-  workerMetaRow: {
+  workerRatingRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
     marginTop: 3,
   },
-  workerMeta: {
-    fontSize: 10,
-    color: '#94A3B8',
-  },
-  workerRating: {
-    fontSize: 10,
+  workerRatingNum: {
+    fontSize: 12,
     fontWeight: '800',
     color: '#F59E0B',
   },
-  workerWage: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#0F172A',
+  workerReviewsCount: {
+    fontSize: 11,
+    color: '#94A3B8',
   },
-  actionPillBtn: {
-    backgroundColor: '#0F172A',
-    paddingHorizontal: 12,
+  wageTag: {
+    alignItems: 'flex-end',
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 12,
-  },
-  actionPillBtnSelected: {
-    backgroundColor: '#DCFCE7',
     borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  wageTagLabel: {
+    fontSize: 10,
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  wageTagAmount: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: '#0F172A',
+  },
+  chipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 12,
+  },
+  metaChip: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
+  },
+  metaChipText: {
+    fontSize: 11,
+    color: '#475569',
+    fontWeight: '600',
+  },
+  workerSpecialtiesText: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 8,
+    lineHeight: 16,
+  },
+  workerCardBottom: {
+    marginTop: 14,
+  },
+  hireWorkerBtn: {
+    backgroundColor: '#0F172A',
+    borderRadius: 14,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  hireWorkerBtnSelected: {
+    backgroundColor: '#DCFCE7',
+    borderWidth: 1.5,
     borderColor: '#86EFAC',
   },
-  actionPillBtnText: {
-    fontSize: 10,
+  hireWorkerBtnText: {
+    fontSize: 13,
     fontWeight: '800',
     color: '#FFFFFF',
   },
 
-  // Floating Bottom Dock (Reference 1 & 2)
-  dockContainer: {
-    position: 'absolute',
-    bottom: 24,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-  },
-  dockBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 36,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.14,
-    shadowRadius: 18,
-    elevation: 8,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    gap: 6,
-  },
-  dockItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 24,
-    gap: 6,
-  },
-  dockItemActive: {
+  // 8. Persona Switcher Card (Inside Profile Tab)
+  personaSwitchBox: {
     backgroundColor: '#0F172A',
+    marginHorizontal: 16,
+    marginTop: 12,
+    borderRadius: 24,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 4,
   },
-  dockLabelActive: {
+  personaSwitchTop: {
+    marginBottom: 14,
+  },
+  personaBadge: {
+    backgroundColor: '#1E293B',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+    marginBottom: 8,
+  },
+  personaBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#94A3B8',
+    letterSpacing: 0.8,
+  },
+  personaTitle: {
+    fontSize: 18,
+    fontWeight: '900',
     color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '700',
   },
-  dockCenterBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#6366F1',
+  personaDesc: {
+    fontSize: 12,
+    color: '#94A3B8',
+    marginTop: 4,
+    lineHeight: 17,
+  },
+  switchPersonaBtn: {
+    backgroundColor: '#4F46E5',
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#6366F1',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    elevation: 6,
+    paddingVertical: 14,
+    borderRadius: 16,
+    gap: 8,
+  },
+  switchPersonaBtnText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
 
-  // Page Header Pad
+  // 9. Work Detail & Matrix
   pageHeaderPad: {
     paddingHorizontal: 20,
-    paddingTop: 12,
+    paddingTop: 14,
     paddingBottom: 8,
   },
   pageMainHeading: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: '900',
     color: '#0F172A',
+    letterSpacing: -0.3,
   },
   pageSubHeading: {
     fontSize: 13,
@@ -1919,114 +2170,111 @@ const styles = StyleSheet.create({
     marginTop: 4,
     lineHeight: 18,
   },
-
-  // Project Detail Card (Work Screen)
   projectDetailCard: {
     backgroundColor: '#FFFFFF',
     marginHorizontal: 16,
     marginTop: 12,
     borderRadius: 24,
-    padding: 18,
-    borderWidth: 1,
+    padding: 20,
+    borderWidth: 1.5,
     borderColor: '#E2E8F0',
   },
   projectDetailTitle: {
-    fontSize: 16,
-    fontWeight: '800',
+    fontSize: 17,
+    fontWeight: '900',
     color: '#0F172A',
-    marginTop: 10,
+    marginTop: 12,
   },
   projectDetailLoc: {
-    fontSize: 12,
+    fontSize: 13,
     color: '#64748B',
-    marginTop: 3,
+    marginTop: 4,
   },
   vacancyMatrixBox: {
     backgroundColor: '#F8FAFC',
-    borderRadius: 18,
-    padding: 14,
-    marginTop: 14,
-    borderWidth: 1,
+    borderRadius: 20,
+    padding: 16,
+    marginTop: 16,
+    borderWidth: 1.5,
     borderColor: '#E2E8F0',
   },
   vacancyMatrixHeading: {
-    fontSize: 10,
-    fontWeight: '800',
+    fontSize: 11,
+    fontWeight: '900',
     color: '#94A3B8',
     letterSpacing: 0.8,
-    marginBottom: 8,
+    marginBottom: 10,
   },
   vacancyRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
   },
   vacancySkillTitle: {
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: 14,
+    fontWeight: '800',
     color: '#0F172A',
   },
   vacancyCounts: {
-    fontSize: 11,
+    fontSize: 12,
     color: '#64748B',
     marginTop: 2,
   },
   vacancyBadgeYellow: {
     backgroundColor: '#FEF3C7',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
   },
   vacancyBadgeYellowText: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '800',
     color: '#B45309',
   },
-
-  // Work Updates Log
   workUpdatesLog: {
-    marginTop: 16,
-    paddingTop: 14,
+    marginTop: 18,
+    paddingTop: 16,
     borderTopWidth: 1,
     borderTopColor: '#F1F5F9',
   },
   logItem: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 12,
-    borderLeftWidth: 1.5,
+    marginBottom: 14,
+    borderLeftWidth: 2,
     borderLeftColor: '#E2E8F0',
-    marginLeft: 6,
-    paddingLeft: 10,
+    marginLeft: 8,
+    paddingLeft: 12,
   },
   logCheck: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     backgroundColor: '#DCFCE7',
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: -19,
+    marginLeft: -23,
     marginTop: 2,
   },
   logTime: {
-    fontSize: 10,
+    fontSize: 11,
     color: '#94A3B8',
     fontWeight: '600',
   },
   logDesc: {
-    fontSize: 12,
+    fontSize: 13,
     color: '#0F172A',
     fontWeight: '500',
-    marginTop: 1,
+    marginTop: 2,
+    lineHeight: 18,
   },
   projectActionsGrid: {
     flexDirection: 'row',
-    gap: 10,
-    marginTop: 16,
+    gap: 12,
+    marginTop: 18,
   },
   projectPrimaryBtn: {
     flex: 1,
@@ -2034,13 +2282,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#0F172A',
-    paddingVertical: 12,
-    borderRadius: 14,
-    gap: 6,
+    paddingVertical: 14,
+    borderRadius: 16,
+    gap: 8,
   },
   projectPrimaryBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: 13,
+    fontWeight: '800',
     color: '#FFFFFF',
   },
   projectSecondaryBtn: {
@@ -2049,107 +2297,109 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#EEF2FF',
-    paddingVertical: 12,
-    borderRadius: 14,
-    gap: 6,
+    paddingVertical: 14,
+    borderRadius: 16,
+    gap: 8,
   },
   projectSecondaryBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: 13,
+    fontWeight: '800',
     color: '#4F46E5',
   },
 
-  // Reviews Screen
+  // 10. Reviews Tab
   scoreOverviewCard: {
     backgroundColor: '#FFFFFF',
     marginHorizontal: 16,
     marginTop: 12,
     borderRadius: 24,
-    padding: 20,
+    padding: 22,
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: '#E2E8F0',
   },
   scoreBigCol: {
     alignItems: 'center',
-    paddingRight: 20,
-    borderRightWidth: 1,
+    paddingRight: 22,
+    borderRightWidth: 1.5,
     borderRightColor: '#E2E8F0',
   },
   scoreBigNumber: {
-    fontSize: 40,
+    fontSize: 44,
     fontWeight: '900',
     color: '#0F172A',
   },
   starsRow: {
     flexDirection: 'row',
-    gap: 2,
+    gap: 3,
     marginTop: 4,
   },
   scoreBasedText: {
-    fontSize: 10,
+    fontSize: 11,
     color: '#94A3B8',
     marginTop: 4,
+    fontWeight: '500',
   },
   scoreBarsCol: {
     flex: 1,
-    marginLeft: 16,
-    gap: 8,
+    marginLeft: 18,
+    gap: 10,
   },
   barItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   barLabel: {
-    fontSize: 10,
+    fontSize: 11,
     color: '#64748B',
-    width: 65,
+    width: 68,
+    fontWeight: '500',
   },
   barTrack: {
     flex: 1,
-    height: 6,
+    height: 7,
     backgroundColor: '#E2E8F0',
-    borderRadius: 3,
+    borderRadius: 3.5,
     overflow: 'hidden',
   },
   barFill: {
-    height: 6,
+    height: 7,
     backgroundColor: '#F59E0B',
-    borderRadius: 3,
+    borderRadius: 3.5,
   },
   barScore: {
-    fontSize: 10,
-    fontWeight: '700',
+    fontSize: 11,
+    fontWeight: '800',
     color: '#0F172A',
-    width: 20,
+    width: 24,
   },
   writeReviewBannerBtn: {
-    backgroundColor: '#6366F1',
+    backgroundColor: '#4F46E5',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 14,
-    borderRadius: 16,
+    paddingVertical: 16,
+    borderRadius: 18,
     gap: 8,
-    shadowColor: '#6366F1',
+    shadowColor: '#4F46E5',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 8,
     elevation: 4,
   },
   writeReviewBannerBtnText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '800',
     color: '#FFFFFF',
   },
   reviewCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
+    borderRadius: 22,
+    padding: 18,
+    marginBottom: 14,
+    borderWidth: 1.5,
     borderColor: '#E2E8F0',
   },
   reviewHeader: {
@@ -2157,82 +2407,76 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   revCustomerName: {
-    fontSize: 14,
-    fontWeight: '800',
+    fontSize: 15,
+    fontWeight: '900',
     color: '#0F172A',
   },
   revWorkerName: {
-    fontSize: 11,
+    fontSize: 12,
     color: '#64748B',
-    marginTop: 1,
+    marginTop: 2,
   },
   revDate: {
-    fontSize: 10,
+    fontSize: 11,
     color: '#94A3B8',
     marginTop: 3,
   },
   revComment: {
-    fontSize: 12,
+    fontSize: 13,
     color: '#334155',
-    lineHeight: 18,
+    lineHeight: 20,
     marginTop: 10,
   },
   tagsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 6,
-    marginTop: 10,
+    marginTop: 12,
   },
   tagPill: {
     backgroundColor: '#F1F5F9',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
   },
   tagPillText: {
-    fontSize: 10,
-    fontWeight: '600',
+    fontSize: 11,
+    fontWeight: '700',
     color: '#475569',
   },
 
-  // Profile Screen
+  // 11. Profile Cards
   profileUserCard: {
     backgroundColor: '#FFFFFF',
     marginHorizontal: 16,
-    marginTop: 12,
+    marginTop: 14,
     borderRadius: 24,
-    padding: 18,
+    padding: 20,
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: '#E2E8F0',
   },
-  profileBigAvatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: '#E2E8F0',
-  },
   profileName: {
-    fontSize: 16,
-    fontWeight: '800',
+    fontSize: 18,
+    fontWeight: '900',
     color: '#0F172A',
   },
   profilePhone: {
-    fontSize: 12,
+    fontSize: 13,
     color: '#64748B',
-    marginTop: 2,
+    marginTop: 3,
   },
   roleTagPill: {
     backgroundColor: '#EEF2FF',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
     alignSelf: 'flex-start',
-    marginTop: 6,
+    marginTop: 8,
   },
   roleTagPillText: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '800',
     color: '#4F46E5',
   },
@@ -2240,53 +2484,64 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 24,
     padding: 8,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: '#E2E8F0',
   },
   settingsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
+    padding: 14,
   },
   settingsIconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: 14,
+    width: 44,
+    height: 44,
+    borderRadius: 16,
     backgroundColor: '#F8FAFC',
     alignItems: 'center',
     justifyContent: 'center',
   },
   settingsTitle: {
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: 14,
+    fontWeight: '800',
     color: '#0F172A',
   },
   settingsSub: {
-    fontSize: 11,
+    fontSize: 12,
     color: '#64748B',
     marginTop: 2,
   },
   settingsDivider: {
     height: 1,
     backgroundColor: '#F1F5F9',
-    marginHorizontal: 12,
+    marginHorizontal: 14,
   },
   statusPillGreen: {
     backgroundColor: '#DCFCE7',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
   },
   statusPillGreenText: {
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '800',
     color: '#15803D',
   },
+  langPill: {
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+  },
+  langPillText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#4F46E5',
+  },
 
-  // Modal Styles
+  // 12. Modal Styles
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.6)',
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
     justifyContent: 'flex-end',
   },
   modalCardLarge: {
@@ -2294,7 +2549,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
     padding: 24,
-    paddingBottom: 36,
+    paddingBottom: 38,
   },
   modalHeaderRow: {
     flexDirection: 'row',
@@ -2303,67 +2558,67 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   modalHeading: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '900',
     color: '#0F172A',
   },
   modalStepBadge: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#6366F1',
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#4F46E5',
     marginTop: 2,
   },
   modalCloseCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
   },
   stepContent: {
-    paddingVertical: 4,
+    paddingVertical: 6,
   },
   stepLabel: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '800',
     color: '#0F172A',
-    marginBottom: 6,
+    marginBottom: 8,
   },
   textInputBox: {
     backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
     borderColor: '#E2E8F0',
-    borderRadius: 16,
-    padding: 14,
-    fontSize: 14,
+    borderRadius: 18,
+    padding: 16,
+    fontSize: 15,
     color: '#0F172A',
   },
   gpsConfirmCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#EEF2FF',
-    padding: 14,
-    borderRadius: 16,
-    marginTop: 12,
+    padding: 16,
+    borderRadius: 18,
+    marginTop: 14,
   },
   counterRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: '#F8FAFC',
-    borderRadius: 16,
-    padding: 14,
-    borderWidth: 1,
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1.5,
     borderColor: '#E2E8F0',
   },
   counterTitle: {
-    fontSize: 14,
-    fontWeight: '800',
+    fontSize: 15,
+    fontWeight: '900',
     color: '#0F172A',
   },
   counterSub: {
-    fontSize: 11,
+    fontSize: 12,
     color: '#64748B',
     marginTop: 2,
   },
@@ -2371,83 +2626,83 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    borderWidth: 1,
+    borderRadius: 16,
+    borderWidth: 1.5,
     borderColor: '#CBD5E1',
-    paddingHorizontal: 4,
-    paddingVertical: 2,
-    gap: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    gap: 10,
   },
   stepperBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 10,
+    width: 32,
+    height: 32,
+    borderRadius: 12,
     backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
   },
   stepperBtnText: {
-    fontSize: 16,
-    fontWeight: '800',
+    fontSize: 18,
+    fontWeight: '900',
     color: '#0F172A',
   },
   stepperNum: {
-    fontSize: 14,
-    fontWeight: '800',
+    fontSize: 16,
+    fontWeight: '900',
     color: '#0F172A',
-    minWidth: 18,
+    minWidth: 22,
     textAlign: 'center',
   },
   summaryReviewCard: {
     backgroundColor: '#F8FAFC',
-    borderRadius: 18,
-    padding: 16,
-    borderWidth: 1,
+    borderRadius: 20,
+    padding: 18,
+    borderWidth: 1.5,
     borderColor: '#E2E8F0',
   },
   summaryReviewHeading: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '900',
     color: '#64748B',
     letterSpacing: 0.8,
   },
   summaryLine: {
-    fontSize: 13,
+    fontSize: 14,
     color: '#0F172A',
-    marginTop: 8,
-    fontWeight: '500',
+    marginTop: 9,
+    fontWeight: '600',
   },
   summaryDivider: {
     height: 1,
     backgroundColor: '#E2E8F0',
-    marginVertical: 14,
+    marginVertical: 16,
   },
   modalFooterRow: {
     flexDirection: 'row',
-    gap: 10,
-    marginTop: 20,
+    gap: 12,
+    marginTop: 22,
   },
   modalPrevBtn: {
     flex: 1,
     backgroundColor: '#F1F5F9',
-    paddingVertical: 14,
-    borderRadius: 16,
+    paddingVertical: 16,
+    borderRadius: 18,
     alignItems: 'center',
   },
   modalPrevBtnText: {
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: 14,
+    fontWeight: '800',
     color: '#475569',
   },
   modalNextBtn: {
     flex: 2,
     backgroundColor: '#0F172A',
-    paddingVertical: 14,
-    borderRadius: 16,
+    paddingVertical: 16,
+    borderRadius: 18,
     alignItems: 'center',
   },
   modalNextBtnText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '800',
     color: '#FFFFFF',
   },
@@ -2457,7 +2712,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     margin: 24,
     borderRadius: 28,
-    padding: 24,
+    padding: 26,
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
@@ -2466,37 +2721,37 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   successCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 68,
+    height: 68,
+    borderRadius: 34,
     backgroundColor: '#DCFCE7',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
   },
   successHeading: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '900',
     color: '#0F172A',
     textAlign: 'center',
   },
   successSub: {
-    fontSize: 13,
+    fontSize: 14,
     color: '#64748B',
     textAlign: 'center',
-    lineHeight: 19,
+    lineHeight: 20,
     marginTop: 8,
   },
   successBtn: {
     backgroundColor: '#0F172A',
     width: '100%',
-    paddingVertical: 14,
-    borderRadius: 16,
+    paddingVertical: 16,
+    borderRadius: 18,
     alignItems: 'center',
-    marginTop: 20,
+    marginTop: 22,
   },
   successBtnText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '800',
     color: '#FFFFFF',
   },
