@@ -75,7 +75,7 @@ const I18N = {
     devLogin: '⚡ Dev Test Login (abc / 1234)',
     termsNotice: 'By continuing, you confirm that you have read and agreed to the Terms of Service and consent to the Privacy Policy.',
     chooseRoleTitle: 'Choose your role',
-    chooseRoleSub: 'How would you like to use MISTRI PRO today?',
+    chooseRoleSub: 'How would you like to use MISTRI PRO as a:',
     customerRole: 'Customer',
     customerDesc: 'Post requirements, get competitive bids, and hire verified skilled mistris.',
     workerRole: 'Worker / Mistri',
@@ -132,7 +132,7 @@ const I18N = {
     devLogin: '⚡ देव टेस्ट लॉगिन (abc / 1234)',
     termsNotice: 'जारी रखकर, आप पुष्टि करते हैं कि आपने सेवा की शर्तें और गोपनीयता नीति पढ़ ली हैं।',
     chooseRoleTitle: 'अपनी भूमिका चुनें',
-    chooseRoleSub: 'आज आप मिस्त्री प्रो का उपयोग कैसे करना चाहते हैं?',
+    chooseRoleSub: 'मिस्त्री प्रो का उपयोग किस रूप में करना चाहते हैं:',
     customerRole: 'ग्राहक (Customer)',
     customerDesc: 'काम पोस्ट करें, प्रतिस्पर्धी बोलियां प्राप्त करें और प्रमाणित मिस्त्री को नियुक्त करें।',
     workerRole: 'कारीगर / मिस्त्री (Worker)',
@@ -189,7 +189,7 @@ const I18N = {
     devLogin: '⚡ દેવ ટેસ્ટ લૉગિન (abc / 1234)',
     termsNotice: 'ચાલુ રાખીને, તમે સેવાની શરતો અને ગોપનીયતા નીતિ સાથે સંમત થાઓ છો.',
     chooseRoleTitle: 'તમારી ભૂમિકા પસંદ કરો',
-    chooseRoleSub: 'તમે મિશ્ત્રી પ્રોનો ઉપયોગ કેવી રીતે કરવા માંગો છો?',
+    chooseRoleSub: 'તમે મિસ્ત્રી પ્રોનો ઉપયોગ કયા રૂપમાં કરવા માંગો છો:',
     customerRole: 'ગ્રાહક (Customer)',
     customerDesc: 'કામ પોસ્ટ કરો, શ્રેષ્ઠ ઑફર મેળવો અને કુશળ કારીગરોને હાયર કરો.',
     workerRole: 'કારીગર / મિસ્ત્રી (Worker)',
@@ -246,7 +246,7 @@ const I18N = {
     devLogin: '⚡ देव टेस्ट लॉगिन (abc / 1234)',
     termsNotice: 'पुढे जाऊन, आपण सेवेच्या अटी व गोपनीयता धोरणाशी सहमत आहात.',
     chooseRoleTitle: 'तुमची भूमिका निवडा',
-    chooseRoleSub: 'आज तुम्हाला मिस्त्री प्रो कशासाठी वापरायचे आहे?',
+    chooseRoleSub: 'मिस्त्री प्रोचा वापर कोणत्या भूमिकेत करू इच्छिता:',
     customerRole: 'ग्राहक (Customer)',
     customerDesc: 'कामाची आवश्यकता पोस्ट करा, योग्य दर मिळवा आणि कुशल कारागीर नेमा.',
     workerRole: 'कारागीर / मिस्त्री (Worker)',
@@ -716,19 +716,25 @@ function MainApp() {
   }
 
   // -------------------------------------------------------------
-  // SCREEN 4: CHOOSE YOUR ROLE (Customer vs Worker Picker)
+  // SCREEN 4: CHOOSE YOUR ROLE (Ultra Engaging & Clear UI)
   // -------------------------------------------------------------
   if (currentScreen === 'ROLE_SELECT') {
     return (
       <SafeAreaView style={styles.roleSafeArea}>
         <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
         <View style={styles.roleContainer}>
-          <TouchableOpacity
-            style={styles.roleBackBtn}
-            onPress={() => setCurrentScreen('SIGN_IN')}
-          >
-            <ChevronRight size={22} color="#0F172A" style={{ transform: [{ rotate: '180deg' }] }} />
-          </TouchableOpacity>
+          <View style={styles.roleTopNav}>
+            <TouchableOpacity
+              style={styles.roleBackBtn}
+              onPress={() => setCurrentScreen('SIGN_IN')}
+              activeOpacity={0.7}
+            >
+              <ChevronRight size={22} color="#0F172A" style={{ transform: [{ rotate: '180deg' }] }} />
+            </TouchableOpacity>
+            <View style={styles.roleStepPill}>
+              <Text style={styles.roleStepPillText}>STEP 2 OF 2</Text>
+            </View>
+          </View>
 
           <View style={styles.roleHeaderSection}>
             <Text style={styles.roleHeaderTitle}>{t.chooseRoleTitle}</Text>
@@ -736,60 +742,91 @@ function MainApp() {
           </View>
 
           <View style={styles.roleCardsGroup}>
-            {/* Customer Role Card */}
+            {/* 1. Customer Role Card */}
             <TouchableOpacity
-              style={[styles.roleCard, role === 'CUSTOMER' && styles.roleCardActive]}
+              style={[styles.roleCard, styles.roleCardCustomer, role === 'CUSTOMER' && styles.roleCardActive]}
               onPress={() => {
                 setRole('CUSTOMER');
                 setCurrentScreen('MAIN');
               }}
-              activeOpacity={0.85}
+              activeOpacity={0.88}
             >
               <View style={styles.roleCardTopRow}>
-                <View style={[styles.roleEmojiWrap, { backgroundColor: '#EEF2FF' }]}>
-                  <Text style={styles.roleEmoji}>🏠</Text>
+                <View style={styles.roleCardLeftBadge}>
+                  <View style={[styles.roleEmojiWrap, { backgroundColor: '#EEF2FF' }]}>
+                    <Text style={styles.roleEmoji}>🏡</Text>
+                  </View>
+                  <View>
+                    <Text style={styles.roleCardTitle}>{t.customerRole}</Text>
+                    <Text style={styles.roleCardSubHint}>I want to get work done</Text>
+                  </View>
                 </View>
                 <View style={styles.roleArrowCircle}>
-                  <ArrowRight size={18} color="#4F46E5" />
+                  <ArrowRight size={18} color="#4F46E5" strokeWidth={2.5} />
                 </View>
               </View>
-              <Text style={styles.roleCardTitle}>{t.customerRole}</Text>
+
               <Text style={styles.roleCardDesc}>{t.customerDesc}</Text>
-              <View style={styles.roleTag}>
-                <Text style={styles.roleTagText}>Post Work • Hire Workers • Escrow Safety</Text>
+
+              {/* Highlighting Feature Chips */}
+              <View style={styles.roleFeaturesRow}>
+                <View style={styles.roleFeatureChip}>
+                  <Check size={12} color="#4F46E5" strokeWidth={2.5} />
+                  <Text style={styles.roleFeatureChipText}>Post Free Requirements</Text>
+                </View>
+                <View style={styles.roleFeatureChip}>
+                  <Check size={12} color="#4F46E5" strokeWidth={2.5} />
+                  <Text style={styles.roleFeatureChipText}>100% Escrow Protected</Text>
+                </View>
               </View>
             </TouchableOpacity>
 
-            {/* Worker Role Card */}
+            {/* 2. Worker / Mistri Role Card */}
             <TouchableOpacity
-              style={[styles.roleCard, role === 'WORKER' && styles.roleCardActiveWorker]}
+              style={[styles.roleCard, styles.roleCardWorker, role === 'WORKER' && styles.roleCardActiveWorker]}
               onPress={() => {
                 setRole('WORKER');
                 setCurrentScreen('MAIN');
               }}
-              activeOpacity={0.85}
+              activeOpacity={0.88}
             >
               <View style={styles.roleCardTopRow}>
-                <View style={[styles.roleEmojiWrap, { backgroundColor: '#F0FDF4' }]}>
-                  <Text style={styles.roleEmoji}>👷</Text>
+                <View style={styles.roleCardLeftBadge}>
+                  <View style={[styles.roleEmojiWrap, { backgroundColor: '#F0FDF4' }]}>
+                    <Text style={styles.roleEmoji}>👷‍♂️</Text>
+                  </View>
+                  <View>
+                    <Text style={styles.roleCardTitle}>{t.workerRole}</Text>
+                    <Text style={[styles.roleCardSubHint, { color: '#166534' }]}>I want to work & earn</Text>
+                  </View>
                 </View>
                 <View style={[styles.roleArrowCircle, { backgroundColor: '#DCFCE7' }]}>
-                  <ArrowRight size={18} color="#16A34A" />
+                  <ArrowRight size={18} color="#16A34A" strokeWidth={2.5} />
                 </View>
               </View>
-              <Text style={styles.roleCardTitle}>{t.workerRole}</Text>
+
               <Text style={styles.roleCardDesc}>{t.workerDesc}</Text>
-              <View style={[styles.roleTag, { backgroundColor: '#F0FDF4' }]}>
-                <Text style={[styles.roleTagText, { color: '#166534' }]}>
-                  Instant Bids • Direct Payout • Aadhaar Badge
-                </Text>
+
+              {/* Highlighting Feature Chips */}
+              <View style={styles.roleFeaturesRow}>
+                <View style={[styles.roleFeatureChip, { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0' }]}>
+                  <Check size={12} color="#16A34A" strokeWidth={2.5} />
+                  <Text style={[styles.roleFeatureChipText, { color: '#166534' }]}>Zero Commission</Text>
+                </View>
+                <View style={[styles.roleFeatureChip, { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0' }]}>
+                  <Check size={12} color="#16A34A" strokeWidth={2.5} />
+                  <Text style={[styles.roleFeatureChipText, { color: '#166534' }]}>Direct Daily Bank Payout</Text>
+                </View>
               </View>
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.roleNote}>
-            💡 You can freely switch between Customer and Worker personas anytime from your Profile tab.
-          </Text>
+          {/* Bottom Switch Note */}
+          <View style={styles.roleBottomNoteWrap}>
+            <Text style={styles.roleBottomNoteText}>
+              💡 Both experiences are inside one app. You can switch between Customer and Worker modes anytime in your Profile.
+            </Text>
+          </View>
         </View>
       </SafeAreaView>
     );
