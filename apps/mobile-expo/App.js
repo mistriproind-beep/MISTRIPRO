@@ -716,20 +716,24 @@ function MainApp() {
   }
 
   // -------------------------------------------------------------
-  // SCREEN 4: CHOOSE YOUR ROLE (Ultra Engaging & Clear UI)
+  // SCREEN 4: CHOOSE YOUR ROLE (Fitted & Responsive UI)
   // -------------------------------------------------------------
   if (currentScreen === 'ROLE_SELECT') {
     return (
       <SafeAreaView style={styles.roleSafeArea}>
         <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-        <View style={styles.roleContainer}>
+        <ScrollView
+          contentContainerStyle={[styles.roleScrollContent, { paddingBottom: Math.max(insets.bottom + 20, 32) }]}
+          showsVerticalScrollIndicator={false}
+          bounces={false}
+        >
           <View style={styles.roleTopNav}>
             <TouchableOpacity
               style={styles.roleBackBtn}
               onPress={() => setCurrentScreen('SIGN_IN')}
               activeOpacity={0.7}
             >
-              <ChevronRight size={22} color="#0F172A" style={{ transform: [{ rotate: '180deg' }] }} />
+              <ChevronRight size={20} color="#0F172A" style={{ transform: [{ rotate: '180deg' }] }} />
             </TouchableOpacity>
             <View style={styles.roleStepPill}>
               <Text style={styles.roleStepPillText}>STEP 2 OF 2</Text>
@@ -762,7 +766,7 @@ function MainApp() {
                   </View>
                 </View>
                 <View style={styles.roleArrowCircle}>
-                  <ArrowRight size={18} color="#4F46E5" strokeWidth={2.5} />
+                  <ArrowRight size={16} color="#4F46E5" strokeWidth={2.5} />
                 </View>
               </View>
 
@@ -771,11 +775,11 @@ function MainApp() {
               {/* Highlighting Feature Chips */}
               <View style={styles.roleFeaturesRow}>
                 <View style={styles.roleFeatureChip}>
-                  <Check size={12} color="#4F46E5" strokeWidth={2.5} />
+                  <Check size={11} color="#4F46E5" strokeWidth={2.5} />
                   <Text style={styles.roleFeatureChipText}>Post Free Requirements</Text>
                 </View>
                 <View style={styles.roleFeatureChip}>
-                  <Check size={12} color="#4F46E5" strokeWidth={2.5} />
+                  <Check size={11} color="#4F46E5" strokeWidth={2.5} />
                   <Text style={styles.roleFeatureChipText}>100% Escrow Protected</Text>
                 </View>
               </View>
@@ -801,7 +805,7 @@ function MainApp() {
                   </View>
                 </View>
                 <View style={[styles.roleArrowCircle, { backgroundColor: '#DCFCE7' }]}>
-                  <ArrowRight size={18} color="#16A34A" strokeWidth={2.5} />
+                  <ArrowRight size={16} color="#16A34A" strokeWidth={2.5} />
                 </View>
               </View>
 
@@ -810,11 +814,11 @@ function MainApp() {
               {/* Highlighting Feature Chips */}
               <View style={styles.roleFeaturesRow}>
                 <View style={[styles.roleFeatureChip, { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0' }]}>
-                  <Check size={12} color="#16A34A" strokeWidth={2.5} />
+                  <Check size={11} color="#16A34A" strokeWidth={2.5} />
                   <Text style={[styles.roleFeatureChipText, { color: '#166534' }]}>Zero Commission</Text>
                 </View>
                 <View style={[styles.roleFeatureChip, { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0' }]}>
-                  <Check size={12} color="#16A34A" strokeWidth={2.5} />
+                  <Check size={11} color="#16A34A" strokeWidth={2.5} />
                   <Text style={[styles.roleFeatureChipText, { color: '#166534' }]}>Direct Daily Bank Payout</Text>
                 </View>
               </View>
@@ -824,10 +828,10 @@ function MainApp() {
           {/* Bottom Switch Note */}
           <View style={styles.roleBottomNoteWrap}>
             <Text style={styles.roleBottomNoteText}>
-              💡 Both experiences are inside one app. You can switch between Customer and Worker modes anytime in your Profile.
+              💡 You can freely switch between Customer and Worker modes anytime in your Profile tab.
             </Text>
           </View>
-        </View>
+        </ScrollView>
       </SafeAreaView>
     );
   }
