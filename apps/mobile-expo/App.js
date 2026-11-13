@@ -8,11 +8,13 @@ import {
   TextInput,
   StatusBar,
   Modal,
+  ActivityIndicator,
   Alert,
   Image,
   Dimensions,
 } from 'react-native';
 import { SafeAreaView, SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFonts } from 'expo-font';
 import {
   Home,
   Briefcase,
@@ -437,8 +439,15 @@ export default function App() {
 function MainApp() {
   const insets = useSafeAreaInsets();
 
+  const [fontsLoaded] = useFonts({
+    'Satoshi-Regular': require('./assets/fonts/Satoshi-Regular.ttf'),
+    'Satoshi-Medium': require('./assets/fonts/Satoshi-Medium.ttf'),
+    'Satoshi-Bold': require('./assets/fonts/Satoshi-Bold.ttf'),
+    'Satoshi-Black': require('./assets/fonts/Satoshi-Black.ttf'),
+  });
+
   // Navigation State: 'SPLASH' | 'LANGUAGE' | 'SIGN_IN' | 'ROLE_SELECT' | 'MAIN'
-  const [currentScreen, setCurrentScreen] = useState('MAIN');
+  const [currentScreen, setCurrentScreen] = useState('SPLASH');
   const [lang, setLang] = useState('en');
   const [role, setRole] = useState('CUSTOMER'); // 'CUSTOMER' | 'WORKER'
   const [activeTab, setActiveTab] = useState('HOME'); // 'HOME' | 'WORK' | 'REVIEWS' | 'PROFILE'
@@ -474,7 +483,7 @@ function MainApp() {
     if (currentScreen === 'SPLASH') {
       const timer = setTimeout(() => {
         setCurrentScreen('LANGUAGE');
-      }, 2200);
+      }, 3500);
       return () => clearTimeout(timer);
     }
   }, [currentScreen]);
@@ -538,26 +547,27 @@ function MainApp() {
   };
 
   // -------------------------------------------------------------
-  // SCREEN 1: SPLASH (Laundrify Reference: Deep Royal Blue Gradient)
+  // SCREEN 1: SPLASH (White & Red mistripro Logo + 3-4s Loading)
   // -------------------------------------------------------------
   if (currentScreen === 'SPLASH') {
     return (
       <View style={styles.splashContainer}>
-        <StatusBar barStyle="light-content" backgroundColor="#1E50C8" />
-        <View style={styles.splashGradientTop} />
-        <View style={styles.splashGradientMid} />
-        <View style={styles.splashGradientBottom} />
+        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
         <View style={styles.splashContent}>
-          <View style={styles.splashLogoCard}>
-            <Image
-              source={require('./assets/logo.png')}
-              style={styles.splashLogoImage}
-              resizeMode="contain"
-            />
-          </View>
-          <Text style={styles.splashTitle}>{t.appName}</Text>
+          {/* Official mistripro Logo */}
+          <Image
+            source={require('./assets/splash_logo.png')}
+            style={styles.splashLogoImage}
+            resizeMode="contain"
+          />
           <Text style={styles.splashTagline}>{t.tagline}</Text>
+
+          {/* Loading Indicator 3-4 seconds */}
+          <View style={styles.splashLoaderWrap}>
+            <ActivityIndicator size="small" color="#E11D48" />
+            <Text style={styles.splashLoadingText}>Initializing mistripro...</Text>
+          </View>
         </View>
 
         <View style={styles.splashFooter}>
@@ -1763,83 +1773,54 @@ const styles = StyleSheet.create({
   // SPLASH SCREEN
   splashContainer: {
     flex: 1,
-    backgroundColor: '#1E50C8',
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
-  },
-  splashGradientTop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: '40%',
-    backgroundColor: '#1740A8',
-    opacity: 0.8,
-  },
-  splashGradientMid: {
-    position: 'absolute',
-    top: '30%',
-    left: 0,
-    right: 0,
-    height: '40%',
-    backgroundColor: '#2563EB',
-    opacity: 0.5,
-  },
-  splashGradientBottom: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: '35%',
-    backgroundColor: '#3B82F6',
-    opacity: 0.3,
-  },
-  splashContent: {
-    alignItems: 'center',
-    zIndex: 10,
-  },
-  splashLogoCard: {
-    width: 90,
-    height: 90,
-    borderRadius: 24,
     backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 24,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.25,
-    shadowRadius: 20,
-    elevation: 8,
+    position: 'relative',
+    paddingHorizontal: 24,
+  },
+  splashContent: {
+    alignItems: 'center',
+    width: '100%',
   },
   splashLogoImage: {
-    width: 60,
-    height: 60,
-  },
-  splashTitle: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: 2,
-    marginBottom: 8,
+    width: 280,
+    height: 90,
+    marginBottom: 16,
   },
   splashTagline: {
-    fontSize: 14,
-    fontWeight: '400',
-    color: 'rgba(255, 255, 255, 0.85)',
-    letterSpacing: 0.5,
+    fontFamily: 'Satoshi-Medium',
+    fontSize: 15,
+    color: '#64748B',
+    letterSpacing: 0.8,
+    marginBottom: 40,
+  },
+  splashLoaderWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  splashLoadingText: {
+    fontFamily: 'Satoshi-Medium',
+    fontFamily: 'Satoshi-Regular',
+    fontSize: 13,
+    color: '#64748B',
   },
   splashFooter: {
     position: 'absolute',
     bottom: 40,
-    zIndex: 10,
   },
   splashFooterText: {
+    fontFamily: 'Satoshi-Bold',
     fontSize: 11,
-    fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.6)',
-    letterSpacing: 1.5,
+    color: '#94A3B8',
+    letterSpacing: 2,
   },
 
   // LANGUAGE SCREEN
@@ -1863,8 +1844,8 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   langBrandTitle: {
+    fontFamily: 'Satoshi-Bold',
     fontSize: 22,
-    fontWeight: '700',
     color: '#FFFFFF',
     letterSpacing: 1.2,
   },
@@ -1889,12 +1870,13 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   sheetTitle: {
+    fontFamily: 'Satoshi-Bold',
     fontSize: 22,
-    fontWeight: '700',
     color: '#0F172A',
     marginBottom: 6,
   },
   sheetSubtitle: {
+    fontFamily: 'Satoshi-Regular',
     fontSize: 14,
     color: '#64748B',
     marginBottom: 22,
@@ -1940,14 +1922,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   langRowTitle: {
+    fontFamily: 'Satoshi-Bold',
     fontSize: 16,
-    fontWeight: '600',
     color: '#0F172A',
   },
   langRowTitleActive: {
     color: '#4F46E5',
   },
   langRowSub: {
+    fontFamily: 'Satoshi-Regular',
     fontSize: 12,
     color: '#64748B',
     marginTop: 2,
@@ -1982,8 +1965,8 @@ const styles = StyleSheet.create({
   },
   primaryBlackBtnText: {
     color: '#FFFFFF',
+    fontFamily: 'Satoshi-Bold',
     fontSize: 16,
-    fontWeight: '700',
     letterSpacing: 0.5,
   },
 
@@ -2012,8 +1995,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   signInMainHeading: {
+    fontFamily: 'Satoshi-Bold',
     fontSize: 28,
-    fontWeight: '700',
     color: '#0F172A',
     textAlign: 'center',
     marginBottom: 10,
@@ -2046,14 +2029,14 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
   },
   authGoogleG: {
+    fontFamily: 'Satoshi-Black',
     fontSize: 20,
-    fontWeight: '800',
     color: '#4285F4',
     marginRight: 10,
   },
   authBlackButtonText: {
+    fontFamily: 'Satoshi-Medium',
     fontSize: 15,
-    fontWeight: '600',
     color: '#FFFFFF',
     letterSpacing: 0.2,
   },
@@ -2070,8 +2053,8 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   authOutlineButtonText: {
+    fontFamily: 'Satoshi-Medium',
     fontSize: 15,
-    fontWeight: '600',
     color: '#0F172A',
   },
   authDevButton: {
@@ -2086,8 +2069,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   authDevButtonText: {
+    fontFamily: 'Satoshi-Bold',
+    fontFamily: 'Satoshi-Regular',
     fontSize: 14,
-    fontWeight: '700',
     color: '#92400E',
   },
   devBox: {
@@ -2112,6 +2096,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     height: 42,
     paddingHorizontal: 12,
+    fontFamily: 'Satoshi-Regular',
     fontSize: 14,
     color: '#0F172A',
     marginBottom: 10,
@@ -2124,8 +2109,8 @@ const styles = StyleSheet.create({
   },
   devSubmitText: {
     color: '#FFFFFF',
+    fontFamily: 'Satoshi-Medium',
     fontSize: 14,
-    fontWeight: '600',
   },
   signInFooter: {
     paddingHorizontal: 12,
@@ -2164,8 +2149,8 @@ const styles = StyleSheet.create({
     marginBottom: 28,
   },
   roleHeaderTitle: {
+    fontFamily: 'Satoshi-Black',
     fontSize: 28,
-    fontWeight: '800',
     color: '#0F172A',
     marginBottom: 8,
   },
@@ -2222,8 +2207,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   roleCardTitle: {
+    fontFamily: 'Satoshi-Bold',
     fontSize: 20,
-    fontWeight: '700',
     color: '#0F172A',
     marginBottom: 6,
   },
@@ -2246,6 +2231,7 @@ const styles = StyleSheet.create({
     color: '#4F46E5',
   },
   roleNote: {
+    fontFamily: 'Satoshi-Regular',
     fontSize: 12,
     color: '#94A3B8',
     textAlign: 'center',
@@ -2351,12 +2337,13 @@ const styles = StyleSheet.create({
   },
   fionixUserTextCol: {},
   fionixHelloSub: {
+    fontFamily: 'Satoshi-Regular',
     fontSize: 12,
     color: '#64748B',
   },
   fionixUserName: {
+    fontFamily: 'Satoshi-Black',
     fontSize: 18,
-    fontWeight: '800',
     color: '#0F172A',
   },
   fionixHeaderActions: {
@@ -2389,11 +2376,12 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   fionixSectionTitle: {
+    fontFamily: 'Satoshi-Black',
     fontSize: 20,
-    fontWeight: '800',
     color: '#0F172A',
   },
   fionixSectionSubtitle: {
+    fontFamily: 'Satoshi-Regular',
     fontSize: 12,
     color: '#64748B',
     marginTop: 2,
@@ -2442,8 +2430,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   fionixHeroHeading: {
+    fontFamily: 'Satoshi-Bold',
     fontSize: 16,
-    fontWeight: '600',
     color: '#FFFFFF',
   },
   fionixHeroArrowCircle: {
@@ -2455,13 +2443,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   fionixHeroBigScore: {
+    fontFamily: 'Satoshi-Black',
     fontSize: 38,
-    fontWeight: '800',
     color: '#FFFFFF',
     letterSpacing: -0.5,
     marginBottom: 4,
   },
   fionixHeroSubPrompt: {
+    fontFamily: 'Satoshi-Regular',
     fontSize: 13,
     color: 'rgba(255, 255, 255, 0.85)',
     marginBottom: 16,
@@ -2483,8 +2472,9 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
   },
   fionixWhiteActionBtnText: {
+    fontFamily: 'Satoshi-Bold',
+    fontFamily: 'Satoshi-Regular',
     fontSize: 13,
-    fontWeight: '700',
     color: '#1D4ED8',
   },
 
@@ -2520,8 +2510,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   fionixStatBigNumber: {
+    fontFamily: 'Satoshi-Black',
     fontSize: 28,
-    fontWeight: '800',
     color: '#0F172A',
     marginBottom: 2,
   },
@@ -2551,8 +2541,8 @@ const styles = StyleSheet.create({
     color: '#0F172A',
   },
   fionixHoursTotal: {
+    fontFamily: 'Satoshi-Black',
     fontSize: 20,
-    fontWeight: '800',
     color: '#0F172A',
   },
   fionixBarGraphRow: {
@@ -2602,8 +2592,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   sectionHeaderTitle: {
+    fontFamily: 'Satoshi-Black',
     fontSize: 18,
-    fontWeight: '800',
     color: '#0F172A',
   },
   categoriesScroll: {
@@ -2625,8 +2615,9 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   catName: {
+    fontFamily: 'Satoshi-Bold',
+    fontFamily: 'Satoshi-Regular',
     fontSize: 12,
-    fontWeight: '700',
     color: '#0F172A',
     marginBottom: 2,
   },
@@ -2661,8 +2652,8 @@ const styles = StyleSheet.create({
   },
   workerAvatarText: {
     color: '#FFFFFF',
+    fontFamily: 'Satoshi-Black',
     fontSize: 18,
-    fontWeight: '800',
   },
   workerVerifiedBadge: {
     position: 'absolute',
@@ -2682,8 +2673,9 @@ const styles = StyleSheet.create({
     color: '#166534',
   },
   workerName: {
+    fontFamily: 'Satoshi-Bold',
+    fontFamily: 'Satoshi-Regular',
     fontSize: 14,
-    fontWeight: '700',
     color: '#0F172A',
     textAlign: 'center',
   },
@@ -2699,8 +2691,9 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   workerRatingNum: {
+    fontFamily: 'Satoshi-Bold',
+    fontFamily: 'Satoshi-Regular',
     fontSize: 12,
-    fontWeight: '700',
     color: '#0F172A',
   },
   workerReviewsCount: {
@@ -2744,11 +2737,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   workScreenTitle: {
+    fontFamily: 'Satoshi-Black',
     fontSize: 20,
-    fontWeight: '800',
     color: '#0F172A',
   },
   workScreenSub: {
+    fontFamily: 'Satoshi-Regular',
     fontSize: 12,
     color: '#64748B',
     marginTop: 2,
@@ -2764,8 +2758,8 @@ const styles = StyleSheet.create({
   },
   workScreenPostBtnText: {
     color: '#FFFFFF',
+    fontFamily: 'Satoshi-Bold',
     fontSize: 13,
-    fontWeight: '700',
   },
   workScrollContent: {
     padding: 20,
@@ -2811,8 +2805,8 @@ const styles = StyleSheet.create({
     color: '#B45309',
   },
   projectTitle: {
+    fontFamily: 'Satoshi-Bold',
     fontSize: 16,
-    fontWeight: '700',
     color: '#0F172A',
     marginBottom: 10,
   },
@@ -2827,6 +2821,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   projectInfoText: {
+    fontFamily: 'Satoshi-Regular',
     fontSize: 12,
     color: '#64748B',
   },
@@ -2846,8 +2841,8 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   projectBudgetVal: {
+    fontFamily: 'Satoshi-Black',
     fontSize: 18,
-    fontWeight: '800',
     color: '#0F172A',
   },
   projectActionBtn: {
@@ -2877,8 +2872,8 @@ const styles = StyleSheet.create({
   },
   writeReviewTopBtnText: {
     color: '#FFFFFF',
+    fontFamily: 'Satoshi-Bold',
     fontSize: 13,
-    fontWeight: '700',
   },
   overallRatingCard: {
     flexDirection: 'row',
@@ -2892,8 +2887,8 @@ const styles = StyleSheet.create({
   },
   overallRatingLeft: {},
   overallScoreText: {
+    fontFamily: 'Satoshi-Black',
     fontSize: 40,
-    fontWeight: '900',
     color: '#0F172A',
   },
   overallStarRow: {
@@ -2967,8 +2962,9 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   reviewRatingNum: {
+    fontFamily: 'Satoshi-Bold',
+    fontFamily: 'Satoshi-Regular',
     fontSize: 12,
-    fontWeight: '700',
     color: '#854D0E',
   },
   reviewBodyText: {
@@ -3032,8 +3028,8 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
   },
   profileAvatarInitial: {
+    fontFamily: 'Satoshi-Black',
     fontSize: 28,
-    fontWeight: '800',
     color: '#FFFFFF',
   },
   profileNameText: {
@@ -3043,6 +3039,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   profileEmailSub: {
+    fontFamily: 'Satoshi-Regular',
     fontSize: 13,
     color: '#64748B',
     marginBottom: 10,
@@ -3075,8 +3072,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   promoTitle: {
+    fontFamily: 'Satoshi-Bold',
+    fontFamily: 'Satoshi-Regular',
     fontSize: 14,
-    fontWeight: '700',
     color: '#9A3412',
     marginBottom: 2,
   },
@@ -3122,8 +3120,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   settingsRowLabel: {
+    fontFamily: 'Satoshi-Medium',
     fontSize: 15,
-    fontWeight: '600',
     color: '#0F172A',
   },
   settingsRowSub: {
@@ -3162,8 +3160,9 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   logoutButtonText: {
+    fontFamily: 'Satoshi-Bold',
+    fontFamily: 'Satoshi-Regular',
     fontSize: 14,
-    fontWeight: '700',
     color: '#DC2626',
   },
   versionText: {
@@ -3199,8 +3198,8 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   modalTitle: {
+    fontFamily: 'Satoshi-Black',
     fontSize: 20,
-    fontWeight: '800',
     color: '#0F172A',
   },
   modalCloseBtn: {
@@ -3227,8 +3226,9 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   inputLabel: {
+    fontFamily: 'Satoshi-Bold',
+    fontFamily: 'Satoshi-Regular',
     fontSize: 13,
-    fontWeight: '700',
     color: '#0F172A',
   },
   modalCatChip: {
@@ -3245,6 +3245,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#EEF2FF',
   },
   modalCatChipText: {
+    fontFamily: 'Satoshi-Regular',
     fontSize: 13,
     color: '#475569',
     fontWeight: '500',
@@ -3260,6 +3261,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingHorizontal: 16,
     paddingVertical: 12,
+    fontFamily: 'Satoshi-Regular',
     fontSize: 14,
     color: '#0F172A',
   },
@@ -3272,8 +3274,8 @@ const styles = StyleSheet.create({
   },
   modalNextBtnText: {
     color: '#FFFFFF',
+    fontFamily: 'Satoshi-Bold',
     fontSize: 14,
-    fontWeight: '700',
   },
   modalBtnRow: {
     flexDirection: 'row',
@@ -3289,8 +3291,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalBackBtnText: {
+    fontFamily: 'Satoshi-Medium',
+    fontFamily: 'Satoshi-Regular',
     fontSize: 14,
-    fontWeight: '600',
     color: '#475569',
   },
   modalSummaryBox: {
@@ -3301,12 +3304,13 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   summaryTitle: {
+    fontFamily: 'Satoshi-Bold',
     fontSize: 16,
-    fontWeight: '700',
     color: '#0F172A',
     marginBottom: 4,
   },
   summaryCategory: {
+    fontFamily: 'Satoshi-Regular',
     fontSize: 13,
     color: '#64748B',
     marginBottom: 8,
@@ -3328,6 +3332,7 @@ const styles = StyleSheet.create({
   },
   escrowNoticeText: {
     flex: 1,
+    fontFamily: 'Satoshi-Regular',
     fontSize: 12,
     color: '#166534',
     lineHeight: 18,
@@ -3386,8 +3391,8 @@ const styles = StyleSheet.create({
   },
   successDoneBtnText: {
     color: '#FFFFFF',
+    fontFamily: 'Satoshi-Bold',
     fontSize: 14,
-    fontWeight: '700',
   },
 
   // RATING STARS
