@@ -16,6 +16,7 @@ import {
 import { SafeAreaView, SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFonts } from 'expo-font';
 import LottieView from 'lottie-react-native';
+import * as ImagePicker from 'expo-image-picker';
 import {
   Home,
   Briefcase,
@@ -456,6 +457,27 @@ export default function App() {
 
 function MainApp() {
   const insets = useSafeAreaInsets();
+  // Generic Image Picker from Phone Gallery
+  const pickImage = async (setImageUri) => {
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permissionResult.granted) {
+        Alert.alert('Permission Required', 'Mistri Pro needs access to your camera roll to upload photos.');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setImageUri(result.assets[0].uri);
+      }
+    } catch (err) {
+      Alert.alert('Upload Error', 'Could not access photo library: ' + err.message);
+    }
+  };
 
   const [fontsLoaded] = useFonts({
     'Satoshi-Regular': require('./assets/fonts/Satoshi-Regular.ttf'),
@@ -471,20 +493,20 @@ function MainApp() {
   const [activeTab, setActiveTab] = useState('HOME'); // 'HOME' | 'WORK' | 'REVIEWS' | 'PROFILE'
 
   // Customer Onboarding Form State
-  const [custPhoto, setCustPhoto] = useState(null);
+  const [custPhotoUri, setCustPhotoUri] = useState(null);
   const [custName, setCustName] = useState('Ramesh Sharma');
   const [custMobile, setCustMobile] = useState('+91 98290 12345');
   const [custAddress, setCustAddress] = useState('Plot 42, Vaishali Nagar, Jaipur');
 
   // Worker Onboarding Form State
-  const [workerPhoto, setWorkerPhoto] = useState(null);
+  const [workerPhotoUri, setWorkerPhotoUri] = useState(null);
   const [workerName, setWorkerName] = useState('Ram Singh Mistri');
   const [workerMobile, setWorkerMobile] = useState('+91 94140 88990');
   const [workerAltMobile, setWorkerAltMobile] = useState('+91 98280 11223');
   const [workerAddress, setWorkerAddress] = useState('Ward 12, Mansarovar, Jaipur, Rajasthan');
   const [workerSkills, setWorkerSkills] = useState(['Mason (Raj Mistri)', 'Tile & Marble Installer']);
-  const [aadhaarFront, setAadhaarFront] = useState(true);
-  const [aadhaarBack, setAadhaarBack] = useState(true);
+  const [aadhaarFrontUri, setAadhaarFrontUri] = useState(null);
+  const [aadhaarBackUri, setAadhaarBackUri] = useState(null);
 
   // Dev Login form state
   const [showDevForm, setShowDevForm] = useState(false);
@@ -868,12 +890,12 @@ function MainApp() {
           <View style={styles.photoUploadCenter}>
             <TouchableOpacity
               style={styles.photoPickerCircle}
-              onPress={() => setCustPhoto('custom_photo_selected')}
+              onPress={() => pickImage(setCustPhotoUri)}
               activeOpacity={0.8}
             >
-              {custPhoto ? (
+              {custPhotoUri ? (
                 <View style={styles.photoSelectedCircle}>
-                  <Text style={styles.photoSelectedInitials}>RS</Text>
+                  <Image source={{ uri: custPhotoUri }} style={styles.photoPreviewImage} />
                   <View style={styles.photoCheckBadge}>
                     <Check size={12} color="#FFFFFF" strokeWidth={3} />
                   </View>
@@ -881,11 +903,11 @@ function MainApp() {
               ) : (
                 <View style={styles.photoPlaceholderWrap}>
                   <Camera size={28} color="#4F46E5" />
-                  <Text style={styles.photoUploadPrompt}>Add Photo</Text>
+                  <Text style={styles.photoUploadPrompt}>Choose Photo</Text>
                 </View>
               )}
             </TouchableOpacity>
-            <Text style={styles.photoHelpText}>Upload profile photo for verified booking</Text>
+            <Text style={styles.photoHelpText}>Tap to choose photo from your gallery</Text>
           </View>
 
           {/* Form Fields */}
@@ -1035,12 +1057,12 @@ function MainApp() {
           <View style={styles.photoUploadCenter}>
             <TouchableOpacity
               style={styles.photoPickerCircle}
-              onPress={() => setWorkerPhoto('worker_photo_ok')}
+              onPress={() => pickImage(setWorkerPhotoUri)}
               activeOpacity={0.8}
             >
-              {workerPhoto ? (
+              {workerPhotoUri ? (
                 <View style={[styles.photoSelectedCircle, { backgroundColor: '#16A34A' }]}>
-                  <Text style={styles.photoSelectedInitials}>RS</Text>
+                  <Image source={{ uri: workerPhotoUri }} style={styles.photoPreviewImage} />
                   <View style={styles.photoCheckBadge}>
                     <Check size={12} color="#FFFFFF" strokeWidth={3} />
                   </View>
@@ -1048,11 +1070,11 @@ function MainApp() {
               ) : (
                 <View style={styles.photoPlaceholderWrap}>
                   <Camera size={28} color="#16A34A" />
-                  <Text style={[styles.photoUploadPrompt, { color: '#16A34A' }]}>Mistri Photo</Text>
+                  <Text style={[styles.photoUploadPrompt, { color: '#16A34A' }]}>Choose Photo</Text>
                 </View>
               )}
             </TouchableOpacity>
-            <Text style={styles.photoHelpText}>Clear passport size photo for government ID check</Text>
+            <Text style={styles.photoHelpText}>Tap to choose mistri passport photo from gallery</Text>
           </View>
 
           {/* Form Fields */}
@@ -1138,27 +1160,49 @@ function MainApp() {
               <Text style={styles.formLabel}>Government ID Verification (Aadhaar Both Sides) *</Text>
               <View style={styles.aadhaarCardsRow}>
                 <TouchableOpacity
-                  style={[styles.aadhaarCardBox, aadhaarFront && styles.aadhaarCardBoxActive]}
-                  onPress={() => setAadhaarFront(!aadhaarFront)}
+                  style={[styles.aadhaarCardBox, aadhaarFrontUri && styles.aadhaarCardBoxActive]}
+                  onPress={() => pickImage(setAadhaarFrontUri)}
                   activeOpacity={0.8}
                 >
-                  <UploadCloud size={24} color={aadhaarFront ? '#16A34A' : '#64748B'} />
-                  <Text style={[styles.aadhaarBoxTitle, aadhaarFront && { color: '#166534' }]}>
-                    Aadhaar Front {aadhaarFront && '✓'}
+                  {aadhaarFrontUri ? (
+                    <View style={styles.aadhaarPreviewWrap}>
+                      <Image source={{ uri: aadhaarFrontUri }} style={styles.aadhaarPreviewImage} />
+                      <View style={styles.aadhaarBadgeCheck}>
+                        <Check size={10} color="#FFFFFF" strokeWidth={3} />
+                      </View>
+                    </View>
+                  ) : (
+                    <UploadCloud size={24} color="#64748B" />
+                  )}
+                  <Text style={[styles.aadhaarBoxTitle, aadhaarFrontUri && { color: '#166534' }]}>
+                    Aadhaar Front {aadhaarFrontUri ? '✓' : ''}
                   </Text>
-                  <Text style={styles.aadhaarBoxSub}>Photo & Name side</Text>
+                  <Text style={styles.aadhaarBoxSub}>
+                    {aadhaarFrontUri ? 'Photo uploaded' : 'Tap to upload'}
+                  </Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[styles.aadhaarCardBox, aadhaarBack && styles.aadhaarCardBoxActive]}
-                  onPress={() => setAadhaarBack(!aadhaarBack)}
+                  style={[styles.aadhaarCardBox, aadhaarBackUri && styles.aadhaarCardBoxActive]}
+                  onPress={() => pickImage(setAadhaarBackUri)}
                   activeOpacity={0.8}
                 >
-                  <UploadCloud size={24} color={aadhaarBack ? '#16A34A' : '#64748B'} />
-                  <Text style={[styles.aadhaarBoxTitle, aadhaarBack && { color: '#166534' }]}>
-                    Aadhaar Back {aadhaarBack && '✓'}
+                  {aadhaarBackUri ? (
+                    <View style={styles.aadhaarPreviewWrap}>
+                      <Image source={{ uri: aadhaarBackUri }} style={styles.aadhaarPreviewImage} />
+                      <View style={styles.aadhaarBadgeCheck}>
+                        <Check size={10} color="#FFFFFF" strokeWidth={3} />
+                      </View>
+                    </View>
+                  ) : (
+                    <UploadCloud size={24} color="#64748B" />
+                  )}
+                  <Text style={[styles.aadhaarBoxTitle, aadhaarBackUri && { color: '#166534' }]}>
+                    Aadhaar Back {aadhaarBackUri ? '✓' : ''}
                   </Text>
-                  <Text style={styles.aadhaarBoxSub}>Address side</Text>
+                  <Text style={styles.aadhaarBoxSub}>
+                    {aadhaarBackUri ? 'Photo uploaded' : 'Tap to upload'}
+                  </Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -3889,6 +3933,34 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
+    overflow: 'hidden',
+  },
+  photoPreviewImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+  },
+  aadhaarPreviewWrap: {
+    position: 'relative',
+    marginBottom: 4,
+  },
+  aadhaarPreviewImage: {
+    width: 60,
+    height: 40,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#16A34A',
+  },
+  aadhaarBadgeCheck: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: '#16A34A',
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   photoSelectedInitials: {
     fontFamily: 'Satoshi-Black',
