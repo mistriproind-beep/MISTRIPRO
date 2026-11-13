@@ -50,6 +50,7 @@ import {
   Award,
   Layers,
   ChevronDown,
+  Smartphone,
 } from 'lucide-react-native';
 
 const { width } = Dimensions.get('window');
@@ -437,7 +438,7 @@ function MainApp() {
   const insets = useSafeAreaInsets();
 
   // Navigation State: 'SPLASH' | 'LANGUAGE' | 'SIGN_IN' | 'ROLE_SELECT' | 'MAIN'
-  const [currentScreen, setCurrentScreen] = useState('SPLASH');
+  const [currentScreen, setCurrentScreen] = useState('MAIN');
   const [lang, setLang] = useState('en');
   const [role, setRole] = useState('CUSTOMER'); // 'CUSTOMER' | 'WORKER'
   const [activeTab, setActiveTab] = useState('HOME'); // 'HOME' | 'WORK' | 'REVIEWS' | 'PROFILE'
