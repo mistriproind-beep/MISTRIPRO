@@ -716,29 +716,20 @@ function MainApp() {
   }
 
   // -------------------------------------------------------------
-  // SCREEN 4: CHOOSE YOUR ROLE (Fitted & Responsive UI)
+  // SCREEN 4: CHOOSE YOUR ROLE (Original Clean Reference Design)
   // -------------------------------------------------------------
   if (currentScreen === 'ROLE_SELECT') {
     return (
       <SafeAreaView style={styles.roleSafeArea}>
         <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-        <ScrollView
-          contentContainerStyle={[styles.roleScrollContent, { paddingBottom: Math.max(insets.bottom + 20, 32) }]}
-          showsVerticalScrollIndicator={false}
-          bounces={false}
-        >
-          <View style={styles.roleTopNav}>
-            <TouchableOpacity
-              style={styles.roleBackBtn}
-              onPress={() => setCurrentScreen('SIGN_IN')}
-              activeOpacity={0.7}
-            >
-              <ChevronRight size={20} color="#0F172A" style={{ transform: [{ rotate: '180deg' }] }} />
-            </TouchableOpacity>
-            <View style={styles.roleStepPill}>
-              <Text style={styles.roleStepPillText}>STEP 2 OF 2</Text>
-            </View>
-          </View>
+        <View style={styles.roleContainer}>
+          <TouchableOpacity
+            style={styles.roleBackBtn}
+            onPress={() => setCurrentScreen('SIGN_IN')}
+            activeOpacity={0.7}
+          >
+            <ChevronRight size={22} color="#0F172A" style={{ transform: [{ rotate: '180deg' }] }} />
+          </TouchableOpacity>
 
           <View style={styles.roleHeaderSection}>
             <Text style={styles.roleHeaderTitle}>{t.chooseRoleTitle}</Text>
@@ -746,92 +737,61 @@ function MainApp() {
           </View>
 
           <View style={styles.roleCardsGroup}>
-            {/* 1. Customer Role Card */}
+            {/* Customer Role Card */}
             <TouchableOpacity
-              style={[styles.roleCard, styles.roleCardCustomer, role === 'CUSTOMER' && styles.roleCardActive]}
+              style={[styles.roleCard, role === 'CUSTOMER' && styles.roleCardActive]}
               onPress={() => {
                 setRole('CUSTOMER');
                 setCurrentScreen('MAIN');
               }}
-              activeOpacity={0.88}
+              activeOpacity={0.85}
             >
               <View style={styles.roleCardTopRow}>
-                <View style={styles.roleCardLeftBadge}>
-                  <View style={[styles.roleEmojiWrap, { backgroundColor: '#EEF2FF' }]}>
-                    <Text style={styles.roleEmoji}>🏡</Text>
-                  </View>
-                  <View>
-                    <Text style={styles.roleCardTitle}>{t.customerRole}</Text>
-                    <Text style={styles.roleCardSubHint}>I want to get work done</Text>
-                  </View>
+                <View style={[styles.roleEmojiWrap, { backgroundColor: '#EEF2FF' }]}>
+                  <Text style={styles.roleEmoji}>🏠</Text>
                 </View>
                 <View style={styles.roleArrowCircle}>
-                  <ArrowRight size={16} color="#4F46E5" strokeWidth={2.5} />
+                  <ArrowRight size={18} color="#4F46E5" />
                 </View>
               </View>
-
+              <Text style={styles.roleCardTitle}>{t.customerRole}</Text>
               <Text style={styles.roleCardDesc}>{t.customerDesc}</Text>
-
-              {/* Highlighting Feature Chips */}
-              <View style={styles.roleFeaturesRow}>
-                <View style={styles.roleFeatureChip}>
-                  <Check size={11} color="#4F46E5" strokeWidth={2.5} />
-                  <Text style={styles.roleFeatureChipText}>Post Free Requirements</Text>
-                </View>
-                <View style={styles.roleFeatureChip}>
-                  <Check size={11} color="#4F46E5" strokeWidth={2.5} />
-                  <Text style={styles.roleFeatureChipText}>100% Escrow Protected</Text>
-                </View>
+              <View style={styles.roleTag}>
+                <Text style={styles.roleTagText}>Post Work • Hire Workers • Escrow Safety</Text>
               </View>
             </TouchableOpacity>
 
-            {/* 2. Worker / Mistri Role Card */}
+            {/* Worker Role Card */}
             <TouchableOpacity
-              style={[styles.roleCard, styles.roleCardWorker, role === 'WORKER' && styles.roleCardActiveWorker]}
+              style={[styles.roleCard, role === 'WORKER' && styles.roleCardActiveWorker]}
               onPress={() => {
                 setRole('WORKER');
                 setCurrentScreen('MAIN');
               }}
-              activeOpacity={0.88}
+              activeOpacity={0.85}
             >
               <View style={styles.roleCardTopRow}>
-                <View style={styles.roleCardLeftBadge}>
-                  <View style={[styles.roleEmojiWrap, { backgroundColor: '#F0FDF4' }]}>
-                    <Text style={styles.roleEmoji}>👷‍♂️</Text>
-                  </View>
-                  <View>
-                    <Text style={styles.roleCardTitle}>{t.workerRole}</Text>
-                    <Text style={[styles.roleCardSubHint, { color: '#166534' }]}>I want to work & earn</Text>
-                  </View>
+                <View style={[styles.roleEmojiWrap, { backgroundColor: '#F0FDF4' }]}>
+                  <Text style={styles.roleEmoji}>👷</Text>
                 </View>
                 <View style={[styles.roleArrowCircle, { backgroundColor: '#DCFCE7' }]}>
-                  <ArrowRight size={16} color="#16A34A" strokeWidth={2.5} />
+                  <ArrowRight size={18} color="#16A34A" />
                 </View>
               </View>
-
+              <Text style={styles.roleCardTitle}>{t.workerRole}</Text>
               <Text style={styles.roleCardDesc}>{t.workerDesc}</Text>
-
-              {/* Highlighting Feature Chips */}
-              <View style={styles.roleFeaturesRow}>
-                <View style={[styles.roleFeatureChip, { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0' }]}>
-                  <Check size={11} color="#16A34A" strokeWidth={2.5} />
-                  <Text style={[styles.roleFeatureChipText, { color: '#166534' }]}>Zero Commission</Text>
-                </View>
-                <View style={[styles.roleFeatureChip, { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0' }]}>
-                  <Check size={11} color="#16A34A" strokeWidth={2.5} />
-                  <Text style={[styles.roleFeatureChipText, { color: '#166534' }]}>Direct Daily Bank Payout</Text>
-                </View>
+              <View style={[styles.roleTag, { backgroundColor: '#F0FDF4' }]}>
+                <Text style={[styles.roleTagText, { color: '#166534' }]}>
+                  Instant Bids • Direct Payout • Aadhaar Badge
+                </Text>
               </View>
             </TouchableOpacity>
           </View>
 
-          {/* Bottom Switch Note */}
-          <View style={styles.roleBottomNoteWrap}>
-            <Text style={styles.roleBottomNoteText}>
-              💡 You can freely switch between Customer and Worker modes anytime in your Profile tab.
-            </Text>
-          </View>
-        </ScrollView>
+          <Text style={styles.roleNote}>
+            💡 You can freely switch between Customer and Worker personas anytime from your Profile tab.
+          </Text>
+        </View>
       </SafeAreaView>
     );
   }
@@ -2150,7 +2110,9 @@ const styles = StyleSheet.create({
   roleContainer: {
     flex: 1,
     paddingHorizontal: 24,
-    paddingTop: 12,
+    paddingTop: 10,
+    justifyContent: 'space-between',
+    paddingBottom: 20,
   },
   roleBackBtn: {
     width: 40,
@@ -2159,31 +2121,33 @@ const styles = StyleSheet.create({
     backgroundColor: '#F1F5F9',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   roleHeaderSection: {
-    marginBottom: 28,
+    marginBottom: 18,
   },
   roleHeaderTitle: {
     fontFamily: 'Satoshi-Black',
     fontSize: 28,
     color: '#0F172A',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   roleHeaderSub: {
+    fontFamily: 'Satoshi-Medium',
     fontSize: 15,
     color: '#64748B',
     lineHeight: 22,
   },
   roleCardsGroup: {
     gap: 16,
-    marginBottom: 24,
+    flex: 1,
+    justifyContent: 'center',
   },
   roleCard: {
     borderRadius: 20,
     borderWidth: 1.5,
     borderColor: '#E2E8F0',
-    padding: 20,
+    padding: 18,
     backgroundColor: '#FFFFFF',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
@@ -2202,17 +2166,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 14,
+    marginBottom: 12,
   },
   roleEmojiWrap: {
-    width: 52,
-    height: 52,
+    width: 48,
+    height: 48,
     borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
   },
   roleEmoji: {
-    fontSize: 26,
+    fontSize: 24,
   },
   roleArrowCircle: {
     width: 36,
@@ -2224,15 +2188,16 @@ const styles = StyleSheet.create({
   },
   roleCardTitle: {
     fontFamily: 'Satoshi-Bold',
-    fontSize: 20,
+    fontSize: 18,
     color: '#0F172A',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   roleCardDesc: {
+    fontFamily: 'Satoshi-Regular',
     fontSize: 13,
-    lineHeight: 19,
+    lineHeight: 18,
     color: '#64748B',
-    marginBottom: 14,
+    marginBottom: 12,
   },
   roleTag: {
     alignSelf: 'flex-start',
@@ -2242,8 +2207,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   roleTagText: {
+    fontFamily: 'Satoshi-Bold',
     fontSize: 11,
-    fontWeight: '600',
     color: '#4F46E5',
   },
   roleNote: {
@@ -2252,8 +2217,8 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     textAlign: 'center',
     lineHeight: 18,
+    marginBottom: 10,
   },
-
   // MAIN CONTAINER
   mainContainer: {
     flex: 1,
