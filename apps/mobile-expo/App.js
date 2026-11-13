@@ -977,31 +977,31 @@ function MainApp() {
   // -------------------------------------------------------------
   if (currentScreen === 'WORKER_ONBOARDING') {
     const availableSkillsList = [
-      'Mason (Raj Mistri)',
-      'Mason Helper (Beldar)',
-      'General Construction Labour',
-      'Shuttering Carpenter',
-      'Steel Fixer / Bar Bender',
-      'Concrete Worker',
-      'Tile & Marble Installer',
-      'Plastering Worker',
-      'Bricklayer',
-      'Waterproofing Worker',
-      'Excavation Labour',
-      'Electrician',
-      'Plumber',
-      'Furniture Carpenter',
-      'Welder',
-      'Wall Painter',
-      'POP Worker',
-      'False Ceiling Installer',
-      'Metal Fabricator',
-      'AC Technician',
-      'Cleaning Worker',
-      'Housekeeping Worker',
-      'Loading & Unloading Labour',
-      'Gardening Worker (Mali)',
-      'Demolition Worker',
+      { name: 'Mason (Raj Mistri)', icon: '🧱' },
+      { name: 'Mason Helper (Beldar)', icon: '👷' },
+      { name: 'General Construction Labour', icon: '🏗️' },
+      { name: 'Shuttering Carpenter', icon: '🪵' },
+      { name: 'Steel Fixer / Bar Bender', icon: '⛓️' },
+      { name: 'Concrete Worker', icon: '🪨' },
+      { name: 'Tile & Marble Installer', icon: '🏛️' },
+      { name: 'Plastering Worker', icon: '🖌️' },
+      { name: 'Bricklayer', icon: '🧱' },
+      { name: 'Waterproofing Worker', icon: '💧' },
+      { name: 'Excavation Labour', icon: '🚜' },
+      { name: 'Electrician', icon: '⚡' },
+      { name: 'Plumber', icon: '🔧' },
+      { name: 'Furniture Carpenter', icon: '🪚' },
+      { name: 'Welder', icon: '🔥' },
+      { name: 'Wall Painter', icon: '🎨' },
+      { name: 'POP Worker', icon: '📐' },
+      { name: 'False Ceiling Installer', icon: '🏢' },
+      { name: 'Metal Fabricator', icon: '⚙️' },
+      { name: 'AC Technician', icon: '❄️' },
+      { name: 'Cleaning Worker', icon: '🧹' },
+      { name: 'Housekeeping Worker', icon: '🏠' },
+      { name: 'Loading & Unloading Labour', icon: '📦' },
+      { name: 'Gardening Worker (Mali)', icon: '🌱' },
+      { name: 'Demolition Worker', icon: '🔨' },
     ];
 
     const toggleSkill = (sk) => {
@@ -1100,20 +1100,21 @@ function MainApp() {
               </View>
               <View style={styles.skillsChipsWrap}>
                 {availableSkillsList.map((sk) => {
-                  const isChecked = workerSkills.includes(sk);
+                  const isChecked = workerSkills.includes(sk.name);
                   return (
                     <TouchableOpacity
-                      key={sk}
+                      key={sk.name}
                       style={[styles.skillToggleChip, isChecked && styles.skillToggleChipActive]}
-                      onPress={() => toggleSkill(sk)}
+                      onPress={() => toggleSkill(sk.name)}
                       activeOpacity={0.75}
                     >
+                      <Text style={styles.skillEmoji}>{sk.icon}</Text>
+                      <Text style={[styles.skillToggleText, isChecked && styles.skillToggleTextActive]}>
+                        {sk.name}
+                      </Text>
                       <View style={[styles.skillCheckCircle, isChecked && styles.skillCheckCircleActive]}>
                         {isChecked && <Check size={10} color="#FFFFFF" strokeWidth={3} />}
                       </View>
-                      <Text style={[styles.skillToggleText, isChecked && styles.skillToggleTextActive]}>
-                        {sk}
-                      </Text>
                     </TouchableOpacity>
                   );
                 })}
@@ -3977,11 +3978,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     backgroundColor: '#F8FAFC',
-    borderWidth: 1,
+    borderWidth: 1.2,
     borderColor: '#E2E8F0',
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
+    paddingVertical: 9,
+    borderRadius: 14,
+  },
+  skillEmoji: {
+    fontSize: 16,
   },
   skillToggleChipActive: {
     backgroundColor: '#F0FDF4',
