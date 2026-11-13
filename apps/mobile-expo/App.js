@@ -1995,15 +1995,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   signInLottieWrapper: {
-    width: 160,
-    height: 160,
+    width: 250,
+    height: 250,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   signInLottieView: {
-    width: 160,
-    height: 160,
+    width: 250,
+    height: 250,
   },
   signInMainHeading: {
     fontFamily: 'Satoshi-Bold',
