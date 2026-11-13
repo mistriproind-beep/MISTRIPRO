@@ -299,13 +299,27 @@ const I18N = {
 // 2. MOCK DATA
 // ==========================================
 const CATEGORIES = [
-  { id: '1', name: 'Mason (राजमिस्त्री)', icon: '🧱', workers: 142 },
-  { id: '2', name: 'Plumber (प्लंबर)', icon: '🔧', workers: 98 },
-  { id: '3', name: 'Electrician (बिजली)', icon: '⚡', workers: 120 },
-  { id: '4', name: 'Carpenter (बढ़ई)', icon: '🪚', workers: 84 },
-  { id: '5', name: 'Painter (पेंटर)', icon: '🎨', workers: 76 },
-  { id: '6', name: 'Tiles & Marble', icon: '🏛️', workers: 65 },
-  { id: '7', name: 'Welder / Fabricator', icon: '⚙️', workers: 43 },
+  { id: '1', name: 'Mason (Raj Mistri)', icon: '🧱', workers: 142 },
+  { id: '2', name: 'Mason Helper (Beldar)', icon: '👷', workers: 198 },
+  { id: '3', name: 'Construction Labour', icon: '🏗️', workers: 240 },
+  { id: '4', name: 'Shuttering Carpenter', icon: '🪵', workers: 84 },
+  { id: '5', name: 'Steel Fixer / Bar Bender', icon: '⛓️', workers: 65 },
+  { id: '6', name: 'Concrete Worker', icon: '🪨', workers: 72 },
+  { id: '7', name: 'Tile & Marble', icon: '🏛️', workers: 95 },
+  { id: '8', name: 'Plastering Worker', icon: '🖌️', workers: 58 },
+  { id: '9', name: 'Waterproofing', icon: '💧', workers: 46 },
+  { id: '10', name: 'Electrician', icon: '⚡', workers: 128 },
+  { id: '11', name: 'Plumber', icon: '🔧', workers: 110 },
+  { id: '12', name: 'Furniture Carpenter', icon: '🪚', workers: 88 },
+  { id: '13', name: 'Welder', icon: '🔥', workers: 54 },
+  { id: '14', name: 'Wall Painter', icon: '🎨', workers: 92 },
+  { id: '15', name: 'POP & False Ceiling', icon: '📐', workers: 64 },
+  { id: '16', name: 'Metal Fabricator', icon: '⚙️', workers: 42 },
+  { id: '17', name: 'AC Technician', icon: '❄️', workers: 52 },
+  { id: '18', name: 'Cleaning & Housekeeping', icon: '🧹', workers: 115 },
+  { id: '19', name: 'Loading Labour', icon: '📦', workers: 80 },
+  { id: '20', name: 'Gardening (Mali)', icon: '🌱', workers: 38 },
+  { id: '21', name: 'Demolition Worker', icon: '🔨', workers: 49 },
 ];
 
 const TOP_WORKERS = [
@@ -468,7 +482,7 @@ function MainApp() {
   const [workerMobile, setWorkerMobile] = useState('+91 94140 88990');
   const [workerAltMobile, setWorkerAltMobile] = useState('+91 98280 11223');
   const [workerAddress, setWorkerAddress] = useState('Ward 12, Mansarovar, Jaipur, Rajasthan');
-  const [workerSkills, setWorkerSkills] = useState(['Mason (राजमिस्त्री)', 'Tiles & Marble']);
+  const [workerSkills, setWorkerSkills] = useState(['Mason (Raj Mistri)', 'Tile & Marble Installer']);
   const [aadhaarFront, setAadhaarFront] = useState(true);
   const [aadhaarBack, setAadhaarBack] = useState(true);
 
@@ -963,15 +977,31 @@ function MainApp() {
   // -------------------------------------------------------------
   if (currentScreen === 'WORKER_ONBOARDING') {
     const availableSkillsList = [
-      'Mason (राजमिस्त्री)',
-      'Plumber (प्लंबर)',
-      'Electrician (बिजली)',
-      'Carpenter (बढ़ई)',
-      'Painter (पेंटर)',
-      'Tiles & Marble',
-      'Welder / Fabricator',
-      'POP False Ceiling',
-      'Demolition Labour',
+      'Mason (Raj Mistri)',
+      'Mason Helper (Beldar)',
+      'General Construction Labour',
+      'Shuttering Carpenter',
+      'Steel Fixer / Bar Bender',
+      'Concrete Worker',
+      'Tile & Marble Installer',
+      'Plastering Worker',
+      'Bricklayer',
+      'Waterproofing Worker',
+      'Excavation Labour',
+      'Electrician',
+      'Plumber',
+      'Furniture Carpenter',
+      'Welder',
+      'Wall Painter',
+      'POP Worker',
+      'False Ceiling Installer',
+      'Metal Fabricator',
+      'AC Technician',
+      'Cleaning Worker',
+      'Housekeeping Worker',
+      'Loading & Unloading Labour',
+      'Gardening Worker (Mali)',
+      'Demolition Worker',
     ];
 
     const toggleSkill = (sk) => {
