@@ -681,13 +681,17 @@ function MainApp() {
 
           {/* Primary Action Buttons */}
           <View style={styles.signInActionsGroup}>
-            {/* 1. Black Continue with Google */}
+            {/* 1. Black Continue with Google (with official Google logo) */}
             <TouchableOpacity
               style={styles.authBlackButton}
               onPress={() => setCurrentScreen('ROLE_SELECT')}
               activeOpacity={0.85}
             >
-              <Text style={styles.authGoogleG}>G</Text>
+              <Image
+                source={require('./assets/google_logo.png')}
+                style={styles.authGoogleLogoImage}
+                resizeMode="contain"
+              />
               <Text style={styles.authBlackButtonText}>{t.continueGoogle}</Text>
             </TouchableOpacity>
 
@@ -700,42 +704,6 @@ function MainApp() {
               <Smartphone size={20} color="#0F172A" />
               <Text style={styles.authOutlineButtonText}>{t.continueOTP}</Text>
             </TouchableOpacity>
-
-            {/* 3. Dev Quick Login Button */}
-            <TouchableOpacity
-              style={styles.authDevButton}
-              onPress={() => setShowDevForm(!showDevForm)}
-              activeOpacity={0.8}
-            >
-              <Zap size={18} color="#B45309" />
-              <Text style={styles.authDevButtonText}>{t.devLogin}</Text>
-            </TouchableOpacity>
-
-            {/* Inline Dev Credentials Form */}
-            {showDevForm && (
-              <View style={styles.devBox}>
-                <Text style={styles.devBoxTitle}>DEVELOPER TEST ACCOUNT</Text>
-                <TextInput
-                  style={styles.devInput}
-                  placeholder="Username (use: abc)"
-                  placeholderTextColor="#9CA3AF"
-                  value={devUser}
-                  onChangeText={setDevUser}
-                  autoCapitalize="none"
-                />
-                <TextInput
-                  style={styles.devInput}
-                  placeholder="Password (use: 1234)"
-                  placeholderTextColor="#9CA3AF"
-                  secureTextEntry
-                  value={devPass}
-                  onChangeText={setDevPass}
-                />
-                <TouchableOpacity style={styles.devSubmitBtn} onPress={handleDevLogin}>
-                  <Text style={styles.devSubmitText}>Sign In with Test Account →</Text>
-                </TouchableOpacity>
-              </View>
-            )}
           </View>
 
           {/* Footer Terms & Legal notice */}
