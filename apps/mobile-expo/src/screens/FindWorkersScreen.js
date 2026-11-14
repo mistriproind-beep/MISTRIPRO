@@ -20,6 +20,7 @@ import {
   Compass,
   LocateFixed,
   RefreshCw,
+  Layers,
 } from 'lucide-react-native';
 import { WebView } from 'react-native-webview';
 import * as Location from 'expo-location';
@@ -36,8 +37,8 @@ function RatingStars({ rating }) {
       <Star
         key={i}
         size={12}
-        color={i < fullStars ? '#0F172A' : '#CBD5E1'}
-        fill={i < fullStars ? '#0F172A' : 'transparent'}
+        color={i < fullStars ? '#EAB308' : '#CBD5E1'}
+        fill={i < fullStars ? '#EAB308' : 'transparent'}
       />
     );
   }
@@ -53,7 +54,7 @@ function WorkerCard({ worker, isSelected, onSelect }) {
     >
       <View style={styles.workerCardRow}>
         {/* Avatar */}
-        <View style={[styles.avatar, { backgroundColor: worker.color || '#0F172A' }]}>
+        <View style={[styles.avatar, { backgroundColor: worker.color || '#4F46E5' }]}>
           <Text style={styles.avatarText}>{worker.avatar}</Text>
         </View>
 
@@ -77,7 +78,7 @@ function WorkerCard({ worker, isSelected, onSelect }) {
 
         {/* Distance Badge */}
         <View style={styles.distanceBadge}>
-          <Navigation size={10} color="#0F172A" />
+          <Navigation size={10} color="#059669" />
           <Text style={styles.distanceText}>{worker.distance} km</Text>
         </View>
       </View>
@@ -95,11 +96,11 @@ function WorkerCard({ worker, isSelected, onSelect }) {
             onPress={() =>
               Alert.alert(
                 worker.name,
-                `Trade: ${worker.skill}\nExperience: ${worker.exp} years\nRate: ₹${worker.rate}/day\nAvailable for immediate site booking.`
+                `Trade: ${worker.skill}\nExperience: ${worker.exp} years\nRate: ₹${worker.rate}/day\nLocation: Near your GPS location\nStatus: Available for instant deployment.`
               )
             }
           >
-            <User size={13} color="#0F172A" />
+            <User size={13} color="#4F46E5" />
             <Text style={styles.viewProfileText}>Profile</Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -120,6 +121,7 @@ export default function FindWorkersScreen({ insets }) {
   const [selectedWorkerId, setSelectedWorkerId] = useState(null);
   const [userLocation, setUserLocation] = useState(null); // { latitude, longitude, areaName }
   const [isLocLoading, setIsLocLoading] = useState(true);
+  const [mapStyle, setMapStyle] = useState('google'); // 'google' | 'voyager'
   const webViewRef = useRef(null);
 
   // Auto fetch user's real live GPS coordinates on mount
@@ -205,7 +207,7 @@ export default function FindWorkersScreen({ insets }) {
 
   const allChips = ['All', ...CATEGORIES.map((c) => c.name)];
 
-  // Real Black and White Leaflet Map with CartoDB Positron / Grayscale OpenStreetMap
+  // Live Colorful Clear Map (Google Roadmap or Apple-like Voyager)
   const mapHtml = useMemo(() => {
     const workersData = JSON.stringify(
       liveWorkers.map((w) => ({
@@ -218,12 +220,22 @@ export default function FindWorkersScreen({ insets }) {
         reviews: w.reviews,
         phone: w.phone,
         avatar: w.avatar,
-        color: w.color,
+        color: w.color || '#4F46E5',
         distance: w.distance,
         lat: w.lat,
         lng: w.lng,
       }))
     );
+
+    const tileUrl =
+      mapStyle === 'google'
+        ? 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}'
+        : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+
+    const tileAttr =
+      mapStyle === 'google'
+        ? '© Google Maps'
+        : '© OpenStreetMap, © CARTO';
 
     return `
 <!DOCTYPE html>
@@ -237,33 +249,27 @@ export default function FindWorkersScreen({ insets }) {
     html, body, #map {
       width: 100%;
       height: 100%;
-      background: #F8FAFC;
+      background: #E8F4F8;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
 
-    /* PURE BLACK AND WHITE / MONOCHROME TILE FILTER */
-    .leaflet-tile-pane {
-      filter: grayscale(100%) contrast(120%) brightness(96%);
-      -webkit-filter: grayscale(100%) contrast(120%) brightness(96%);
-    }
-
-    /* Real GPS User Marker: Black circle with white border & pulsing radar */
+    /* Vibrant User Marker: Google Blue with pulsing live GPS radar */
     .user-marker {
-      width: 20px;
-      height: 20px;
+      width: 22px;
+      height: 22px;
       border-radius: 50%;
-      background: #0F172A;
+      background: #2563EB;
       border: 3px solid #FFFFFF;
-      box-shadow: 0 0 0 5px rgba(15, 23, 42, 0.3);
+      box-shadow: 0 0 0 5px rgba(37, 99, 235, 0.4);
       animation: pulseRadar 2s infinite;
     }
     @keyframes pulseRadar {
-      0% { box-shadow: 0 0 0 0 rgba(15, 23, 42, 0.5); }
-      70% { box-shadow: 0 0 0 10px rgba(15, 23, 42, 0); }
-      100% { box-shadow: 0 0 0 0 rgba(15, 23, 42, 0); }
+      0% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.6); }
+      70% { box-shadow: 0 0 0 12px rgba(37, 99, 235, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); }
     }
 
-    /* B&W Worker Marker Pin */
+    /* Colorful Apple-Style Worker Marker Pin */
     .worker-marker-wrap {
       display: flex;
       flex-direction: column;
@@ -271,39 +277,36 @@ export default function FindWorkersScreen({ insets }) {
       cursor: pointer;
     }
     .worker-circle {
-      width: 32px;
-      height: 32px;
-      border-radius: 16px;
-      background: #0F172A;
+      width: 34px;
+      height: 34px;
+      border-radius: 17px;
       color: #FFFFFF;
-      font-weight: 700;
+      font-weight: 800;
       font-size: 11px;
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 3px 8px rgba(0,0,0,0.4);
-      border: 2px solid #FFFFFF;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+      border: 2.5px solid #FFFFFF;
     }
     .worker-pill {
-      background: #000000;
+      background: #0F172A;
       color: #FFFFFF;
       font-size: 9px;
       font-weight: 700;
-      padding: 2px 6px;
+      padding: 2px 7px;
       border-radius: 6px;
       margin-top: 2px;
       white-space: nowrap;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-      border: 1px solid rgba(255,255,255,0.4);
+      box-shadow: 0 2px 5px rgba(0,0,0,0.25);
     }
 
-    /* B&W Callout Popup */
+    /* Vibrant Callout Popup */
     .leaflet-popup-content-wrapper {
-      border-radius: 12px;
+      border-radius: 14px;
       padding: 4px;
       background: #FFFFFF;
-      border: 1px solid #0F172A;
-      box-shadow: 0 6px 16px rgba(0,0,0,0.25);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.2);
     }
     .popup-box {
       font-size: 12px;
@@ -318,27 +321,27 @@ export default function FindWorkersScreen({ insets }) {
     }
     .popup-skill {
       font-weight: 600;
-      color: #475569;
+      color: #4F46E5;
       font-size: 11px;
       margin-bottom: 4px;
     }
     .popup-rate {
       font-weight: 800;
-      color: #0F172A;
+      color: #059669;
       font-size: 13px;
       margin-top: 4px;
     }
     .popup-btn {
       display: block;
       width: 100%;
-      background: #0F172A;
+      background: #16A34A;
       color: #FFFFFF;
       text-align: center;
-      padding: 7px 12px;
+      padding: 8px 12px;
       border-radius: 8px;
       text-decoration: none;
       font-weight: 700;
-      font-size: 11px;
+      font-size: 12px;
       margin-top: 8px;
       border: none;
       cursor: pointer;
@@ -354,22 +357,23 @@ export default function FindWorkersScreen({ insets }) {
       attributionControl: false
     }).setView([${userLat}, ${userLng}], 13);
 
-    // CartoDB Positron Black & White Real Map Layer
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-      maxZoom: 19,
-      attribution: '© OpenStreetMap, © CARTO'
+    // Live Crystal-Clear Map Layer
+    L.tileLayer('${tileUrl}', {
+      maxZoom: 20,
+      subdomains: ['mt0', 'mt1', 'mt2', 'mt3', 'a', 'b', 'c', 'd'],
+      attribution: '${tileAttr}'
     }).addTo(map);
 
     // Real Live GPS User Location Marker
     var userIcon = L.divIcon({
       className: '',
       html: '<div class="user-marker"></div>',
-      iconSize: [20, 20],
-      iconAnchor: [10, 10]
+      iconSize: [22, 22],
+      iconAnchor: [11, 11]
     });
     L.marker([${userLat}, ${userLng}], { icon: userIcon })
       .addTo(map)
-      .bindPopup('<b>📍 Your Live GPS Location</b><br/>${areaLabel}')
+      .bindPopup('<b>📍 Your Live Location</b><br/>${areaLabel}')
       .openPopup();
 
     // Worker Markers scattered around user's live position
@@ -379,7 +383,7 @@ export default function FindWorkersScreen({ insets }) {
       var icon = L.divIcon({
         className: '',
         html: '<div class="worker-marker-wrap">' +
-                '<div class="worker-circle" style="background-color:' + (w.color || '#0F172A') + ';">' + w.avatar + '</div>' +
+                '<div class="worker-circle" style="background-color:' + w.color + ';">' + w.avatar + '</div>' +
                 '<div class="worker-pill">' + w.skill.split(' ')[0] + '</div>' +
               '</div>',
         iconSize: [36, 44],
@@ -413,7 +417,7 @@ export default function FindWorkersScreen({ insets }) {
 </body>
 </html>
 `;
-  }, [liveWorkers, userLat, userLng, areaLabel]);
+  }, [liveWorkers, userLat, userLng, areaLabel, mapStyle]);
 
   const handleWebViewMessage = (event) => {
     try {
@@ -435,26 +439,42 @@ export default function FindWorkersScreen({ insets }) {
         <View style={styles.headerLeftCol}>
           <Text style={styles.headerTitle}>Find Workers</Text>
           <View style={styles.locationSubRow}>
-            <MapPin size={12} color="#0F172A" />
+            <MapPin size={13} color="#2563EB" />
             <Text style={styles.headerSubtitle} numberOfLines={1}>
               {areaLabel}
             </Text>
           </View>
         </View>
-        <TouchableOpacity
-          style={styles.recenterBtn}
-          onPress={fetchLiveLocation}
-          activeOpacity={0.8}
-        >
-          {isLocLoading ? (
-            <ActivityIndicator size="small" color="#0F172A" />
-          ) : (
-            <>
-              <LocateFixed size={14} color="#0F172A" />
-              <Text style={styles.recenterBtnText}>Live GPS</Text>
-            </>
-          )}
-        </TouchableOpacity>
+
+        <View style={styles.headerRightActions}>
+          {/* Map style toggle */}
+          <TouchableOpacity
+            style={styles.styleToggleBtn}
+            onPress={() => setMapStyle(mapStyle === 'google' ? 'voyager' : 'google')}
+            activeOpacity={0.8}
+          >
+            <Layers size={13} color="#4F46E5" />
+            <Text style={styles.styleToggleText}>
+              {mapStyle === 'google' ? 'Google' : 'Apple Style'}
+            </Text>
+          </TouchableOpacity>
+
+          {/* Re-center GPS */}
+          <TouchableOpacity
+            style={styles.recenterBtn}
+            onPress={fetchLiveLocation}
+            activeOpacity={0.8}
+          >
+            {isLocLoading ? (
+              <ActivityIndicator size="small" color="#2563EB" />
+            ) : (
+              <>
+                <LocateFixed size={13} color="#2563EB" />
+                <Text style={styles.recenterBtnText}>GPS</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView
@@ -494,7 +514,7 @@ export default function FindWorkersScreen({ insets }) {
           })}
         </ScrollView>
 
-        {/* ─── BLACK & WHITE REAL MAP CONTAINER ─── */}
+        {/* ─── LIVE VIBRANT REAL MAP CONTAINER ─── */}
         <View style={styles.mapOuterWrap}>
           <View style={styles.mapCard}>
             <WebView
@@ -507,18 +527,18 @@ export default function FindWorkersScreen({ insets }) {
               startInLoadingState={true}
               renderLoading={() => (
                 <View style={styles.mapLoadingOverlay}>
-                  <ActivityIndicator size="large" color="#0F172A" />
-                  <Text style={styles.mapLoadingText}>Loading B&W Real Map...</Text>
+                  <ActivityIndicator size="large" color="#2563EB" />
+                  <Text style={styles.mapLoadingText}>Loading Live Clear Map...</Text>
                 </View>
               )}
               onMessage={handleWebViewMessage}
             />
 
-            {/* Live B&W Map Badge Overlay */}
+            {/* Live Map Badge Overlay */}
             <View style={styles.mapLivePill}>
-              <View style={styles.blackLiveDot} />
+              <View style={styles.greenLiveDot} />
               <Text style={styles.mapLiveText}>
-                ⚫ Black & White Real Map • {liveWorkers.length} Mistris
+                {mapStyle === 'google' ? 'Google Roadmap' : 'Apple Voyager'} • {liveWorkers.length} Mistris
               </Text>
             </View>
           </View>
@@ -528,7 +548,7 @@ export default function FindWorkersScreen({ insets }) {
         <View style={styles.listSection}>
           <View style={styles.listHeader}>
             <View>
-              <Text style={styles.listTitle}>Workers Near Your Location</Text>
+              <Text style={styles.listTitle}>Nearby Workers on Map</Text>
               <Text style={styles.listCount}>
                 Showing {liveWorkers.length} available mistris around {areaLabel.split(',')[0]}
               </Text>
@@ -591,24 +611,45 @@ const styles = StyleSheet.create({
   headerSubtitle: {
     fontFamily: 'Satoshi-Medium',
     fontSize: 12,
-    color: '#0F172A',
+    color: '#2563EB',
     flex: 1,
+  },
+  headerRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  styleToggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#EEF2FF',
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 14,
+  },
+  styleToggleText: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 11,
+    color: '#4F46E5',
   },
   recenterBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: '#EFF6FF',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    paddingHorizontal: 10,
+    borderColor: '#BFDBFE',
+    paddingHorizontal: 8,
     paddingVertical: 6,
     borderRadius: 14,
   },
   recenterBtnText: {
     fontFamily: 'Satoshi-Bold',
     fontSize: 11,
-    color: '#0F172A',
+    color: '#2563EB',
   },
   scroll: {
     flex: 1,
@@ -628,8 +669,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   chipSelected: {
-    backgroundColor: '#0F172A',
-    borderColor: '#0F172A',
+    backgroundColor: '#4F46E5',
+    borderColor: '#4F46E5',
   },
   chipUnselected: {
     backgroundColor: '#FFFFFF',
@@ -654,7 +695,7 @@ const styles = StyleSheet.create({
     height: 330,
     borderRadius: 20,
     overflow: 'hidden',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#E8F4F8',
     borderWidth: 1,
     borderColor: '#CBD5E1',
     shadowColor: '#000000',
@@ -666,11 +707,11 @@ const styles = StyleSheet.create({
   },
   mapWebView: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#E8F4F8',
   },
   mapLoadingOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#E8F4F8',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
@@ -687,18 +728,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: 'rgba(15, 23, 42, 0.9)',
+    backgroundColor: 'rgba(15, 23, 42, 0.88)',
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
   },
-  blackLiveDot: {
+  greenLiveDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#10B981',
   },
   mapLiveText: {
     fontFamily: 'Satoshi-Bold',
@@ -726,7 +767,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   resetFilterBtn: {
-    backgroundColor: '#F1F5F9',
+    backgroundColor: '#EEF2FF',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
@@ -734,7 +775,7 @@ const styles = StyleSheet.create({
   resetFilterText: {
     fontFamily: 'Satoshi-Medium',
     fontSize: 11,
-    color: '#0F172A',
+    color: '#4F46E5',
   },
   workerCard: {
     backgroundColor: '#FFFFFF',
@@ -750,8 +791,8 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   workerCardSelected: {
-    borderColor: '#0F172A',
-    backgroundColor: '#F8FAFC',
+    borderColor: '#4F46E5',
+    backgroundColor: '#F8FAFF',
   },
   workerCardRow: {
     flexDirection: 'row',
@@ -784,9 +825,7 @@ const styles = StyleSheet.create({
     color: '#0F172A',
   },
   verifiedBadge: {
-    backgroundColor: '#F1F5F9',
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
+    backgroundColor: '#DCFCE7',
     paddingHorizontal: 5,
     paddingVertical: 1,
     borderRadius: 4,
@@ -794,12 +833,12 @@ const styles = StyleSheet.create({
   verifiedText: {
     fontFamily: 'Satoshi-Bold',
     fontSize: 9,
-    color: '#0F172A',
+    color: '#15803D',
   },
   workerSkill: {
     fontFamily: 'Satoshi-Medium',
     fontSize: 12,
-    color: '#475569',
+    color: '#4F46E5',
     marginTop: 1,
   },
   ratingRow: {
@@ -826,9 +865,7 @@ const styles = StyleSheet.create({
   distanceBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F1F5F9',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+    backgroundColor: '#DCFCE7',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 8,
@@ -837,7 +874,7 @@ const styles = StyleSheet.create({
   distanceText: {
     fontFamily: 'Satoshi-Bold',
     fontSize: 10,
-    color: '#0F172A',
+    color: '#15803D',
   },
   workerCardBottom: {
     flexDirection: 'row',
@@ -870,9 +907,7 @@ const styles = StyleSheet.create({
   viewProfileBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F1F5F9',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+    backgroundColor: '#EEF2FF',
     paddingHorizontal: 10,
     paddingVertical: 7,
     borderRadius: 8,
@@ -881,12 +916,12 @@ const styles = StyleSheet.create({
   viewProfileText: {
     fontFamily: 'Satoshi-Medium',
     fontSize: 11,
-    color: '#0F172A',
+    color: '#4F46E5',
   },
   callBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#0F172A',
+    backgroundColor: '#16A34A',
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: 8,

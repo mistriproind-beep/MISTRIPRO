@@ -20,9 +20,10 @@ import { MOCK_WORKERS } from '../data/mockWorkers';
 const shortName = (full) => {
   // Take text before first parenthesis / slash, trim
   const cleaned = full.split('(')[0].split('/')[0].trim();
-  // Max two words
   const words = cleaned.split(' ');
-  return words.length > 2 ? words.slice(0, 2).join(' ') : cleaned;
+  if (words.length <= 2) return cleaned;
+  if (words[1] === '&' && words[2]) return `${words[0]} & ${words[2]}`;
+  return words.slice(0, 2).join(' ');
 };
 
 /* ─── Component ─── */
@@ -374,11 +375,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 16,
-    gap: 8,
+    gap: 6,
   },
   tab: {
     flex: 1,
-    paddingVertical: 9,
+    paddingVertical: 8,
     paddingHorizontal: 2,
     borderRadius: 20,
     borderWidth: 1,
@@ -393,7 +394,7 @@ const styles = StyleSheet.create({
   },
   tabText: {
     fontFamily: 'Satoshi-Medium',
-    fontSize: 12,
+    fontSize: 11.5,
     color: '#64748B',
     textAlign: 'center',
   },
