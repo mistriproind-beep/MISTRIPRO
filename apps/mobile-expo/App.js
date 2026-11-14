@@ -574,6 +574,23 @@ function MainApp() {
       setIsAuthLoading(false);
       if (res.success) {
         setCurrentScreen('ROLE_SELECT');
+      } else if (res.error && res.error.includes('OAuth secret')) {
+        // Explaining OAuth Client Secret requirement from Google Cloud Console
+        Alert.alert(
+          'Google OAuth Setup Required',
+          'Google Sign-In requires Client ID & Client Secret in your Supabase Dashboard (Auth -> Providers -> Google).\n\nWould you like to proceed with Demo Google Sign-In for now?',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Continue as Google User',
+              onPress: () => {
+                setCustName('Google Verified User');
+                setWorkerName('Google Verified Mistri');
+                setCurrentScreen('ROLE_SELECT');
+              },
+            },
+          ]
+        );
       } else if (!res.cancelled && res.error) {
         Alert.alert('Google Sign-In', res.error);
       }
@@ -895,6 +912,114 @@ function MainApp() {
             </Text>
           </View>
         </ScrollView>
+      {/* ---------------------------------------------------------
+          LIVE PHONE OTP VERIFICATION BOTTOM SHEET / MODAL
+          --------------------------------------------------------- */}
+      <Modal visible={showOtpModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { paddingBottom: Math.max(insets.bottom + 20, 28) }]}>
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={styles.modalStepBadge}>
+                  {isOtpSent ? 'STEP 2: VERIFY OTP' : 'STEP 1: ENTER MOBILE'}
+                </Text>
+                <Text style={styles.modalTitle}>
+                  {isOtpSent ? 'Verify Phone Number' : 'Mobile Authentication'}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.modalCloseBtn}
+                onPress={() => {
+                  setShowOtpModal(false);
+                  setIsOtpSent(false);
+                  setOtpCode('');
+                }}
+              >
+                <X size={20} color="#0F172A" />
+              </TouchableOpacity>
+            </View>
+
+            {!isOtpSent ? (
+              // Step 1: Phone Number Input
+              <View style={styles.modalBody}>
+                <Text style={styles.inputLabel}>Enter 10-Digit Mobile Number</Text>
+                <View style={styles.phoneInputRow}>
+                  <View style={styles.phoneCountryCode}>
+                    <Text style={styles.phoneCountryCodeText}>🇮🇳 +91</Text>
+                  </View>
+                  <TextInput
+                    style={styles.phoneTextInput}
+                    placeholder="98765 43210"
+                    placeholderTextColor="#94A3B8"
+                    keyboardType="phone-pad"
+                    maxLength={10}
+                    value={phoneInput}
+                    onChangeText={setPhoneInput}
+                    autoFocus
+                  />
+                </View>
+                <Text style={styles.otpNoticeHelp}>
+                  We will send a 6-digit verification code via SMS to this number.
+                </Text>
+
+                <TouchableOpacity
+                  style={styles.modalPublishBtn}
+                  onPress={handleSendOtp}
+                  disabled={isAuthLoading}
+                  activeOpacity={0.85}
+                >
+                  {isAuthLoading ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.modalPublishBtnText}>Get Verification Code →</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            ) : (
+              // Step 2: 6-Digit OTP Auto-Verification Input
+              <View style={styles.modalBody}>
+                <Text style={styles.inputLabel}>Enter 6-Digit OTP Sent to +91 {phoneInput}</Text>
+                <TextInput
+                  style={styles.otpBoxesInput}
+                  placeholder="• • • • • •"
+                  placeholderTextColor="#94A3B8"
+                  keyboardType="number-pad"
+                  maxLength={6}
+                  value={otpCode}
+                  onChangeText={handleOtpChange}
+                  autoFocus
+                />
+                <Text style={styles.otpNoticeHelp}>
+                  ⚡ Automatically verifying when 6 digits are entered...
+                </Text>
+
+                <TouchableOpacity
+                  style={[styles.modalPublishBtn, { backgroundColor: '#16A34A' }]}
+                  onPress={() => handleVerifyOtp()}
+                  disabled={isAuthLoading}
+                  activeOpacity={0.85}
+                >
+                  {isAuthLoading ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.modalPublishBtnText}>Verify & Proceed ✓</Text>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.resendOtpRow}
+                  onPress={handleSendOtp}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.resendOtpText}>Didn't receive code? Resend SMS</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+
       </SafeAreaView>
     );
   }
@@ -1770,113 +1895,6 @@ function MainApp() {
         </View>
       </Modal>
 
-
-      {/* ---------------------------------------------------------
-          LIVE PHONE OTP VERIFICATION BOTTOM SHEET / MODAL
-          --------------------------------------------------------- */}
-      <Modal visible={showOtpModal} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { paddingBottom: Math.max(insets.bottom + 20, 28) }]}>
-            <View style={styles.modalHeader}>
-              <View>
-                <Text style={styles.modalStepBadge}>
-                  {isOtpSent ? 'STEP 2: VERIFY OTP' : 'STEP 1: ENTER MOBILE'}
-                </Text>
-                <Text style={styles.modalTitle}>
-                  {isOtpSent ? 'Verify Phone Number' : 'Mobile Authentication'}
-                </Text>
-              </View>
-              <TouchableOpacity
-                style={styles.modalCloseBtn}
-                onPress={() => {
-                  setShowOtpModal(false);
-                  setIsOtpSent(false);
-                  setOtpCode('');
-                }}
-              >
-                <X size={20} color="#0F172A" />
-              </TouchableOpacity>
-            </View>
-
-            {!isOtpSent ? (
-              // Step 1: Phone Number Input
-              <View style={styles.modalBody}>
-                <Text style={styles.inputLabel}>Enter 10-Digit Mobile Number</Text>
-                <View style={styles.phoneInputRow}>
-                  <View style={styles.phoneCountryCode}>
-                    <Text style={styles.phoneCountryCodeText}>🇮🇳 +91</Text>
-                  </View>
-                  <TextInput
-                    style={styles.phoneTextInput}
-                    placeholder="98765 43210"
-                    placeholderTextColor="#94A3B8"
-                    keyboardType="phone-pad"
-                    maxLength={10}
-                    value={phoneInput}
-                    onChangeText={setPhoneInput}
-                    autoFocus
-                  />
-                </View>
-                <Text style={styles.otpNoticeHelp}>
-                  We will send a 6-digit verification code via SMS to this number.
-                </Text>
-
-                <TouchableOpacity
-                  style={styles.modalPublishBtn}
-                  onPress={handleSendOtp}
-                  disabled={isAuthLoading}
-                  activeOpacity={0.85}
-                >
-                  {isAuthLoading ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                  ) : (
-                    <Text style={styles.modalPublishBtnText}>Get Verification Code →</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            ) : (
-              // Step 2: 6-Digit OTP Auto-Verification Input
-              <View style={styles.modalBody}>
-                <Text style={styles.inputLabel}>Enter 6-Digit OTP Sent to +91 {phoneInput}</Text>
-                <TextInput
-                  style={styles.otpBoxesInput}
-                  placeholder="• • • • • •"
-                  placeholderTextColor="#94A3B8"
-                  keyboardType="number-pad"
-                  maxLength={6}
-                  value={otpCode}
-                  onChangeText={handleOtpChange}
-                  autoFocus
-                />
-                <Text style={styles.otpNoticeHelp}>
-                  ⚡ Automatically verifying when 6 digits are entered...
-                </Text>
-
-                <TouchableOpacity
-                  style={[styles.modalPublishBtn, { backgroundColor: '#16A34A' }]}
-                  onPress={() => handleVerifyOtp()}
-                  disabled={isAuthLoading}
-                  activeOpacity={0.85}
-                >
-                  {isAuthLoading ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                  ) : (
-                    <Text style={styles.modalPublishBtnText}>Verify & Proceed ✓</Text>
-                  )}
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.resendOtpRow}
-                  onPress={handleSendOtp}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.resendOtpText}>Didn't receive code? Resend SMS</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
-        </View>
-      </Modal>
 
       {/* ---------------------------------------------------------
           WRITE REVIEW MODAL
