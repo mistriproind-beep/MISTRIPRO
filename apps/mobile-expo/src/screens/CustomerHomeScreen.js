@@ -185,12 +185,7 @@ export default function CustomerHomeScreen({ insets }) {
         </View>
 
         {/* ─── 5. Category Filter Tabs ─── */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.tabsRow}
-          contentContainerStyle={styles.tabsContent}
-        >
+        <View style={styles.tabsRow}>
           {CATEGORY_GROUPS.map((g) => {
             const active = activeGroup === g.key;
             return (
@@ -200,11 +195,16 @@ export default function CustomerHomeScreen({ insets }) {
                 onPress={() => setActiveGroup(g.key)}
                 activeOpacity={0.8}
               >
-                <Text style={[styles.tabText, active && styles.tabTextActive]}>{g.label}</Text>
+                <Text
+                  style={[styles.tabText, active && styles.tabTextActive]}
+                  numberOfLines={1}
+                >
+                  {g.label}
+                </Text>
               </TouchableOpacity>
             );
           })}
-        </ScrollView>
+        </View>
 
         {/* ─── 6. Categories Grid ─── */}
         <FlatList
@@ -370,19 +370,22 @@ const styles = StyleSheet.create({
 
   /* ── Filter Tabs ── */
   tabsRow: {
-    marginBottom: 12,
-  },
-  tabsContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
     gap: 8,
-    paddingVertical: 2,
   },
   tab: {
-    paddingHorizontal: 18,
-    paddingVertical: 8,
-    borderRadius: 24,
+    flex: 1,
+    paddingVertical: 9,
+    paddingHorizontal: 2,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   tabActive: {
     backgroundColor: '#4F46E5',
@@ -390,11 +393,13 @@ const styles = StyleSheet.create({
   },
   tabText: {
     fontFamily: 'Satoshi-Medium',
-    fontSize: 13,
+    fontSize: 12,
     color: '#64748B',
+    textAlign: 'center',
   },
   tabTextActive: {
     color: '#FFFFFF',
+    fontFamily: 'Satoshi-Bold',
   },
 
   /* ── Category Grid ── */

@@ -1790,7 +1790,7 @@ function MainApp() {
                   strokeWidth={activeTab === 'HOME' ? 2.5 : 2}
                 />
               </View>
-              <Text style={[styles.navLabel, activeTab === 'HOME' && styles.navLabelActive]}>
+              <Text style={[styles.navLabel, activeTab === 'HOME' && styles.navLabelActive]} numberOfLines={1}>
                 Home
               </Text>
             </TouchableOpacity>
@@ -1808,7 +1808,7 @@ function MainApp() {
                   strokeWidth={activeTab === 'FIND_WORKERS' ? 2.5 : 2}
                 />
               </View>
-              <Text style={[styles.navLabel, activeTab === 'FIND_WORKERS' && styles.navLabelActive]}>
+              <Text style={[styles.navLabel, activeTab === 'FIND_WORKERS' && styles.navLabelActive]} numberOfLines={1}>
                 Find
               </Text>
             </TouchableOpacity>
@@ -1826,7 +1826,7 @@ function MainApp() {
                   strokeWidth={activeTab === 'BOOKINGS' ? 2.5 : 2}
                 />
               </View>
-              <Text style={[styles.navLabel, activeTab === 'BOOKINGS' && styles.navLabelActive]}>
+              <Text style={[styles.navLabel, activeTab === 'BOOKINGS' && styles.navLabelActive]} numberOfLines={1}>
                 Bookings
               </Text>
             </TouchableOpacity>
@@ -1844,7 +1844,7 @@ function MainApp() {
                   strokeWidth={activeTab === 'CONTRACTOR' ? 2.5 : 2}
                 />
               </View>
-              <Text style={[styles.navLabel, activeTab === 'CONTRACTOR' && styles.navLabelActive]}>
+              <Text style={[styles.navLabel, activeTab === 'CONTRACTOR' && styles.navLabelActive]} numberOfLines={1}>
                 Contractor
               </Text>
             </TouchableOpacity>
@@ -1862,7 +1862,7 @@ function MainApp() {
                   strokeWidth={activeTab === 'PROFILE' ? 2.5 : 2}
                 />
               </View>
-              <Text style={[styles.navLabel, activeTab === 'PROFILE' && styles.navLabelActive]}>
+              <Text style={[styles.navLabel, activeTab === 'PROFILE' && styles.navLabelActive]} numberOfLines={1}>
                 Profile
               </Text>
             </TouchableOpacity>
@@ -3229,15 +3229,15 @@ const styles = StyleSheet.create({
   // BOTTOM NAVIGATION CAPSULE (FIONIX DOCK)
   bottomNavCapsule: {
     position: 'absolute',
-    left: 20,
-    right: 20,
-    height: 68,
+    left: 14,
+    right: 14,
+    height: 64,
     backgroundColor: '#FFFFFF',
-    borderRadius: 34,
+    borderRadius: 32,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-around',
-    paddingHorizontal: 12,
+    justifyContent: 'space-between',
+    paddingHorizontal: 6,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.12,
@@ -3251,23 +3251,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     flex: 1,
+    height: '100%',
+    paddingVertical: 4,
   },
   navIconBox: {
-    padding: 4,
+    width: 32,
+    height: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderRadius: 12,
   },
   navIconBoxActive: {
     backgroundColor: '#EEF2FF',
   },
   navLabel: {
+    fontFamily: 'Satoshi-Medium',
     fontSize: 10,
-    fontWeight: '500',
     color: '#94A3B8',
     marginTop: 2,
+    textAlign: 'center',
+    letterSpacing: -0.3,
   },
   navLabelActive: {
     color: '#4F46E5',
-    fontWeight: '700',
+    fontFamily: 'Satoshi-Bold',
   },
   navCenterFab: {
     width: 52,
