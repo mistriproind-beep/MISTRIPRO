@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -18,8 +18,11 @@ import {
   Navigation,
   Globe,
   Compass,
+  LocateFixed,
+  RefreshCw,
 } from 'lucide-react-native';
 import { WebView } from 'react-native-webview';
+import * as Location from 'expo-location';
 import { CATEGORIES } from '../data/categories';
 import { MOCK_WORKERS } from '../data/mockWorkers';
 
@@ -33,8 +36,8 @@ function RatingStars({ rating }) {
       <Star
         key={i}
         size={12}
-        color={i < fullStars ? '#F59E0B' : '#E2E8F0'}
-        fill={i < fullStars ? '#F59E0B' : 'transparent'}
+        color={i < fullStars ? '#0F172A' : '#CBD5E1'}
+        fill={i < fullStars ? '#0F172A' : 'transparent'}
       />
     );
   }
@@ -50,7 +53,7 @@ function WorkerCard({ worker, isSelected, onSelect }) {
     >
       <View style={styles.workerCardRow}>
         {/* Avatar */}
-        <View style={[styles.avatar, { backgroundColor: worker.color }]}>
+        <View style={[styles.avatar, { backgroundColor: worker.color || '#0F172A' }]}>
           <Text style={styles.avatarText}>{worker.avatar}</Text>
         </View>
 
@@ -74,7 +77,7 @@ function WorkerCard({ worker, isSelected, onSelect }) {
 
         {/* Distance Badge */}
         <View style={styles.distanceBadge}>
-          <Navigation size={10} color="#4F46E5" />
+          <Navigation size={10} color="#0F172A" />
           <Text style={styles.distanceText}>{worker.distance} km</Text>
         </View>
       </View>
@@ -92,11 +95,11 @@ function WorkerCard({ worker, isSelected, onSelect }) {
             onPress={() =>
               Alert.alert(
                 worker.name,
-                `Trade: ${worker.skill}\nExperience: ${worker.exp} years\nRate: ₹${worker.rate}/day\nLocation: ${worker.area}`
+                `Trade: ${worker.skill}\nExperience: ${worker.exp} years\nRate: ₹${worker.rate}/day\nAvailable for immediate site booking.`
               )
             }
           >
-            <User size={13} color="#4F46E5" />
+            <User size={13} color="#0F172A" />
             <Text style={styles.viewProfileText}>Profile</Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -115,8 +118,65 @@ function WorkerCard({ worker, isSelected, onSelect }) {
 export default function FindWorkersScreen({ insets }) {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedWorkerId, setSelectedWorkerId] = useState(null);
+  const [userLocation, setUserLocation] = useState(null); // { latitude, longitude, areaName }
+  const [isLocLoading, setIsLocLoading] = useState(true);
+  const webViewRef = useRef(null);
 
-  const filteredWorkers = useMemo(() => {
+  // Auto fetch user's real live GPS coordinates on mount
+  useEffect(() => {
+    fetchLiveLocation();
+  }, []);
+
+  const fetchLiveLocation = async () => {
+    setIsLocLoading(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        setUserLocation({
+          latitude: 26.0124,
+          longitude: 76.3533,
+          areaName: 'Sawai Madhopur, Rajasthan',
+        });
+        setIsLocLoading(false);
+        return;
+      }
+      const loc = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      const rev = await Location.reverseGeocodeAsync({
+        latitude: loc.coords.latitude,
+        longitude: loc.coords.longitude,
+      });
+      let area = 'Current Location';
+      if (rev && rev.length > 0) {
+        const place = rev[0];
+        const locality = place.district || place.subregion || place.city || '';
+        const sub = place.name || place.street || '';
+        area = sub ? `${sub}, ${locality}` : locality || 'Current Location';
+      }
+      setUserLocation({
+        latitude: loc.coords.latitude,
+        longitude: loc.coords.longitude,
+        areaName: area,
+      });
+    } catch (e) {
+      console.log('Location error:', e);
+      setUserLocation({
+        latitude: 26.0124,
+        longitude: 76.3533,
+        areaName: 'Sawai Madhopur, Rajasthan',
+      });
+    } finally {
+      setIsLocLoading(false);
+    }
+  };
+
+  const userLat = userLocation?.latitude || 26.0124;
+  const userLng = userLocation?.longitude || 76.3533;
+  const areaLabel = userLocation?.areaName || 'Detecting GPS...';
+
+  // Base filtered list
+  const baseWorkers = useMemo(() => {
     if (selectedCategory === 'All') {
       return MOCK_WORKERS.filter((w) => w.available);
     }
@@ -125,14 +185,30 @@ export default function FindWorkersScreen({ insets }) {
     );
   }, [selectedCategory]);
 
+  // Dynamically place workers around the user's REAL live GPS location
+  const liveWorkers = useMemo(() => {
+    return baseWorkers.map((w, index) => {
+      // Scatter workers realistically within 1 to 7 km of the user's exact coordinates
+      const angle = (index * 2 * Math.PI) / baseWorkers.length;
+      const radius = 0.012 + (index % 5) * 0.01; // ~1.2km to ~5.5km
+      const lat = userLat + radius * Math.cos(angle);
+      const lng = userLng + radius * Math.sin(angle);
+      const distance = (radius * 111).toFixed(1);
+      return {
+        ...w,
+        lat,
+        lng,
+        distance,
+      };
+    });
+  }, [baseWorkers, userLat, userLng]);
+
   const allChips = ['All', ...CATEGORIES.map((c) => c.name)];
 
-  // Real OpenStreetMap HTML using Leaflet.js
+  // Real Black and White Leaflet Map with CartoDB Positron / Grayscale OpenStreetMap
   const mapHtml = useMemo(() => {
-    const userLat = 26.9124;
-    const userLng = 75.7873;
     const workersData = JSON.stringify(
-      filteredWorkers.map((w) => ({
+      liveWorkers.map((w) => ({
         id: w.id,
         name: w.name,
         skill: w.skill,
@@ -161,17 +237,33 @@ export default function FindWorkersScreen({ insets }) {
     html, body, #map {
       width: 100%;
       height: 100%;
-      background: #E8F4F8;
+      background: #F8FAFC;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
+
+    /* PURE BLACK AND WHITE / MONOCHROME TILE FILTER */
+    .leaflet-tile-pane {
+      filter: grayscale(100%) contrast(120%) brightness(96%);
+      -webkit-filter: grayscale(100%) contrast(120%) brightness(96%);
+    }
+
+    /* Real GPS User Marker: Black circle with white border & pulsing radar */
     .user-marker {
       width: 20px;
       height: 20px;
       border-radius: 50%;
-      background: #2563EB;
+      background: #0F172A;
       border: 3px solid #FFFFFF;
-      box-shadow: 0 0 0 5px rgba(37, 99, 235, 0.35);
+      box-shadow: 0 0 0 5px rgba(15, 23, 42, 0.3);
+      animation: pulseRadar 2s infinite;
     }
+    @keyframes pulseRadar {
+      0% { box-shadow: 0 0 0 0 rgba(15, 23, 42, 0.5); }
+      70% { box-shadow: 0 0 0 10px rgba(15, 23, 42, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(15, 23, 42, 0); }
+    }
+
+    /* B&W Worker Marker Pin */
     .worker-marker-wrap {
       display: flex;
       flex-direction: column;
@@ -182,63 +274,72 @@ export default function FindWorkersScreen({ insets }) {
       width: 32px;
       height: 32px;
       border-radius: 16px;
+      background: #0F172A;
       color: #FFFFFF;
       font-weight: 700;
       font-size: 11px;
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+      box-shadow: 0 3px 8px rgba(0,0,0,0.4);
       border: 2px solid #FFFFFF;
     }
     .worker-pill {
-      background: #0F172A;
+      background: #000000;
       color: #FFFFFF;
       font-size: 9px;
-      font-weight: 600;
-      padding: 1px 5px;
+      font-weight: 700;
+      padding: 2px 6px;
       border-radius: 6px;
-      margin-top: 1px;
+      margin-top: 2px;
       white-space: nowrap;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      border: 1px solid rgba(255,255,255,0.4);
     }
+
+    /* B&W Callout Popup */
     .leaflet-popup-content-wrapper {
       border-radius: 12px;
-      padding: 2px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.18);
+      padding: 4px;
+      background: #FFFFFF;
+      border: 1px solid #0F172A;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.25);
     }
     .popup-box {
       font-size: 12px;
       padding: 4px;
+      color: #0F172A;
     }
     .popup-name {
-      font-weight: 700;
-      font-size: 13px;
+      font-weight: 800;
+      font-size: 14px;
       color: #0F172A;
+      margin-bottom: 2px;
     }
     .popup-skill {
       font-weight: 600;
-      color: #4F46E5;
+      color: #475569;
       font-size: 11px;
-      margin-bottom: 2px;
+      margin-bottom: 4px;
     }
     .popup-rate {
-      font-weight: 700;
-      color: #059669;
-      margin-top: 2px;
+      font-weight: 800;
+      color: #0F172A;
+      font-size: 13px;
+      margin-top: 4px;
     }
     .popup-btn {
       display: block;
       width: 100%;
-      background: #4F46E5;
+      background: #0F172A;
       color: #FFFFFF;
       text-align: center;
-      padding: 6px 10px;
-      border-radius: 6px;
+      padding: 7px 12px;
+      border-radius: 8px;
       text-decoration: none;
-      font-weight: 600;
+      font-weight: 700;
       font-size: 11px;
-      margin-top: 6px;
+      margin-top: 8px;
       border: none;
       cursor: pointer;
     }
@@ -251,14 +352,15 @@ export default function FindWorkersScreen({ insets }) {
     var map = L.map('map', {
       zoomControl: true,
       attributionControl: false
-    }).setView([${userLat}, ${userLng}], 12);
+    }).setView([${userLat}, ${userLng}], 13);
 
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    // CartoDB Positron Black & White Real Map Layer
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
       maxZoom: 19,
-      attribution: '© OpenStreetMap'
+      attribution: '© OpenStreetMap, © CARTO'
     }).addTo(map);
 
-    // User Location Marker
+    // Real Live GPS User Location Marker
     var userIcon = L.divIcon({
       className: '',
       html: '<div class="user-marker"></div>',
@@ -267,16 +369,17 @@ export default function FindWorkersScreen({ insets }) {
     });
     L.marker([${userLat}, ${userLng}], { icon: userIcon })
       .addTo(map)
-      .bindPopup('<b>📍 You are here</b><br/>Jaipur, Rajasthan');
+      .bindPopup('<b>📍 Your Live GPS Location</b><br/>${areaLabel}')
+      .openPopup();
 
-    // Worker Markers
+    // Worker Markers scattered around user's live position
     var workers = ${workersData};
     workers.forEach(function(w) {
       if (!w.lat || !w.lng) return;
       var icon = L.divIcon({
         className: '',
         html: '<div class="worker-marker-wrap">' +
-                '<div class="worker-circle" style="background-color:' + w.color + ';">' + w.avatar + '</div>' +
+                '<div class="worker-circle" style="background-color:' + (w.color || '#0F172A') + ';">' + w.avatar + '</div>' +
                 '<div class="worker-pill">' + w.skill.split(' ')[0] + '</div>' +
               '</div>',
         iconSize: [36, 44],
@@ -287,7 +390,7 @@ export default function FindWorkersScreen({ insets }) {
         '<div class="popup-name">' + w.name + '</div>' +
         '<div class="popup-skill">' + w.skill + '</div>' +
         '<div>⭐ ' + w.rating + ' (' + w.reviews + ' reviews)</div>' +
-        '<div class="popup-rate">₹' + w.rate + '/' + w.rateType + ' • ' + w.distance + ' km</div>' +
+        '<div class="popup-rate">₹' + w.rate + '/' + w.rateType + ' • ' + w.distance + ' km away</div>' +
         '<button class="popup-btn" onclick="sendMsg(\\'' + w.phone + '\\')">📞 Call Mistri</button>' +
       '</div>';
 
@@ -310,7 +413,7 @@ export default function FindWorkersScreen({ insets }) {
 </body>
 </html>
 `;
-  }, [filteredWorkers]);
+  }, [liveWorkers, userLat, userLng, areaLabel]);
 
   const handleWebViewMessage = (event) => {
     try {
@@ -331,12 +434,27 @@ export default function FindWorkersScreen({ insets }) {
       <View style={styles.header}>
         <View style={styles.headerLeftCol}>
           <Text style={styles.headerTitle}>Find Workers</Text>
-          <Text style={styles.headerSubtitle}>Live OpenStreetMap view of verified mistris</Text>
+          <View style={styles.locationSubRow}>
+            <MapPin size={12} color="#0F172A" />
+            <Text style={styles.headerSubtitle} numberOfLines={1}>
+              {areaLabel}
+            </Text>
+          </View>
         </View>
-        <View style={styles.osmBadge}>
-          <Globe size={13} color="#059669" />
-          <Text style={styles.osmBadgeText}>OpenStreetMap</Text>
-        </View>
+        <TouchableOpacity
+          style={styles.recenterBtn}
+          onPress={fetchLiveLocation}
+          activeOpacity={0.8}
+        >
+          {isLocLoading ? (
+            <ActivityIndicator size="small" color="#0F172A" />
+          ) : (
+            <>
+              <LocateFixed size={14} color="#0F172A" />
+              <Text style={styles.recenterBtnText}>Live GPS</Text>
+            </>
+          )}
+        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -376,10 +494,11 @@ export default function FindWorkersScreen({ insets }) {
           })}
         </ScrollView>
 
-        {/* ─── REAL OPENSTREETMAP CONTAINER ─── */}
+        {/* ─── BLACK & WHITE REAL MAP CONTAINER ─── */}
         <View style={styles.mapOuterWrap}>
           <View style={styles.mapCard}>
             <WebView
+              ref={webViewRef}
               originWhitelist={['*']}
               source={{ html: mapHtml }}
               style={styles.mapWebView}
@@ -388,18 +507,18 @@ export default function FindWorkersScreen({ insets }) {
               startInLoadingState={true}
               renderLoading={() => (
                 <View style={styles.mapLoadingOverlay}>
-                  <ActivityIndicator size="large" color="#4F46E5" />
-                  <Text style={styles.mapLoadingText}>Loading OpenStreetMap...</Text>
+                  <ActivityIndicator size="large" color="#0F172A" />
+                  <Text style={styles.mapLoadingText}>Loading B&W Real Map...</Text>
                 </View>
               )}
               onMessage={handleWebViewMessage}
             />
 
-            {/* Live Map Header Pill */}
+            {/* Live B&W Map Badge Overlay */}
             <View style={styles.mapLivePill}>
-              <View style={styles.greenLiveDot} />
+              <View style={styles.blackLiveDot} />
               <Text style={styles.mapLiveText}>
-                {filteredWorkers.length} Workers Plotted on Map
+                ⚫ Black & White Real Map • {liveWorkers.length} Mistris
               </Text>
             </View>
           </View>
@@ -409,9 +528,9 @@ export default function FindWorkersScreen({ insets }) {
         <View style={styles.listSection}>
           <View style={styles.listHeader}>
             <View>
-              <Text style={styles.listTitle}>Nearby Workers on Map</Text>
+              <Text style={styles.listTitle}>Workers Near Your Location</Text>
               <Text style={styles.listCount}>
-                Showing {filteredWorkers.length} available mistris
+                Showing {liveWorkers.length} available mistris around {areaLabel.split(',')[0]}
               </Text>
             </View>
             {selectedCategory !== 'All' && (
@@ -419,12 +538,12 @@ export default function FindWorkersScreen({ insets }) {
                 style={styles.resetFilterBtn}
                 onPress={() => setSelectedCategory('All')}
               >
-                <Text style={styles.resetFilterText}>Clear Filter</Text>
+                <Text style={styles.resetFilterText}>Clear</Text>
               </TouchableOpacity>
             )}
           </View>
 
-          {filteredWorkers.map((worker) => (
+          {liveWorkers.map((worker) => (
             <WorkerCard
               key={worker.id}
               worker={worker}
@@ -463,25 +582,33 @@ const styles = StyleSheet.create({
     fontSize: 22,
     color: '#0F172A',
   },
-  headerSubtitle: {
-    fontFamily: 'Satoshi-Regular',
-    fontSize: 12,
-    color: '#64748B',
-    marginTop: 2,
-  },
-  osmBadge: {
+  locationSubRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#DCFCE7',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
+    marginTop: 2,
   },
-  osmBadgeText: {
+  headerSubtitle: {
+    fontFamily: 'Satoshi-Medium',
+    fontSize: 12,
+    color: '#0F172A',
+    flex: 1,
+  },
+  recenterBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 14,
+  },
+  recenterBtnText: {
     fontFamily: 'Satoshi-Bold',
-    fontSize: 10,
-    color: '#15803D',
+    fontSize: 11,
+    color: '#0F172A',
   },
   scroll: {
     flex: 1,
@@ -501,8 +628,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   chipSelected: {
-    backgroundColor: '#4F46E5',
-    borderColor: '#4F46E5',
+    backgroundColor: '#0F172A',
+    borderColor: '#0F172A',
   },
   chipUnselected: {
     backgroundColor: '#FFFFFF',
@@ -527,10 +654,10 @@ const styles = StyleSheet.create({
     height: 330,
     borderRadius: 20,
     overflow: 'hidden',
-    backgroundColor: '#E8F4F8',
+    backgroundColor: '#F8FAFC',
     borderWidth: 1,
     borderColor: '#CBD5E1',
-    shadowColor: '#0F172A',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 10,
@@ -539,7 +666,7 @@ const styles = StyleSheet.create({
   },
   mapWebView: {
     flex: 1,
-    backgroundColor: 'transparent',
+    backgroundColor: '#F8FAFC',
   },
   mapLoadingOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -560,16 +687,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+    backgroundColor: 'rgba(15, 23, 42, 0.9)',
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
-  greenLiveDot: {
+  blackLiveDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#10B981',
+    backgroundColor: '#FFFFFF',
   },
   mapLiveText: {
     fontFamily: 'Satoshi-Bold',
@@ -597,7 +726,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   resetFilterBtn: {
-    backgroundColor: '#EEF2FF',
+    backgroundColor: '#F1F5F9',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
@@ -605,7 +734,7 @@ const styles = StyleSheet.create({
   resetFilterText: {
     fontFamily: 'Satoshi-Medium',
     fontSize: 11,
-    color: '#4F46E5',
+    color: '#0F172A',
   },
   workerCard: {
     backgroundColor: '#FFFFFF',
@@ -621,8 +750,8 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   workerCardSelected: {
-    borderColor: '#4F46E5',
-    backgroundColor: '#F8FAFF',
+    borderColor: '#0F172A',
+    backgroundColor: '#F8FAFC',
   },
   workerCardRow: {
     flexDirection: 'row',
@@ -655,7 +784,9 @@ const styles = StyleSheet.create({
     color: '#0F172A',
   },
   verifiedBadge: {
-    backgroundColor: '#DCFCE7',
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
     paddingHorizontal: 5,
     paddingVertical: 1,
     borderRadius: 4,
@@ -663,12 +794,12 @@ const styles = StyleSheet.create({
   verifiedText: {
     fontFamily: 'Satoshi-Bold',
     fontSize: 9,
-    color: '#15803D',
+    color: '#0F172A',
   },
   workerSkill: {
     fontFamily: 'Satoshi-Medium',
     fontSize: 12,
-    color: '#4F46E5',
+    color: '#475569',
     marginTop: 1,
   },
   ratingRow: {
@@ -695,16 +826,18 @@ const styles = StyleSheet.create({
   distanceBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#EEF2FF',
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 8,
     gap: 3,
   },
   distanceText: {
-    fontFamily: 'Satoshi-Medium',
+    fontFamily: 'Satoshi-Bold',
     fontSize: 10,
-    color: '#4F46E5',
+    color: '#0F172A',
   },
   workerCardBottom: {
     flexDirection: 'row',
@@ -737,7 +870,9 @@ const styles = StyleSheet.create({
   viewProfileBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#EEF2FF',
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     paddingHorizontal: 10,
     paddingVertical: 7,
     borderRadius: 8,
@@ -746,12 +881,12 @@ const styles = StyleSheet.create({
   viewProfileText: {
     fontFamily: 'Satoshi-Medium',
     fontSize: 11,
-    color: '#4F46E5',
+    color: '#0F172A',
   },
   callBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#4F46E5',
+    backgroundColor: '#0F172A',
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: 8,
