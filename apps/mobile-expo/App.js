@@ -12,6 +12,8 @@ import {
   Alert,
   Image,
   Dimensions,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView, SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFonts } from 'expo-font';
@@ -916,7 +918,10 @@ function MainApp() {
           LIVE PHONE OTP VERIFICATION BOTTOM SHEET / MODAL
           --------------------------------------------------------- */}
       <Modal visible={showOtpModal} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
           <View style={[styles.modalCard, { paddingBottom: Math.max(insets.bottom + 20, 28) }]}>
             <View style={styles.modalHeader}>
               <View>
@@ -1016,7 +1021,7 @@ function MainApp() {
               </View>
             )}
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
 
@@ -1866,7 +1871,7 @@ function MainApp() {
               </View>
             )}
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* ---------------------------------------------------------
