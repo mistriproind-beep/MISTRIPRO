@@ -79,17 +79,19 @@ export default function MyBookingsScreen({ insets, onNavigateTab }) {
 
       {/* Header */}
       <View style={styles.header}>
-        <View>
+        <View style={styles.headerLeftCol}>
           <Text style={styles.headerTitle}>My Bookings</Text>
-          <Text style={styles.headerSub}>Manage your daily labour & contractor bookings</Text>
+          <Text style={styles.headerSub} numberOfLines={1}>
+            Track your daily labour & contractor bookings
+          </Text>
         </View>
         <TouchableOpacity
           style={styles.newBookingBtn}
           onPress={() => onNavigateTab && onNavigateTab('HOME')}
           activeOpacity={0.8}
         >
-          <Plus size={16} color="#FFFFFF" strokeWidth={2.5} />
-          <Text style={styles.newBookingBtnText}>Book</Text>
+          <Plus size={15} color="#FFFFFF" strokeWidth={2.5} />
+          <Text style={styles.newBookingBtnText}>Book Mistri</Text>
         </TouchableOpacity>
       </View>
 
@@ -299,6 +301,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
   },
+  headerLeftCol: {
+    flex: 1,
+    marginRight: 12,
+  },
   headerTitle: {
     fontFamily: 'Satoshi-Bold',
     fontSize: 22,
@@ -306,18 +312,19 @@ const styles = StyleSheet.create({
   },
   headerSub: {
     fontFamily: 'Satoshi-Regular',
-    fontSize: 13,
+    fontSize: 12,
     color: '#64748B',
     marginTop: 2,
   },
   newBookingBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 5,
     backgroundColor: '#4F46E5',
     paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingVertical: 9,
     borderRadius: 20,
+    flexShrink: 0,
   },
   newBookingBtnText: {
     fontFamily: 'Satoshi-Bold',

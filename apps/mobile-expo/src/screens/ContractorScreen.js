@@ -201,7 +201,7 @@ export default function ContractorScreen({ insets, onNavigateTab }) {
             <View style={styles.stepCircle}>
               <Text style={styles.stepText}>1</Text>
             </View>
-            <View>
+            <View style={styles.sectionHeaderTitleCol}>
               <Text style={styles.sectionTitle}>Select Crew Requirements</Text>
               <Text style={styles.sectionSub}>Add the number of workers per skill</Text>
             </View>
@@ -214,9 +214,11 @@ export default function ContractorScreen({ insets, onNavigateTab }) {
               return (
                 <View key={role.id} style={styles.roleItem}>
                   <View style={styles.roleLeft}>
-                    <Text style={styles.roleEmoji}>{role.icon}</Text>
-                    <View>
-                      <Text style={styles.roleName}>{role.name}</Text>
+                    <View style={styles.roleEmojiWrap}>
+                      <Text style={styles.roleEmoji}>{role.icon}</Text>
+                    </View>
+                    <View style={styles.roleTextCol}>
+                      <Text style={styles.roleName} numberOfLines={1}>{role.name}</Text>
                       <Text style={styles.roleRate}>
                         ₹{role.baseRate} / {role.unit}
                       </Text>
@@ -255,7 +257,7 @@ export default function ContractorScreen({ insets, onNavigateTab }) {
             <View style={styles.stepCircle}>
               <Text style={styles.stepText}>2</Text>
             </View>
-            <View>
+            <View style={styles.sectionHeaderTitleCol}>
               <Text style={styles.sectionTitle}>Shift Duration</Text>
               <Text style={styles.sectionSub}>Select working hours or multiple days</Text>
             </View>
@@ -350,7 +352,10 @@ export default function ContractorScreen({ insets, onNavigateTab }) {
           {/* Stepper for Multiple Days */}
           {durationType === 'multi' && (
             <View style={styles.multiDaysCard}>
-              <Text style={styles.multiDaysLabel}>Number of Working Days:</Text>
+              <View style={styles.multiDaysTextCol}>
+                <Text style={styles.multiDaysLabel}>Number of Working Days:</Text>
+                <Text style={styles.multiDaysSub}>Crew will report for {daysCount} consecutive days</Text>
+              </View>
               <View style={styles.stepperWrap}>
                 <TouchableOpacity
                   style={[styles.stepperBtn, daysCount <= 1 && styles.stepperBtnDisabled]}
@@ -359,7 +364,7 @@ export default function ContractorScreen({ insets, onNavigateTab }) {
                 >
                   <Minus size={14} color="#0F172A" />
                 </TouchableOpacity>
-                <Text style={styles.stepperCount}>{daysCount} days</Text>
+                <Text style={[styles.stepperCount, { minWidth: 32 }]}>{daysCount} d</Text>
                 <TouchableOpacity
                   style={styles.stepperBtn}
                   onPress={() => setDaysCount(daysCount + 1)}
@@ -373,7 +378,10 @@ export default function ContractorScreen({ insets, onNavigateTab }) {
           {/* Stepper for Hourly */}
           {durationType === 'hourly' && (
             <View style={styles.multiDaysCard}>
-              <Text style={styles.multiDaysLabel}>Hours Required:</Text>
+              <View style={styles.multiDaysTextCol}>
+                <Text style={styles.multiDaysLabel}>Hours Required:</Text>
+                <Text style={styles.multiDaysSub}>Short shift: {hoursCount} hours per worker</Text>
+              </View>
               <View style={styles.stepperWrap}>
                 <TouchableOpacity
                   style={[styles.stepperBtn, hoursCount <= 2 && styles.stepperBtnDisabled]}
@@ -382,7 +390,7 @@ export default function ContractorScreen({ insets, onNavigateTab }) {
                 >
                   <Minus size={14} color="#0F172A" />
                 </TouchableOpacity>
-                <Text style={styles.stepperCount}>{hoursCount} hrs</Text>
+                <Text style={[styles.stepperCount, { minWidth: 32 }]}>{hoursCount} h</Text>
                 <TouchableOpacity
                   style={styles.stepperBtn}
                   onPress={() => setHoursCount(hoursCount + 1)}
@@ -400,7 +408,7 @@ export default function ContractorScreen({ insets, onNavigateTab }) {
             <View style={styles.stepCircle}>
               <Text style={styles.stepText}>3</Text>
             </View>
-            <View>
+            <View style={styles.sectionHeaderTitleCol}>
               <Text style={styles.sectionTitle}>Working Site Location</Text>
               <Text style={styles.sectionSub}>Where should the crew report?</Text>
             </View>
@@ -582,6 +590,8 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 12,
     alignItems: 'center',
+    minWidth: 64,
+    flexShrink: 0,
   },
   crewCountNum: {
     fontFamily: 'Satoshi-Bold',
@@ -616,6 +626,9 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 16,
   },
+  sectionHeaderTitleCol: {
+    flex: 1,
+  },
   stepCircle: {
     width: 28,
     height: 28,
@@ -638,6 +651,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Satoshi-Regular',
     fontSize: 12,
     color: '#64748B',
+    marginTop: 2,
   },
   rolesList: {
     gap: 10,
@@ -646,19 +660,35 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 14,
     backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
   },
   roleLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
     flex: 1,
+    marginRight: 10,
+  },
+  roleEmojiWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   roleEmoji: {
-    fontSize: 22,
+    fontSize: 20,
+  },
+  roleTextCol: {
+    flex: 1,
   },
   roleName: {
     fontFamily: 'Satoshi-Bold',
@@ -669,17 +699,19 @@ const styles = StyleSheet.create({
     fontFamily: 'Satoshi-Regular',
     fontSize: 11,
     color: '#64748B',
+    marginTop: 2,
   },
   stepperWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
     backgroundColor: '#FFFFFF',
     paddingVertical: 4,
     paddingHorizontal: 8,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: '#E2E8F0',
+    flexShrink: 0,
   },
   stepperBtn: {
     width: 28,
@@ -696,7 +728,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Satoshi-Bold',
     fontSize: 14,
     color: '#0F172A',
-    minWidth: 18,
+    minWidth: 20,
     textAlign: 'center',
   },
   durationGrid: {
@@ -740,10 +772,20 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 12,
   },
+  multiDaysTextCol: {
+    flex: 1,
+    marginRight: 10,
+  },
   multiDaysLabel: {
-    fontFamily: 'Satoshi-Medium',
+    fontFamily: 'Satoshi-Bold',
     fontSize: 13,
     color: '#0F172A',
+  },
+  multiDaysSub: {
+    fontFamily: 'Satoshi-Regular',
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 2,
   },
   inputGroup: {
     marginBottom: 10,
@@ -800,11 +842,14 @@ const styles = StyleSheet.create({
     fontFamily: 'Satoshi-Regular',
     fontSize: 13,
     color: '#94A3B8',
+    flex: 1,
+    marginRight: 10,
   },
   summaryVal: {
-    fontFamily: 'Satoshi-Medium',
+    fontFamily: 'Satoshi-Bold',
     fontSize: 13,
     color: '#FFFFFF',
+    flexShrink: 0,
   },
   summaryDivider: {
     height: 1,

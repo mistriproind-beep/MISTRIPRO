@@ -1,111 +1,57 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
   ScrollView,
   TouchableOpacity,
   StyleSheet,
-  Animated,
   Dimensions,
   Linking,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import {
-  Search,
   MapPin,
   Star,
   Phone,
   User,
   Navigation,
-  ChevronRight,
+  Globe,
+  Compass,
 } from 'lucide-react-native';
+import { WebView } from 'react-native-webview';
 import { CATEGORIES } from '../data/categories';
 import { MOCK_WORKERS } from '../data/mockWorkers';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const MAP_HEIGHT = 350;
-const MAP_WIDTH = SCREEN_WIDTH - 32;
-
-// Center reference point (approx Jaipur center)
-const CENTER_LAT = 26.92;
-const CENTER_LNG = 75.76;
-
-function WorkerDot({ worker, mapWidth, mapHeight }) {
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-
-  useEffect(() => {
-    const pulse = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1.8,
-          duration: 1200,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 1200,
-          useNativeDriver: true,
-        }),
-      ])
-    );
-    pulse.start();
-    return () => pulse.stop();
-  }, [pulseAnim]);
-
-  const x = mapWidth / 2 + (worker.lng - CENTER_LNG) * 800;
-  const y = mapHeight / 2 + (CENTER_LAT - worker.lat) * 800;
-
-  // Clamp within bounds
-  const clampedX = Math.max(16, Math.min(x, mapWidth - 16));
-  const clampedY = Math.max(16, Math.min(y, mapHeight - 16));
-
-  return (
-    <View style={[styles.dotContainer, { left: clampedX - 14, top: clampedY - 14 }]}>
-      <Animated.View
-        style={[
-          styles.dotPulse,
-          {
-            backgroundColor: worker.color + '25',
-            borderColor: worker.color + '50',
-            transform: [{ scale: pulseAnim }],
-          },
-        ]}
-      />
-      <View style={[styles.dotInner, { backgroundColor: worker.color }]}>
-        <Text style={styles.dotInitials}>{worker.avatar}</Text>
-      </View>
-    </View>
-  );
-}
 
 function RatingStars({ rating }) {
   const fullStars = Math.floor(rating);
-  const hasHalf = rating - fullStars >= 0.5;
   const stars = [];
   for (let i = 0; i < 5; i++) {
-    if (i < fullStars) {
-      stars.push(
-        <Star key={i} size={12} color="#F59E0B" fill="#F59E0B" />
-      );
-    } else if (i === fullStars && hasHalf) {
-      stars.push(
-        <Star key={i} size={12} color="#F59E0B" fill="#F59E0B" style={{ opacity: 0.5 }} />
-      );
-    } else {
-      stars.push(
-        <Star key={i} size={12} color="#D1D5DB" />
-      );
-    }
+    stars.push(
+      <Star
+        key={i}
+        size={12}
+        color={i < fullStars ? '#F59E0B' : '#E2E8F0'}
+        fill={i < fullStars ? '#F59E0B' : 'transparent'}
+      />
+    );
   }
   return <View style={styles.starsRow}>{stars}</View>;
 }
 
-function WorkerCard({ worker }) {
+function WorkerCard({ worker, isSelected, onSelect }) {
   return (
-    <View style={styles.workerCard}>
+    <TouchableOpacity
+      style={[styles.workerCard, isSelected && styles.workerCardSelected]}
+      onPress={() => onSelect && onSelect(worker)}
+      activeOpacity={0.85}
+    >
       <View style={styles.workerCardRow}>
         {/* Avatar */}
-        <View style={[styles.avatar, { backgroundColor: worker.color + '18' }]}>
-          <Text style={[styles.avatarText, { color: worker.color }]}>{worker.avatar}</Text>
+        <View style={[styles.avatar, { backgroundColor: worker.color }]}>
+          <Text style={styles.avatarText}>{worker.avatar}</Text>
         </View>
 
         {/* Info */}
@@ -114,7 +60,7 @@ function WorkerCard({ worker }) {
             <Text style={styles.workerName}>{worker.name}</Text>
             {worker.verified && (
               <View style={styles.verifiedBadge}>
-                <Text style={styles.verifiedText}>✓</Text>
+                <Text style={styles.verifiedText}>KYC ✓</Text>
               </View>
             )}
           </View>
@@ -141,47 +87,263 @@ function WorkerCard({ worker }) {
         </View>
 
         <View style={styles.workerActions}>
-          <TouchableOpacity style={styles.viewProfileBtn}>
-            <User size={14} color="#4F46E5" />
-            <Text style={styles.viewProfileText}>View Profile</Text>
+          <TouchableOpacity
+            style={styles.viewProfileBtn}
+            onPress={() =>
+              Alert.alert(
+                worker.name,
+                `Trade: ${worker.skill}\nExperience: ${worker.exp} years\nRate: ₹${worker.rate}/day\nLocation: ${worker.area}`
+              )
+            }
+          >
+            <User size={13} color="#4F46E5" />
+            <Text style={styles.viewProfileText}>Profile</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.callBtn}
             onPress={() => Linking.openURL(`tel:${worker.phone}`)}
           >
-            <Phone size={14} color="#FFFFFF" />
-            <Text style={styles.callText}>Call</Text>
+            <Phone size={13} color="#FFFFFF" />
+            <Text style={styles.callText}>Call Now</Text>
           </TouchableOpacity>
         </View>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
 export default function FindWorkersScreen({ insets }) {
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [selectedWorkerId, setSelectedWorkerId] = useState(null);
 
-  const filteredWorkers = selectedCategory === 'All'
-    ? MOCK_WORKERS.filter(w => w.available)
-    : MOCK_WORKERS.filter(
-        w => w.available && w.category === selectedCategory
-      );
+  const filteredWorkers = useMemo(() => {
+    if (selectedCategory === 'All') {
+      return MOCK_WORKERS.filter((w) => w.available);
+    }
+    return MOCK_WORKERS.filter(
+      (w) => w.available && (w.category === selectedCategory || w.skill.includes(selectedCategory))
+    );
+  }, [selectedCategory]);
 
-  const allChips = ['All', ...CATEGORIES.map(c => c.name)];
+  const allChips = ['All', ...CATEGORIES.map((c) => c.name)];
+
+  // Real OpenStreetMap HTML using Leaflet.js
+  const mapHtml = useMemo(() => {
+    const userLat = 26.9124;
+    const userLng = 75.7873;
+    const workersData = JSON.stringify(
+      filteredWorkers.map((w) => ({
+        id: w.id,
+        name: w.name,
+        skill: w.skill,
+        rate: w.rate,
+        rateType: w.rateType,
+        rating: w.rating,
+        reviews: w.reviews,
+        phone: w.phone,
+        avatar: w.avatar,
+        color: w.color,
+        distance: w.distance,
+        lat: w.lat,
+        lng: w.lng,
+      }))
+    );
+
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body, #map {
+      width: 100%;
+      height: 100%;
+      background: #E8F4F8;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    .user-marker {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #2563EB;
+      border: 3px solid #FFFFFF;
+      box-shadow: 0 0 0 5px rgba(37, 99, 235, 0.35);
+    }
+    .worker-marker-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      cursor: pointer;
+    }
+    .worker-circle {
+      width: 32px;
+      height: 32px;
+      border-radius: 16px;
+      color: #FFFFFF;
+      font-weight: 700;
+      font-size: 11px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+      border: 2px solid #FFFFFF;
+    }
+    .worker-pill {
+      background: #0F172A;
+      color: #FFFFFF;
+      font-size: 9px;
+      font-weight: 600;
+      padding: 1px 5px;
+      border-radius: 6px;
+      margin-top: 1px;
+      white-space: nowrap;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    .leaflet-popup-content-wrapper {
+      border-radius: 12px;
+      padding: 2px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.18);
+    }
+    .popup-box {
+      font-size: 12px;
+      padding: 4px;
+    }
+    .popup-name {
+      font-weight: 700;
+      font-size: 13px;
+      color: #0F172A;
+    }
+    .popup-skill {
+      font-weight: 600;
+      color: #4F46E5;
+      font-size: 11px;
+      margin-bottom: 2px;
+    }
+    .popup-rate {
+      font-weight: 700;
+      color: #059669;
+      margin-top: 2px;
+    }
+    .popup-btn {
+      display: block;
+      width: 100%;
+      background: #4F46E5;
+      color: #FFFFFF;
+      text-align: center;
+      padding: 6px 10px;
+      border-radius: 6px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 11px;
+      margin-top: 6px;
+      border: none;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    var map = L.map('map', {
+      zoomControl: true,
+      attributionControl: false
+    }).setView([${userLat}, ${userLng}], 12);
+
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '© OpenStreetMap'
+    }).addTo(map);
+
+    // User Location Marker
+    var userIcon = L.divIcon({
+      className: '',
+      html: '<div class="user-marker"></div>',
+      iconSize: [20, 20],
+      iconAnchor: [10, 10]
+    });
+    L.marker([${userLat}, ${userLng}], { icon: userIcon })
+      .addTo(map)
+      .bindPopup('<b>📍 You are here</b><br/>Jaipur, Rajasthan');
+
+    // Worker Markers
+    var workers = ${workersData};
+    workers.forEach(function(w) {
+      if (!w.lat || !w.lng) return;
+      var icon = L.divIcon({
+        className: '',
+        html: '<div class="worker-marker-wrap">' +
+                '<div class="worker-circle" style="background-color:' + w.color + ';">' + w.avatar + '</div>' +
+                '<div class="worker-pill">' + w.skill.split(' ')[0] + '</div>' +
+              '</div>',
+        iconSize: [36, 44],
+        iconAnchor: [18, 22]
+      });
+
+      var popupHtml = '<div class="popup-box">' +
+        '<div class="popup-name">' + w.name + '</div>' +
+        '<div class="popup-skill">' + w.skill + '</div>' +
+        '<div>⭐ ' + w.rating + ' (' + w.reviews + ' reviews)</div>' +
+        '<div class="popup-rate">₹' + w.rate + '/' + w.rateType + ' • ' + w.distance + ' km</div>' +
+        '<button class="popup-btn" onclick="sendMsg(\\'' + w.phone + '\\')">📞 Call Mistri</button>' +
+      '</div>';
+
+      L.marker([w.lat, w.lng], { icon: icon })
+        .addTo(map)
+        .bindPopup(popupHtml)
+        .on('click', function() {
+          if (window.ReactNativeWebView) {
+            window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'SELECT_WORKER', id: w.id }));
+          }
+        });
+    });
+
+    function sendMsg(phone) {
+      if (window.ReactNativeWebView) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'CALL', phone: phone }));
+      }
+    }
+  </script>
+</body>
+</html>
+`;
+  }, [filteredWorkers]);
+
+  const handleWebViewMessage = (event) => {
+    try {
+      const data = JSON.parse(event.nativeEvent.data);
+      if (data.type === 'CALL' && data.phone) {
+        Linking.openURL(`tel:${data.phone}`);
+      } else if (data.type === 'SELECT_WORKER' && data.id) {
+        setSelectedWorkerId(data.id);
+      }
+    } catch (e) {
+      console.log('WebView message error:', e);
+    }
+  };
 
   return (
-    <View style={[styles.container, { paddingTop: insets?.top || 44 }]}>
+    <View style={[styles.container, { paddingTop: insets?.top || 0 }]}>
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.headerLeftCol}>
+          <Text style={styles.headerTitle}>Find Workers</Text>
+          <Text style={styles.headerSubtitle}>Live OpenStreetMap view of verified mistris</Text>
+        </View>
+        <View style={styles.osmBadge}>
+          <Globe size={13} color="#059669" />
+          <Text style={styles.osmBadgeText}>OpenStreetMap</Text>
+        </View>
+      </View>
+
       <ScrollView
         style={styles.scroll}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: (insets?.bottom || 34) + 80 }}
+        contentContainerStyle={{ paddingBottom: (insets?.bottom || 34) + 110 }}
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Find Workers</Text>
-          <Text style={styles.headerSubtitle}>Discover skilled workers near you</Text>
-        </View>
-
         {/* Category Chips */}
         <ScrollView
           horizontal
@@ -214,86 +376,62 @@ export default function FindWorkersScreen({ insets }) {
           })}
         </ScrollView>
 
-        {/* Simulated Map View */}
-        <View style={styles.mapContainer}>
+        {/* ─── REAL OPENSTREETMAP CONTAINER ─── */}
+        <View style={styles.mapOuterWrap}>
           <View style={styles.mapCard}>
-            {/* Grid lines for map effect */}
-            {[0.25, 0.5, 0.75].map((frac) => (
-              <View
-                key={`h-${frac}`}
-                style={[
-                  styles.gridLineH,
-                  { top: `${frac * 100}%` },
-                ]}
-              />
-            ))}
-            {[0.25, 0.5, 0.75].map((frac) => (
-              <View
-                key={`v-${frac}`}
-                style={[
-                  styles.gridLineV,
-                  { left: `${frac * 100}%` },
-                ]}
-              />
-            ))}
+            <WebView
+              originWhitelist={['*']}
+              source={{ html: mapHtml }}
+              style={styles.mapWebView}
+              javaScriptEnabled={true}
+              domStorageEnabled={true}
+              startInLoadingState={true}
+              renderLoading={() => (
+                <View style={styles.mapLoadingOverlay}>
+                  <ActivityIndicator size="large" color="#4F46E5" />
+                  <Text style={styles.mapLoadingText}>Loading OpenStreetMap...</Text>
+                </View>
+              )}
+              onMessage={handleWebViewMessage}
+            />
 
-            {/* Road-like lines */}
-            <View style={styles.roadH} />
-            <View style={styles.roadV} />
-
-            {/* Worker dots */}
-            {filteredWorkers.map((worker) => (
-              <WorkerDot
-                key={worker.id}
-                worker={worker}
-                mapWidth={MAP_WIDTH}
-                mapHeight={MAP_HEIGHT}
-              />
-            ))}
-
-            {/* Center marker - "You" */}
-            <View style={styles.youMarkerContainer}>
-              <Text style={styles.youMarkerEmoji}>📍</Text>
-              <View style={styles.youLabel}>
-                <Text style={styles.youLabelText}>You</Text>
-              </View>
-            </View>
-
-            {/* Map label */}
-            <View style={styles.mapLabelContainer}>
-              <MapPin size={12} color="#64748B" />
-              <Text style={styles.mapLabel}>Jaipur, Rajasthan</Text>
-            </View>
-
-            {/* Worker count badge */}
-            <View style={styles.workerCountBadge}>
-              <Text style={styles.workerCountText}>
-                {filteredWorkers.length} workers nearby
+            {/* Live Map Header Pill */}
+            <View style={styles.mapLivePill}>
+              <View style={styles.greenLiveDot} />
+              <Text style={styles.mapLiveText}>
+                {filteredWorkers.length} Workers Plotted on Map
               </Text>
             </View>
           </View>
         </View>
 
-        {/* Worker List */}
+        {/* Worker List Section */}
         <View style={styles.listSection}>
           <View style={styles.listHeader}>
-            <Text style={styles.listTitle}>Available Workers</Text>
-            <Text style={styles.listCount}>{filteredWorkers.length} found</Text>
-          </View>
-
-          {filteredWorkers.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Search size={32} color="#CBD5E1" />
-              <Text style={styles.emptyTitle}>No workers found</Text>
-              <Text style={styles.emptySubtitle}>
-                Try selecting a different category
+            <View>
+              <Text style={styles.listTitle}>Nearby Workers on Map</Text>
+              <Text style={styles.listCount}>
+                Showing {filteredWorkers.length} available mistris
               </Text>
             </View>
-          ) : (
-            filteredWorkers.map((worker) => (
-              <WorkerCard key={worker.id} worker={worker} />
-            ))
-          )}
+            {selectedCategory !== 'All' && (
+              <TouchableOpacity
+                style={styles.resetFilterBtn}
+                onPress={() => setSelectedCategory('All')}
+              >
+                <Text style={styles.resetFilterText}>Clear Filter</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {filteredWorkers.map((worker) => (
+            <WorkerCard
+              key={worker.id}
+              worker={worker}
+              isSelected={selectedWorkerId === worker.id}
+              onSelect={(w) => setSelectedWorkerId(w.id)}
+            />
+          ))}
         </View>
       </ScrollView>
     </View>
@@ -305,42 +443,62 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F6F7FB',
   },
-  scroll: {
-    flex: 1,
-  },
-
-  // Header
   header: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    paddingBottom: 14,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  headerLeftCol: {
+    flex: 1,
+    marginRight: 10,
   },
   headerTitle: {
-    fontSize: 26,
     fontFamily: 'Satoshi-Bold',
+    fontSize: 22,
     color: '#0F172A',
   },
   headerSubtitle: {
-    fontSize: 14,
     fontFamily: 'Satoshi-Regular',
+    fontSize: 12,
     color: '#64748B',
     marginTop: 2,
   },
-
-  // Chips
+  osmBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  osmBadgeText: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 10,
+    color: '#15803D',
+  },
+  scroll: {
+    flex: 1,
+  },
   chipsScroll: {
     marginTop: 12,
+    marginBottom: 10,
   },
   chipsContent: {
     paddingHorizontal: 16,
     gap: 8,
-    flexDirection: 'row',
   },
   chip: {
     paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingVertical: 7,
     borderRadius: 20,
-    borderWidth: 1.5,
+    borderWidth: 1,
   },
   chipSelected: {
     backgroundColor: '#4F46E5',
@@ -348,165 +506,78 @@ const styles = StyleSheet.create({
   },
   chipUnselected: {
     backgroundColor: '#FFFFFF',
-    borderColor: '#D1D5DB',
+    borderColor: '#E2E8F0',
   },
   chipText: {
-    fontSize: 13,
     fontFamily: 'Satoshi-Medium',
+    fontSize: 12,
   },
   chipTextSelected: {
     color: '#FFFFFF',
+    fontFamily: 'Satoshi-Bold',
   },
   chipTextUnselected: {
     color: '#475569',
   },
-
-  // Map
-  mapContainer: {
+  mapOuterWrap: {
     paddingHorizontal: 16,
-    marginTop: 16,
+    marginBottom: 16,
   },
   mapCard: {
-    width: '100%',
-    height: MAP_HEIGHT,
-    backgroundColor: '#E8F4F8',
-    borderRadius: 16,
+    height: 330,
+    borderRadius: 20,
     overflow: 'hidden',
-    position: 'relative',
+    backgroundColor: '#E8F4F8',
     borderWidth: 1,
-    borderColor: '#D1E7ED',
+    borderColor: '#CBD5E1',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 4,
+    position: 'relative',
   },
-  gridLineH: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    height: 1,
-    backgroundColor: '#C5DDE5',
-    opacity: 0.5,
+  mapWebView: {
+    flex: 1,
+    backgroundColor: 'transparent',
   },
-  gridLineV: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    width: 1,
-    backgroundColor: '#C5DDE5',
-    opacity: 0.5,
-  },
-  roadH: {
-    position: 'absolute',
-    top: '48%',
-    left: 0,
-    right: 0,
-    height: 3,
-    backgroundColor: '#B8CDD5',
-    opacity: 0.7,
-  },
-  roadV: {
-    position: 'absolute',
-    left: '52%',
-    top: 0,
-    bottom: 0,
-    width: 3,
-    backgroundColor: '#B8CDD5',
-    opacity: 0.7,
-  },
-
-  // Worker dots
-  dotContainer: {
-    position: 'absolute',
-    width: 28,
-    height: 28,
+  mapLoadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#F8FAFC',
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 10,
+    gap: 8,
   },
-  dotPulse: {
-    position: 'absolute',
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    borderWidth: 2,
-  },
-  dotInner: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 3,
-  },
-  dotInitials: {
-    fontSize: 7,
-    fontFamily: 'Satoshi-Bold',
-    color: '#FFFFFF',
-  },
-
-  // "You" marker
-  youMarkerContainer: {
-    position: 'absolute',
-    top: MAP_HEIGHT / 2 - 22,
-    left: '50%',
-    marginLeft: -16,
-    alignItems: 'center',
-    zIndex: 20,
-  },
-  youMarkerEmoji: {
-    fontSize: 24,
-  },
-  youLabel: {
-    backgroundColor: '#0F172A',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
-    marginTop: -2,
-  },
-  youLabelText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontFamily: 'Satoshi-Bold',
-  },
-
-  // Map labels
-  mapLabelContainer: {
-    position: 'absolute',
-    bottom: 10,
-    left: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFFCC',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    gap: 4,
-  },
-  mapLabel: {
-    fontSize: 11,
+  mapLoadingText: {
     fontFamily: 'Satoshi-Medium',
+    fontSize: 12,
     color: '#64748B',
   },
-  workerCountBadge: {
+  mapLivePill: {
     position: 'absolute',
-    top: 10,
-    right: 10,
-    backgroundColor: '#4F46E5',
+    top: 12,
+    left: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(15, 23, 42, 0.85)',
     paddingHorizontal: 10,
     paddingVertical: 5,
-    borderRadius: 12,
+    borderRadius: 14,
   },
-  workerCountText: {
-    fontSize: 11,
+  greenLiveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#10B981',
+  },
+  mapLiveText: {
     fontFamily: 'Satoshi-Bold',
+    fontSize: 11,
     color: '#FFFFFF',
   },
-
-  // Worker list
   listSection: {
     paddingHorizontal: 16,
-    marginTop: 20,
   },
   listHeader: {
     flexDirection: 'row',
@@ -515,61 +586,60 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   listTitle: {
-    fontSize: 18,
     fontFamily: 'Satoshi-Bold',
+    fontSize: 17,
     color: '#0F172A',
   },
   listCount: {
-    fontSize: 13,
-    fontFamily: 'Satoshi-Medium',
-    color: '#64748B',
-  },
-
-  // Empty state
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 48,
-    gap: 8,
-  },
-  emptyTitle: {
-    fontSize: 16,
-    fontFamily: 'Satoshi-Bold',
-    color: '#475569',
-  },
-  emptySubtitle: {
-    fontSize: 13,
     fontFamily: 'Satoshi-Regular',
-    color: '#94A3B8',
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
   },
-
-  // Worker card
+  resetFilterBtn: {
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  resetFilterText: {
+    fontFamily: 'Satoshi-Medium',
+    fontSize: 11,
+    color: '#4F46E5',
+  },
   workerCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 14,
+    borderRadius: 16,
     padding: 14,
-    marginBottom: 12,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
     elevation: 2,
+  },
+  workerCardSelected: {
+    borderColor: '#4F46E5',
+    backgroundColor: '#F8FAFF',
   },
   workerCardRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
   },
   avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
   },
   avatarText: {
-    fontSize: 16,
     fontFamily: 'Satoshi-Bold',
+    fontSize: 15,
+    color: '#FFFFFF',
   },
   workerInfo: {
     flex: 1,
@@ -580,47 +650,46 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   workerName: {
-    fontSize: 15,
     fontFamily: 'Satoshi-Bold',
+    fontSize: 14,
     color: '#0F172A',
   },
   verifiedBadge: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: '#10B981',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 4,
   },
   verifiedText: {
-    fontSize: 9,
-    color: '#FFFFFF',
     fontFamily: 'Satoshi-Bold',
+    fontSize: 9,
+    color: '#15803D',
   },
   workerSkill: {
-    fontSize: 13,
-    fontFamily: 'Satoshi-Regular',
-    color: '#64748B',
+    fontFamily: 'Satoshi-Medium',
+    fontSize: 12,
+    color: '#4F46E5',
     marginTop: 1,
   },
   ratingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
     marginTop: 4,
+    gap: 4,
   },
   starsRow: {
     flexDirection: 'row',
     gap: 1,
   },
   ratingText: {
-    fontSize: 12,
     fontFamily: 'Satoshi-Bold',
+    fontSize: 11,
     color: '#0F172A',
+    marginLeft: 2,
   },
   reviewsText: {
-    fontSize: 11,
     fontFamily: 'Satoshi-Regular',
+    fontSize: 10,
     color: '#94A3B8',
   },
   distanceBadge: {
@@ -628,23 +697,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#EEF2FF',
     paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 10,
+    paddingVertical: 3,
+    borderRadius: 8,
     gap: 3,
   },
   distanceText: {
-    fontSize: 11,
-    fontFamily: 'Satoshi-Bold',
+    fontFamily: 'Satoshi-Medium',
+    fontSize: 10,
     color: '#4F46E5',
   },
-
-  // Card bottom
   workerCardBottom: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginTop: 12,
-    paddingTop: 12,
+    paddingTop: 10,
     borderTopWidth: 1,
     borderTopColor: '#F1F5F9',
   },
@@ -653,14 +720,15 @@ const styles = StyleSheet.create({
     alignItems: 'baseline',
   },
   rateAmount: {
-    fontSize: 18,
     fontFamily: 'Satoshi-Bold',
+    fontSize: 16,
     color: '#0F172A',
   },
   rateType: {
-    fontSize: 12,
     fontFamily: 'Satoshi-Regular',
-    color: '#94A3B8',
+    fontSize: 11,
+    color: '#64748B',
+    marginLeft: 2,
   },
   workerActions: {
     flexDirection: 'row',
@@ -669,30 +737,29 @@ const styles = StyleSheet.create({
   viewProfileBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    borderColor: '#4F46E5',
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 8,
     gap: 4,
   },
   viewProfileText: {
-    fontSize: 12,
     fontFamily: 'Satoshi-Medium',
+    fontSize: 11,
     color: '#4F46E5',
   },
   callBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 10,
-    backgroundColor: '#10B981',
+    backgroundColor: '#4F46E5',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 8,
     gap: 4,
   },
   callText: {
-    fontSize: 12,
     fontFamily: 'Satoshi-Bold',
+    fontSize: 11,
     color: '#FFFFFF',
   },
 });
