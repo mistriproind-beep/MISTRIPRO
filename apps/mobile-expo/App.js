@@ -914,6 +914,57 @@ function MainApp() {
               <Smartphone size={20} color="#0F172A" />
               <Text style={styles.authOutlineButtonText}>{t.continueOTP}</Text>
             </TouchableOpacity>
+
+            {/* 3. Dev Quick Login Button */}
+            <TouchableOpacity
+              style={styles.authDevButton}
+              onPress={() => setShowDevForm(!showDevForm)}
+              activeOpacity={0.8}
+            >
+              <Zap size={18} color="#B45309" />
+              <Text style={styles.authDevButtonText}>{t.devLogin}</Text>
+            </TouchableOpacity>
+
+            {/* Inline Dev Credentials Form */}
+            {showDevForm && (
+              <View style={styles.devBox}>
+                <Text style={styles.devBoxTitle}>DEVELOPER TEST ACCOUNT</Text>
+                <TextInput
+                  style={styles.devInput}
+                  placeholder="Username (use: abc)"
+                  placeholderTextColor="#9CA3AF"
+                  value={devUser}
+                  onChangeText={setDevUser}
+                  autoCapitalize="none"
+                />
+                <TextInput
+                  style={styles.devInput}
+                  placeholder="Password (use: 1234)"
+                  placeholderTextColor="#9CA3AF"
+                  secureTextEntry
+                  value={devPass}
+                  onChangeText={setDevPass}
+                />
+                <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
+                  <TouchableOpacity
+                    style={[styles.devSubmitBtn, { flex: 1 }]}
+                    onPress={handleDevLogin}
+                  >
+                    <Text style={styles.devSubmitText}>Sign In (abc/1234) →</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.devSubmitBtn, { flex: 1, backgroundColor: '#059669' }]}
+                    onPress={() => {
+                      setCustName('Developer User');
+                      setCustPhone('+91 98765 43210');
+                      setCurrentScreen('ROLE_SELECT');
+                    }}
+                  >
+                    <Text style={styles.devSubmitText}>⚡ 1-Tap Bypass</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
           </View>
 
           {/* Footer Terms & Legal notice */}
@@ -2835,7 +2886,6 @@ const styles = StyleSheet.create({
   },
   authDevButtonText: {
     fontFamily: 'Satoshi-Bold',
-    fontFamily: 'Satoshi-Regular',
     fontSize: 14,
     color: '#92400E',
   },
