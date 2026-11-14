@@ -17,6 +17,7 @@ import { SafeAreaView, SafeAreaProvider, useSafeAreaInsets } from 'react-native-
 import { useFonts } from 'expo-font';
 import LottieView from 'lottie-react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { supabase } from './src/services/supabase';
 import {
   Home,
   Briefcase,
@@ -967,6 +968,23 @@ function MainApp() {
                 Alert.alert('Required Fields', 'Please fill in your name, mobile, and address.');
                 return;
               }
+              // Save to Supabase (Background sync)
+              try {
+                supabase.from('profiles').upsert({
+                  full_name: custName.trim(),
+                  phone: custMobile.trim(),
+                  address: custAddress.trim(),
+                  role: 'CUSTOMER',
+                  avatar_url: custPhotoUri || null,
+                  kyc_status: 'VERIFIED',
+                  updated_at: new Date().toISOString(),
+                }).then(({ error }) => {
+                  if (error) console.log('Supabase Customer Sync Notice:', error.message);
+                  else console.log('Customer successfully synced to Supabase!');
+                });
+              } catch (e) {
+                console.log('Sync err:', e);
+              }
               setCurrentScreen('CUSTOMER_READY');
             }}
             activeOpacity={0.85}
@@ -1226,6 +1244,34 @@ function MainApp() {
               if (!workerName.trim() || !workerMobile.trim() || workerSkills.length === 0) {
                 Alert.alert('Required Fields', 'Please fill name, mobile, and select at least one skill.');
                 return;
+              }
+              // Save to Supabase (Background sync)
+              try {
+                supabase.from('profiles').upsert({
+                  full_name: workerName.trim(),
+                  phone: workerMobile.trim(),
+                  alt_phone: workerAltMobile.trim() || null,
+                  address: workerAddress.trim(),
+                  role: 'WORKER',
+                  avatar_url: workerPhotoUri || null,
+                  kyc_status: 'PENDING',
+                  updated_at: new Date().toISOString(),
+                }).then(({ error }) => {
+                  if (error) console.log('Supabase Worker Profile Sync Notice:', error.message);
+                  else {
+                    console.log('Worker profile synced to Supabase!');
+                    supabase.from('worker_profiles').upsert({
+                      skills: workerSkills,
+                      aadhaar_front_url: aadhaarFrontUri || null,
+                      aadhaar_back_url: aadhaarBackUri || null,
+                      is_available: true,
+                    }).then(({ error: wErr }) => {
+                      if (wErr) console.log('Worker skills sync notice:', wErr.message);
+                    });
+                  }
+                });
+              } catch (e) {
+                console.log('Sync err:', e);
               }
               setCurrentScreen('WORKER_UNDER_REVIEW');
             }}
