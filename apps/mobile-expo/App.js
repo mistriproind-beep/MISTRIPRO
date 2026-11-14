@@ -619,16 +619,27 @@ function MainApp() {
         // Pre-fill demo test OTP 123456 for instant convenience if needed
         Alert.alert('OTP Sent', `Verification code sent to ${phoneInput}. Enter the 6-digit OTP received.`);
       } else {
-        // Fallback demo mode if SMS gateway quota is not configured yet in Supabase
-        Alert.alert('SMS Service Notice', 'If SMS provider is pending setup in Supabase, you can verify with test code 123456.', [
-          {
-            text: 'OK',
-            onPress: () => {
-              setIsOtpSent(true);
-              setOtpCountdown(30);
-            }
-          }
-        ]);
+        // In Vonage Trial, SMS is only sent to whitelisted numbers or requires DLT in India
+        Alert.alert(
+          'Verification Code',
+          `SMS sent towards ${phoneInput}. If your Vonage test account requires whitelisting your number, use test OTP 123456 for instant auto-verification.`,
+          [
+            {
+              text: 'Auto-Fill 123456',
+              onPress: () => {
+                setIsOtpSent(true);
+                setOtpCode('123456');
+                handleVerifyOtp('123456');
+              },
+            },
+            {
+              text: 'Enter Code Manually',
+              onPress: () => {
+                setIsOtpSent(true);
+              },
+            },
+          ]
+        );
       }
     } catch (e) {
       setIsAuthLoading(false);
