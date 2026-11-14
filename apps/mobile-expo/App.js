@@ -1871,7 +1871,7 @@ function MainApp() {
               </View>
             )}
           </View>
-        </KeyboardAvoidingView>
+        </View>
       </Modal>
 
       {/* ---------------------------------------------------------
