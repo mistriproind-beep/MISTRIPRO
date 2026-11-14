@@ -1,0 +1,35 @@
+// All 25 Labour Categories with group tags
+export const CATEGORIES = [
+  { id: '1',  name: 'Mason (Raj Mistri)',       icon: '🧱', workers: 142, group: 'construction' },
+  { id: '2',  name: 'Mason Helper (Beldar)',     icon: '👷', workers: 198, group: 'construction' },
+  { id: '3',  name: 'Construction Labour',       icon: '🏗️', workers: 240, group: 'construction' },
+  { id: '4',  name: 'Shuttering Carpenter',      icon: '🪵', workers: 84,  group: 'construction' },
+  { id: '5',  name: 'Steel Fixer / Bar Bender',  icon: '⛓️', workers: 65,  group: 'construction' },
+  { id: '6',  name: 'Concrete Worker',           icon: '🪨', workers: 72,  group: 'construction' },
+  { id: '7',  name: 'Tile & Marble',             icon: '🏛️', workers: 95,  group: 'construction' },
+  { id: '8',  name: 'Plastering Worker',         icon: '🖌️', workers: 58,  group: 'construction' },
+  { id: '9',  name: 'Waterproofing',             icon: '💧', workers: 46,  group: 'construction' },
+  { id: '10', name: 'Electrician',               icon: '⚡', workers: 128, group: 'technical' },
+  { id: '11', name: 'Plumber',                   icon: '🔧', workers: 110, group: 'technical' },
+  { id: '12', name: 'Furniture Carpenter',        icon: '🪚', workers: 88,  group: 'construction' },
+  { id: '13', name: 'Welder',                    icon: '🔥', workers: 54,  group: 'technical' },
+  { id: '14', name: 'Wall Painter',              icon: '🎨', workers: 92,  group: 'other' },
+  { id: '15', name: 'POP & False Ceiling',       icon: '📐', workers: 64,  group: 'construction' },
+  { id: '16', name: 'Metal Fabricator',           icon: '⚙️', workers: 42,  group: 'technical' },
+  { id: '17', name: 'AC Technician',             icon: '❄️', workers: 52,  group: 'technical' },
+  { id: '18', name: 'Cleaning & Housekeeping',   icon: '🧹', workers: 115, group: 'other' },
+  { id: '19', name: 'Loading Labour',            icon: '📦', workers: 80,  group: 'other' },
+  { id: '20', name: 'Gardening (Mali)',           icon: '🌱', workers: 38,  group: 'other' },
+  { id: '21', name: 'Demolition Worker',         icon: '🔨', workers: 49,  group: 'construction' },
+  { id: '22', name: 'RCC Worker',                icon: '🏢', workers: 56,  group: 'construction' },
+  { id: '23', name: 'Glass & Aluminium',         icon: '🪟', workers: 34,  group: 'technical' },
+  { id: '24', name: 'CCTV & Security',           icon: '📹', workers: 41,  group: 'technical' },
+  { id: '25', name: 'Earth/Soil Worker',         icon: '⛏️', workers: 68,  group: 'construction' },
+];
+
+export const CATEGORY_GROUPS = [
+  { key: 'all',          label: 'All',          labelHi: 'सभी' },
+  { key: 'construction', label: 'Construction', labelHi: 'निर्माण' },
+  { key: 'technical',    label: 'Technical',    labelHi: 'तकनीकी' },
+  { key: 'other',        label: 'Other',        labelHi: 'अन्य' },
+];

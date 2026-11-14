@@ -62,7 +62,14 @@ import {
   Layers,
   ChevronDown,
   Smartphone,
+  Users,
+  Compass,
 } from 'lucide-react-native';
+
+import CustomerHomeScreen from './src/screens/CustomerHomeScreen';
+import FindWorkersScreen from './src/screens/FindWorkersScreen';
+import MyBookingsScreen from './src/screens/MyBookingsScreen';
+import ContractorScreen from './src/screens/ContractorScreen';
 
 const { width } = Dimensions.get('window');
 
@@ -1643,55 +1650,118 @@ function MainApp() {
       <StatusBar barStyle="dark-content" backgroundColor="#F6F7FB" />
 
       {/* RENDER ACTIVE TAB */}
-      {activeTab === 'HOME' && (
-        <HomeScreen
-          t={t}
-          role={role}
-          insets={insets}
-          projects={projects}
-          onOpenPost={() => setShowPostModal(true)}
-          onSelectCategory={(cat) => setNewCategory(cat)}
-        />
-      )}
+      {role === 'CUSTOMER' ? (
+        <>
+          {activeTab === 'HOME' && (
+            <CustomerHomeScreen
+              insets={insets}
+              onNavigateTab={(tab) => setActiveTab(tab)}
+            />
+          )}
 
-      {activeTab === 'WORK' && (
-        <WorkScreen
-          t={t}
-          role={role}
-          insets={insets}
-          projects={projects}
-          onOpenPost={() => setShowPostModal(true)}
-        />
-      )}
+          {activeTab === 'FIND_WORKERS' && (
+            <FindWorkersScreen
+              insets={insets}
+              onNavigateTab={(tab) => setActiveTab(tab)}
+            />
+          )}
 
-      {activeTab === 'REVIEWS' && (
-        <ReviewsScreen
-          t={t}
-          insets={insets}
-          reviews={reviews}
-          onOpenWriteReview={() => setShowReviewModal(true)}
-        />
-      )}
+          {activeTab === 'BOOKINGS' && (
+            <MyBookingsScreen
+              insets={insets}
+              onNavigateTab={(tab) => setActiveTab(tab)}
+            />
+          )}
 
-      {activeTab === 'PROFILE' && (
-        <ProfileScreen
-          t={t}
-          role={role}
-          lang={lang}
-          insets={insets}
-          onSwitchRole={() => setRole(role === 'CUSTOMER' ? 'WORKER' : 'CUSTOMER')}
-          onSwitchLang={() => setCurrentScreen('LANGUAGE')}
-          onLogout={() => {
-            Alert.alert(t.logout, 'Are you sure you want to sign out?', [
-              { text: 'Cancel', style: 'cancel' },
-              {
-                text: 'Sign Out',
-                style: 'destructive',
-                onPress: () => setCurrentScreen('SIGN_IN'),
-              },
-            ]);
-          }}
-        />
+          {activeTab === 'CONTRACTOR' && (
+            <ContractorScreen
+              insets={insets}
+              onNavigateTab={(tab) => setActiveTab(tab)}
+            />
+          )}
+
+          {activeTab === 'PROFILE' && (
+            <ProfileScreen
+              t={t}
+              role={role}
+              lang={lang}
+              insets={insets}
+              onSwitchRole={() => {
+                const nextRole = role === 'CUSTOMER' ? 'WORKER' : 'CUSTOMER';
+                setRole(nextRole);
+                setActiveTab('HOME');
+              }}
+              onSwitchLang={() => setCurrentScreen('LANGUAGE')}
+              onLogout={() => {
+                Alert.alert(t.logout, 'Are you sure you want to sign out?', [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Sign Out',
+                    style: 'destructive',
+                    onPress: () => setCurrentScreen('SIGN_IN'),
+                  },
+                ]);
+              }}
+            />
+          )}
+        </>
+      ) : (
+        <>
+          {activeTab === 'HOME' && (
+            <HomeScreen
+              t={t}
+              role={role}
+              insets={insets}
+              projects={projects}
+              onOpenPost={() => setShowPostModal(true)}
+              onSelectCategory={(cat) => setNewCategory(cat)}
+            />
+          )}
+
+          {activeTab === 'WORK' && (
+            <WorkScreen
+              t={t}
+              role={role}
+              insets={insets}
+              projects={projects}
+              onOpenPost={() => setShowPostModal(true)}
+            />
+          )}
+
+          {activeTab === 'REVIEWS' && (
+            <ReviewsScreen
+              t={t}
+              insets={insets}
+              reviews={reviews}
+              onOpenWriteReview={() => setShowReviewModal(true)}
+            />
+          )}
+
+          {activeTab === 'PROFILE' && (
+            <ProfileScreen
+              t={t}
+              role={role}
+              lang={lang}
+              insets={insets}
+              onSwitchRole={() => {
+                const nextRole = role === 'CUSTOMER' ? 'WORKER' : 'CUSTOMER';
+                setRole(nextRole);
+                setActiveTab('HOME');
+              }}
+              onSwitchLang={() => setCurrentScreen('LANGUAGE')}
+              onLogout={() => {
+                Alert.alert(t.logout, 'Are you sure you want to sign out?', [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Sign Out',
+                    style: 'destructive',
+                    onPress: () => setCurrentScreen('SIGN_IN'),
+                  },
+                ]);
+              }}
+            />
+          )}
+        </>
       )}
 
       {/* ---------------------------------------------------------
@@ -1705,92 +1775,184 @@ function MainApp() {
           },
         ]}
       >
-        {/* Tab 1: Home */}
-        <TouchableOpacity
-          style={styles.navItem}
-          onPress={() => setActiveTab('HOME')}
-          activeOpacity={0.7}
-        >
-          <View style={[styles.navIconBox, activeTab === 'HOME' && styles.navIconBoxActive]}>
-            <Home
-              size={20}
-              color={activeTab === 'HOME' ? '#4F46E5' : '#94A3B8'}
-              strokeWidth={activeTab === 'HOME' ? 2.5 : 2}
-            />
-          </View>
-          <Text style={[styles.navLabel, activeTab === 'HOME' && styles.navLabelActive]}>
-            {t.home}
-          </Text>
-        </TouchableOpacity>
+        {role === 'CUSTOMER' ? (
+          <>
+            {/* Customer Tab 1: Home */}
+            <TouchableOpacity
+              style={styles.navItem}
+              onPress={() => setActiveTab('HOME')}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.navIconBox, activeTab === 'HOME' && styles.navIconBoxActive]}>
+                <Home
+                  size={20}
+                  color={activeTab === 'HOME' ? '#4F46E5' : '#94A3B8'}
+                  strokeWidth={activeTab === 'HOME' ? 2.5 : 2}
+                />
+              </View>
+              <Text style={[styles.navLabel, activeTab === 'HOME' && styles.navLabelActive]}>
+                Home
+              </Text>
+            </TouchableOpacity>
 
-        {/* Tab 2: Work */}
-        <TouchableOpacity
-          style={styles.navItem}
-          onPress={() => setActiveTab('WORK')}
-          activeOpacity={0.7}
-        >
-          <View style={[styles.navIconBox, activeTab === 'WORK' && styles.navIconBoxActive]}>
-            <Briefcase
-              size={20}
-              color={activeTab === 'WORK' ? '#4F46E5' : '#94A3B8'}
-              strokeWidth={activeTab === 'WORK' ? 2.5 : 2}
-            />
-          </View>
-          <Text style={[styles.navLabel, activeTab === 'WORK' && styles.navLabelActive]}>
-            {t.work}
-          </Text>
-        </TouchableOpacity>
+            {/* Customer Tab 2: Find Workers */}
+            <TouchableOpacity
+              style={styles.navItem}
+              onPress={() => setActiveTab('FIND_WORKERS')}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.navIconBox, activeTab === 'FIND_WORKERS' && styles.navIconBoxActive]}>
+                <Compass
+                  size={20}
+                  color={activeTab === 'FIND_WORKERS' ? '#4F46E5' : '#94A3B8'}
+                  strokeWidth={activeTab === 'FIND_WORKERS' ? 2.5 : 2}
+                />
+              </View>
+              <Text style={[styles.navLabel, activeTab === 'FIND_WORKERS' && styles.navLabelActive]}>
+                Find
+              </Text>
+            </TouchableOpacity>
 
-        {/* Center Floating Action Button (Post Tender / Find Jobs) */}
-        <TouchableOpacity
-          style={styles.navCenterFab}
-          onPress={() => {
-            if (role === 'CUSTOMER') {
-              setShowPostModal(true);
-            } else {
-              setActiveTab('WORK');
-            }
-          }}
-          activeOpacity={0.85}
-        >
-          <Plus size={26} color="#FFFFFF" strokeWidth={2.8} />
-        </TouchableOpacity>
+            {/* Customer Tab 3: My Bookings */}
+            <TouchableOpacity
+              style={styles.navItem}
+              onPress={() => setActiveTab('BOOKINGS')}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.navIconBox, activeTab === 'BOOKINGS' && styles.navIconBoxActive]}>
+                <Calendar
+                  size={20}
+                  color={activeTab === 'BOOKINGS' ? '#4F46E5' : '#94A3B8'}
+                  strokeWidth={activeTab === 'BOOKINGS' ? 2.5 : 2}
+                />
+              </View>
+              <Text style={[styles.navLabel, activeTab === 'BOOKINGS' && styles.navLabelActive]}>
+                Bookings
+              </Text>
+            </TouchableOpacity>
 
-        {/* Tab 4: Reviews */}
-        <TouchableOpacity
-          style={styles.navItem}
-          onPress={() => setActiveTab('REVIEWS')}
-          activeOpacity={0.7}
-        >
-          <View style={[styles.navIconBox, activeTab === 'REVIEWS' && styles.navIconBoxActive]}>
-            <Star
-              size={20}
-              color={activeTab === 'REVIEWS' ? '#4F46E5' : '#94A3B8'}
-              strokeWidth={activeTab === 'REVIEWS' ? 2.5 : 2}
-            />
-          </View>
-          <Text style={[styles.navLabel, activeTab === 'REVIEWS' && styles.navLabelActive]}>
-            {t.reviews}
-          </Text>
-        </TouchableOpacity>
+            {/* Customer Tab 4: Contractor Group Booking */}
+            <TouchableOpacity
+              style={styles.navItem}
+              onPress={() => setActiveTab('CONTRACTOR')}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.navIconBox, activeTab === 'CONTRACTOR' && styles.navIconBoxActive]}>
+                <Users
+                  size={20}
+                  color={activeTab === 'CONTRACTOR' ? '#4F46E5' : '#94A3B8'}
+                  strokeWidth={activeTab === 'CONTRACTOR' ? 2.5 : 2}
+                />
+              </View>
+              <Text style={[styles.navLabel, activeTab === 'CONTRACTOR' && styles.navLabelActive]}>
+                Contractor
+              </Text>
+            </TouchableOpacity>
 
-        {/* Tab 5: Profile */}
-        <TouchableOpacity
-          style={styles.navItem}
-          onPress={() => setActiveTab('PROFILE')}
-          activeOpacity={0.7}
-        >
-          <View style={[styles.navIconBox, activeTab === 'PROFILE' && styles.navIconBoxActive]}>
-            <User
-              size={20}
-              color={activeTab === 'PROFILE' ? '#4F46E5' : '#94A3B8'}
-              strokeWidth={activeTab === 'PROFILE' ? 2.5 : 2}
-            />
-          </View>
-          <Text style={[styles.navLabel, activeTab === 'PROFILE' && styles.navLabelActive]}>
-            {t.profile}
-          </Text>
-        </TouchableOpacity>
+            {/* Customer Tab 5: Profile */}
+            <TouchableOpacity
+              style={styles.navItem}
+              onPress={() => setActiveTab('PROFILE')}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.navIconBox, activeTab === 'PROFILE' && styles.navIconBoxActive]}>
+                <User
+                  size={20}
+                  color={activeTab === 'PROFILE' ? '#4F46E5' : '#94A3B8'}
+                  strokeWidth={activeTab === 'PROFILE' ? 2.5 : 2}
+                />
+              </View>
+              <Text style={[styles.navLabel, activeTab === 'PROFILE' && styles.navLabelActive]}>
+                Profile
+              </Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <>
+            {/* Worker Tab 1: Home */}
+            <TouchableOpacity
+              style={styles.navItem}
+              onPress={() => setActiveTab('HOME')}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.navIconBox, activeTab === 'HOME' && styles.navIconBoxActive]}>
+                <Home
+                  size={20}
+                  color={activeTab === 'HOME' ? '#4F46E5' : '#94A3B8'}
+                  strokeWidth={activeTab === 'HOME' ? 2.5 : 2}
+                />
+              </View>
+              <Text style={[styles.navLabel, activeTab === 'HOME' && styles.navLabelActive]}>
+                {t.home}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Worker Tab 2: Work */}
+            <TouchableOpacity
+              style={styles.navItem}
+              onPress={() => setActiveTab('WORK')}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.navIconBox, activeTab === 'WORK' && styles.navIconBoxActive]}>
+                <Briefcase
+                  size={20}
+                  color={activeTab === 'WORK' ? '#4F46E5' : '#94A3B8'}
+                  strokeWidth={activeTab === 'WORK' ? 2.5 : 2}
+                />
+              </View>
+              <Text style={[styles.navLabel, activeTab === 'WORK' && styles.navLabelActive]}>
+                {t.work}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Center Floating Action Button (Post Tender / Find Jobs) */}
+            <TouchableOpacity
+              style={styles.navCenterFab}
+              onPress={() => {
+                setShowPostModal(true);
+              }}
+              activeOpacity={0.85}
+            >
+              <Plus size={26} color="#FFFFFF" strokeWidth={2.8} />
+            </TouchableOpacity>
+
+            {/* Worker Tab 4: Reviews */}
+            <TouchableOpacity
+              style={styles.navItem}
+              onPress={() => setActiveTab('REVIEWS')}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.navIconBox, activeTab === 'REVIEWS' && styles.navIconBoxActive]}>
+                <Star
+                  size={20}
+                  color={activeTab === 'REVIEWS' ? '#4F46E5' : '#94A3B8'}
+                  strokeWidth={activeTab === 'REVIEWS' ? 2.5 : 2}
+                />
+              </View>
+              <Text style={[styles.navLabel, activeTab === 'REVIEWS' && styles.navLabelActive]}>
+                {t.reviews}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Worker Tab 5: Profile */}
+            <TouchableOpacity
+              style={styles.navItem}
+              onPress={() => setActiveTab('PROFILE')}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.navIconBox, activeTab === 'PROFILE' && styles.navIconBoxActive]}>
+                <User
+                  size={20}
+                  color={activeTab === 'PROFILE' ? '#4F46E5' : '#94A3B8'}
+                  strokeWidth={activeTab === 'PROFILE' ? 2.5 : 2}
+                />
+              </View>
+              <Text style={[styles.navLabel, activeTab === 'PROFILE' && styles.navLabelActive]}>
+                {t.profile}
+              </Text>
+            </TouchableOpacity>
+          </>
+        )}
       </View>
 
       {/* ---------------------------------------------------------
