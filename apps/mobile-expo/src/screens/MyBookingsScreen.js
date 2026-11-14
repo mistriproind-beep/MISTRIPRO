@@ -168,9 +168,11 @@ export default function MyBookingsScreen({ insets, onNavigateTab }) {
                   </View>
                   <View style={styles.workerMeta}>
                     <View style={styles.workerNameRow}>
-                      <Text style={styles.workerName}>{booking.workerName}</Text>
+                      <Text style={styles.workerName} numberOfLines={1}>
+                        {booking.workerName}
+                      </Text>
                       <View style={styles.kycBadge}>
-                        <ShieldCheck size={11} color="#15803D" />
+                        <ShieldCheck size={10} color="#15803D" />
                         <Text style={styles.kycText}>Verified</Text>
                       </View>
                     </View>
@@ -382,15 +384,18 @@ const styles = StyleSheet.create({
   },
   cardHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     marginBottom: 12,
+    gap: 8,
   },
   workerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     flex: 1,
+    minWidth: 0,
+    marginRight: 8,
   },
   workerAvatar: {
     width: 44,
@@ -398,6 +403,7 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   avatarText: {
     fontFamily: 'Satoshi-Bold',
@@ -406,16 +412,19 @@ const styles = StyleSheet.create({
   },
   workerMeta: {
     flex: 1,
+    minWidth: 0,
   },
   workerNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    flexWrap: 'wrap',
   },
   workerName: {
     fontFamily: 'Satoshi-Bold',
     fontSize: 15,
     color: '#0F172A',
+    flexShrink: 1,
   },
   kycBadge: {
     flexDirection: 'row',
@@ -423,8 +432,9 @@ const styles = StyleSheet.create({
     gap: 2,
     backgroundColor: '#DCFCE7',
     paddingHorizontal: 5,
-    paddingVertical: 1,
+    paddingVertical: 1.5,
     borderRadius: 4,
+    flexShrink: 0,
   },
   kycText: {
     fontFamily: 'Satoshi-Bold',
@@ -442,8 +452,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 5,
     paddingHorizontal: 9,
-    paddingVertical: 4,
+    paddingVertical: 4.5,
     borderRadius: 12,
+    flexShrink: 0,
+    alignSelf: 'flex-start',
   },
   statusPillActive: {
     backgroundColor: '#EEF2FF',

@@ -97,7 +97,7 @@ export default function CustomerHomeScreen({ insets }) {
         {/* Info */}
         <View style={styles.workerInfo}>
           <View style={styles.workerNameRow}>
-            <Text style={styles.workerName}>{item.name}</Text>
+            <Text style={styles.workerName} numberOfLines={1}>{item.name}</Text>
             {item.verified && (
               <View style={styles.verifiedBadge}>
                 <Text style={styles.verifiedText}>✓</Text>
@@ -482,16 +482,20 @@ const styles = StyleSheet.create({
   },
   workerInfo: {
     flex: 1,
+    minWidth: 0,
+    marginRight: 10,
   },
   workerNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    flexWrap: 'wrap',
   },
   workerName: {
     fontFamily: 'Satoshi-Bold',
     fontSize: 15,
     color: '#0F172A',
+    flexShrink: 1,
   },
   verifiedBadge: {
     width: 16,
@@ -500,6 +504,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#4F46E5',
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   verifiedText: {
     color: '#FFFFFF',
@@ -545,6 +550,7 @@ const styles = StyleSheet.create({
   workerRight: {
     alignItems: 'flex-end',
     gap: 8,
+    flexShrink: 0,
   },
   distanceBadge: {
     flexDirection: 'row',

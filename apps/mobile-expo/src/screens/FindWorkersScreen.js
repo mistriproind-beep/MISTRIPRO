@@ -61,7 +61,7 @@ function WorkerCard({ worker, isSelected, onSelect }) {
         {/* Info */}
         <View style={styles.workerInfo}>
           <View style={styles.workerNameRow}>
-            <Text style={styles.workerName}>{worker.name}</Text>
+            <Text style={styles.workerName} numberOfLines={1}>{worker.name}</Text>
             {worker.verified && (
               <View style={styles.verifiedBadge}>
                 <Text style={styles.verifiedText}>KYC ✓</Text>
@@ -813,22 +813,27 @@ const styles = StyleSheet.create({
   },
   workerInfo: {
     flex: 1,
+    minWidth: 0,
+    marginRight: 8,
   },
   workerNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    flexWrap: 'wrap',
   },
   workerName: {
     fontFamily: 'Satoshi-Bold',
     fontSize: 14,
     color: '#0F172A',
+    flexShrink: 1,
   },
   verifiedBadge: {
     backgroundColor: '#DCFCE7',
     paddingHorizontal: 5,
     paddingVertical: 1,
     borderRadius: 4,
+    flexShrink: 0,
   },
   verifiedText: {
     fontFamily: 'Satoshi-Bold',
@@ -870,6 +875,7 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 8,
     gap: 3,
+    flexShrink: 0,
   },
   distanceText: {
     fontFamily: 'Satoshi-Bold',
