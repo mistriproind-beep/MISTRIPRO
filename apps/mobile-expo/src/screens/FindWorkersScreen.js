@@ -9,6 +9,7 @@ import {
   Linking,
   ActivityIndicator,
   Alert,
+  Modal,
 } from 'react-native';
 import {
   MapPin,
@@ -21,6 +22,9 @@ import {
   LocateFixed,
   RefreshCw,
   Layers,
+  X,
+  ShieldCheck,
+  CheckCircle2,
 } from 'lucide-react-native';
 import { WebView } from 'react-native-webview';
 import * as Location from 'expo-location';
