@@ -8,10 +8,25 @@ const KEYS = {
   ONBOARDING_COMPLETED: '@mistri_onboarded',
   WORKER_PROFILE: '@mistri_worker_profile',
   NOTIFICATIONS: '@mistri_notifications',
+  CREDENTIALS: '@mistri_credentials',
   BOOKINGS: '@mistri_bookings',
 };
 
 export const StorageService = {
+  // Stored Credentials
+  getCredentials: async () => {
+    try {
+      const data = await AsyncStorage.getItem(KEYS.CREDENTIALS);
+      return data ? JSON.parse(data) : null;
+    } catch (e) {
+      return null;
+    }
+  },
+  setCredentials: async (creds) => {
+    try {
+      await AsyncStorage.setItem(KEYS.CREDENTIALS, JSON.stringify(creds));
+    } catch (e) {}
+  },
   // 1. Language Preferences (Ask once, remember forever)
   getLanguage: async () => {
     try {

@@ -20,7 +20,14 @@ import { useFonts } from 'expo-font';
 import LottieView from 'lottie-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from './src/services/supabase';
-import { signInWithGoogle, sendMobileOtp, verifyMobileOtp } from './src/services/auth';
+import {
+  signInWithGoogle,
+  sendMobileOtp,
+  verifyMobileOtp,
+  signInWithEmail,
+  sendPasswordResetOtp,
+  updatePasswordWithOtp,
+} from './src/services/auth';
 import {
   Home,
   Briefcase,
@@ -66,6 +73,11 @@ import {
   Compass,
   Wallet,
   Download,
+  Mail,
+  Lock,
+  Eye,
+  EyeOff,
+  KeyRound,
 } from 'lucide-react-native';
 
 import CustomerHomeScreen from './src/screens/CustomerHomeScreen';
@@ -107,7 +119,6 @@ const I18N = {
     signInSub: 'Please try one of the following ways to register or log in to your account.',
     continueOTP: 'Continue with Mobile OTP',
     continueGoogle: 'Continue with Google',
-    devLogin: '⚡ Dev Test Login (abc / 1234)',
     termsNotice: 'By continuing, you confirm that you have read and agreed to the Terms of Service and consent to the Privacy Policy.',
     chooseRoleTitle: 'Choose your role',
     chooseRoleSub: 'How would you like to use MISTRI PRO as:\nSelect your account experience below',
@@ -164,7 +175,6 @@ const I18N = {
     signInSub: 'अपने खाते में लॉग इन करने के लिए कृपया इनमें से कोई एक तरीका चुनें।',
     continueOTP: 'मोबाइल OTP से आगे बढ़ें',
     continueGoogle: 'Google से आगे बढ़ें',
-    devLogin: '⚡ देव टेस्ट लॉगिन (abc / 1234)',
     termsNotice: 'जारी रखकर, आप पुष्टि करते हैं कि आपने सेवा की शर्तें और गोपनीयता नीति पढ़ ली हैं।',
     chooseRoleTitle: 'अपनी भूमिका चुनें',
     chooseRoleSub: 'मिस्त्री प्रो का उपयोग किस रूप में करना चाहते हैं:',
@@ -221,7 +231,6 @@ const I18N = {
     signInSub: 'તમારા ખાતામાં લૉગ ઇન કરવા માટે નીચેનામાંથી કોઈ વિકલ્પ પસંદ કરો.',
     continueOTP: 'મોબાઇલ OTP સાથે ચાલુ રાખો',
     continueGoogle: 'Google સાથે ચાલુ રાખો',
-    devLogin: '⚡ દેવ ટેસ્ટ લૉગિન (abc / 1234)',
     termsNotice: 'ચાલુ રાખીને, તમે સેવાની શરતો અને ગોપનીયતા નીતિ સાથે સંમત થાઓ છો.',
     chooseRoleTitle: 'તમારી ભૂમિકા પસંદ કરો',
     chooseRoleSub: 'તમે મિસ્ત્રી પ્રોનો ઉપયોગ કયા રૂપમાં કરવા માંગો છો:',
@@ -278,7 +287,6 @@ const I18N = {
     signInSub: 'कृपया खात्यात लॉग इन करण्यासाठी खालीलपैकी एक पर्याय निवडा.',
     continueOTP: 'मोबाईल OTP द्वारे पुढे जा',
     continueGoogle: 'Google द्वारे पुढे जा',
-    devLogin: '⚡ देव टेस्ट लॉगिन (abc / 1234)',
     termsNotice: 'पुढे जाऊन, आपण सेवेच्या अटी व गोपनीयता धोरणाशी सहमत आहात.',
     chooseRoleTitle: 'तुमची भूमिका निवडा',
     chooseRoleSub: 'मिस्त्री प्रोचा वापर कोणत्या भूमिकेत करू इच्छिता:',
@@ -542,6 +550,25 @@ function MainApp() {
   const [isAuthLoading, setIsAuthLoading] = useState(false);
   const [otpCountdown, setOtpCountdown] = useState(30);
 
+  // Email + Password Auth State
+  const [emailInput, setEmailInput] = useState('');
+  const [passwordInput, setPasswordInput] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [isSubmittingAuth, setIsSubmittingAuth] = useState(false);
+
+  // Forgot Password Recovery State
+  const [showForgotModal, setShowForgotModal] = useState(false);
+  const [forgotTarget, setForgotTarget] = useState('');
+  const [forgotOtp, setForgotOtp] = useState('');
+  const [forgotNewPass, setForgotNewPass] = useState('');
+  const [isForgotOtpSent, setIsForgotOtpSent] = useState(false);
+  const [isForgotSubmitting, setIsForgotSubmitting] = useState(false);
+
+  // Button Responsiveness & Feedback States
+  const [isSubmittingCustomer, setIsSubmittingCustomer] = useState(false);
+  const [isSubmittingWorker, setIsSubmittingWorker] = useState(false);
+  const [isCheckingApproval, setIsCheckingApproval] = useState(false);
+
   // Customer Onboarding Form State
   const [custPhotoUri, setCustPhotoUri] = useState(null);
   const [custName, setCustName] = useState('Ramesh Sharma');
@@ -567,8 +594,6 @@ function MainApp() {
   // Customer Bookings State (Connected to Live DB + Mock Bookings)
   const [customerBookings, setCustomerBookings] = useState(MOCK_BOOKINGS);
   const [findInitialCategory, setFindInitialCategory] = useState('All');
-
-  const [isDev, setIsDev] = useState(false);
   const [showNotifModal, setShowNotifModal] = useState(false);
   const [notifications, setNotifications] = useState([
     {
@@ -835,11 +860,6 @@ function MainApp() {
     }));
   };
 
-  // Dev Login form state
-  const [showDevForm, setShowDevForm] = useState(false);
-  const [devUser, setDevUser] = useState('');
-  const [devPass, setDevPass] = useState('');
-
   // Modals
   const [showPostModal, setShowPostModal] = useState(false);
   const [postStep, setPostStep] = useState(1);
@@ -872,11 +892,11 @@ function MainApp() {
         }
 
         const savedSession = await StorageService.getSession();
-        const savedIsDev = await StorageService.getIsDev();
         const savedRole = await StorageService.getRole();
-
-        if (savedIsDev && isMounted) {
-          setIsDev(true);
+        const savedCreds = await StorageService.getCredentials();
+        if (savedCreds && isMounted) {
+          if (savedCreds.email) setEmailInput(savedCreds.email);
+          if (savedCreds.password) setPasswordInput(savedCreds.password);
         }
 
         const savedBookings = await StorageService.getBookings();
@@ -884,12 +904,12 @@ function MainApp() {
           setCustomerBookings(savedBookings);
         }
 
-        // If user already logged in
+        // If user already logged in -> NEVER prompt login or language again
         if (savedSession && isMounted) {
           if (savedRole) {
             setRole(savedRole);
           }
-          if (savedRole === 'WORKER' && !savedIsDev) {
+          if (savedRole === 'WORKER') {
             const approval = await LiveBackend.checkWorkerApprovalStatus(savedSession.mobile || '9414088990');
             if (approval?.status === 'APPROVED') {
               setCurrentScreen('MAIN');
@@ -902,7 +922,7 @@ function MainApp() {
           return;
         }
 
-        // If language was chosen before but not logged in -> go to SIGN_IN
+        // If language was chosen before but not logged in -> go straight to SIGN_IN (NEVER ask language again)
         if (savedLang && isMounted) {
           setCurrentScreen('SIGN_IN');
           return;
@@ -920,7 +940,7 @@ function MainApp() {
     if (currentScreen === 'SPLASH') {
       const timer = setTimeout(() => {
         checkInitialState();
-      }, 2000);
+      }, 1500);
       return () => {
         isMounted = false;
         clearTimeout(timer);
@@ -1043,26 +1063,98 @@ function MainApp() {
     }
   };
 
-  // Auto transition for Customer Ready loading screen (4 seconds)
+  // Auto transition for Customer Ready loading screen (Fast 400ms transition)
   useEffect(() => {
     if (currentScreen === 'CUSTOMER_READY') {
       const timer = setTimeout(() => {
         setCurrentScreen('MAIN');
-      }, 4000);
+      }, 400);
       return () => clearTimeout(timer);
     }
   }, [currentScreen]);
 
-  // Handle Dev Login
-  const handleDevLogin = async () => {
-    if (devUser.trim() === 'abc' && devPass.trim() === '1234') {
-      setShowDevForm(false);
-      setIsDev(true);
-      await StorageService.setIsDev(true);
-      await StorageService.setSession({ user: 'abc', role: 'CUSTOMER', isDev: true });
-      setCurrentScreen('ROLE_SELECT');
-    } else {
-      Alert.alert('Invalid Credentials', 'Please use Username: abc and Password: 1234');
+  // Handle Email & Password Sign In
+  const handleEmailLogin = async () => {
+    const cleanEmail = emailInput.trim();
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      Alert.alert('Invalid Email', 'Please enter a valid email address (e.g. name@example.com).');
+      return;
+    }
+    if (!passwordInput || passwordInput.length < 4) {
+      Alert.alert('Invalid Password', 'Please enter your password (minimum 4 characters).');
+      return;
+    }
+
+    setIsSubmittingAuth(true);
+    try {
+      const res = await signInWithEmail(cleanEmail, passwordInput);
+      setIsSubmittingAuth(false);
+      if (res.success) {
+        DeviceFeedback.triggerSuccessHaptics();
+        // Persistently save credentials & session on device
+        await StorageService.setCredentials({ email: cleanEmail, password: passwordInput });
+        await StorageService.setSession({
+          email: cleanEmail,
+          user: cleanEmail.split('@')[0],
+          role: role || 'CUSTOMER',
+        });
+        setCustName(cleanEmail.split('@')[0]);
+        setCurrentScreen('ROLE_SELECT');
+      } else {
+        DeviceFeedback.triggerAlertHaptics();
+        Alert.alert('Sign In Failed', res.error || 'Invalid email or password.');
+      }
+    } catch (e) {
+      setIsSubmittingAuth(false);
+      Alert.alert('Sign In Error', e.message);
+    }
+  };
+
+  // Handle Send Forgot Password OTP
+  const handleSendForgotOtp = async () => {
+    const target = forgotTarget.trim();
+    if (!target) {
+      Alert.alert('Required', 'Please enter your registered email address or phone number.');
+      return;
+    }
+    setIsForgotSubmitting(true);
+    try {
+      await sendPasswordResetOtp(target);
+      setIsForgotSubmitting(false);
+      setIsForgotOtpSent(true);
+      DeviceFeedback.triggerSuccessHaptics();
+      Alert.alert('OTP Sent', `Password reset code sent to ${target}. Enter OTP and new password.`);
+    } catch (e) {
+      setIsForgotSubmitting(false);
+      setIsForgotOtpSent(true);
+    }
+  };
+
+  // Handle Reset Password Submit
+  const handleResetPasswordSubmit = async () => {
+    if (!forgotOtp.trim()) {
+      Alert.alert('Required', 'Please enter the 6-digit verification code.');
+      return;
+    }
+    if (!forgotNewPass || forgotNewPass.length < 4) {
+      Alert.alert('Invalid Password', 'New password must be at least 4 characters.');
+      return;
+    }
+    setIsForgotSubmitting(true);
+    try {
+      await updatePasswordWithOtp(forgotTarget.trim(), forgotOtp.trim(), forgotNewPass);
+      setIsForgotSubmitting(false);
+      setShowForgotModal(false);
+      DeviceFeedback.triggerSuccessHaptics();
+      if (forgotTarget.includes('@')) {
+        setEmailInput(forgotTarget.trim());
+        setPasswordInput(forgotNewPass);
+        await StorageService.setCredentials({ email: forgotTarget.trim(), password: forgotNewPass });
+      }
+      Alert.alert('Password Updated! ✓', 'Your password has been reset successfully. You can now sign in.');
+    } catch (e) {
+      setIsForgotSubmitting(false);
+      Alert.alert('Reset Failed', e.message);
     }
   };
 
@@ -1225,7 +1317,7 @@ function MainApp() {
   }
 
   // -------------------------------------------------------------
-  // SCREEN 3: SIGN IN TO CONTINUE (Exact Clean Design Reference)
+  // SCREEN 3: SIGN IN TO CONTINUE (Clean Email + Password & OTP)
   // -------------------------------------------------------------
   if (currentScreen === 'SIGN_IN') {
     return (
@@ -1234,6 +1326,7 @@ function MainApp() {
         <ScrollView
           contentContainerStyle={[styles.signInContent, { paddingBottom: Math.max(insets.bottom + 20, 30) }]}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
           {/* Top Animated Lottie Graphics */}
           <View style={styles.signInLottieWrapper}>
@@ -1247,28 +1340,96 @@ function MainApp() {
 
           {/* Heading and subtext */}
           <Text style={styles.signInMainHeading}>{t.signInTitle}</Text>
-          <Text style={styles.signInSubHeading}>{t.signInSub}</Text>
+          <Text style={styles.signInSubHeading}>
+            Enter your Email ID & Password to sign in or register instantly.
+          </Text>
 
-          {/* Primary Action Buttons */}
-          <View style={styles.signInActionsGroup}>
-            {/* 1. Black Continue with Google */}
+          {/* Email ID & Password Form */}
+          <View style={styles.emailFormCard}>
+            {/* Email Field */}
+            <View style={styles.authInputFieldGroup}>
+              <Text style={styles.authInputLabel}>Email Address (ईमेल आईडी)</Text>
+              <View style={styles.authInputRow}>
+                <Mail size={18} color="#64748B" />
+                <TextInput
+                  style={styles.authTextInput}
+                  placeholder="name@example.com"
+                  placeholderTextColor="#94A3B8"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  value={emailInput}
+                  onChangeText={setEmailInput}
+                />
+              </View>
+            </View>
+
+            {/* Password Field */}
+            <View style={[styles.authInputFieldGroup, { marginTop: 12 }]}>
+              <View style={styles.passwordLabelRow}>
+                <Text style={styles.authInputLabel}>Password (पासवर्ड)</Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    setForgotTarget(emailInput || '');
+                    setIsForgotOtpSent(false);
+                    setForgotOtp('');
+                    setForgotNewPass('');
+                    setShowForgotModal(true);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.forgotPassLink}>Forgot? (भूल गए?)</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.authInputRow}>
+                <Lock size={18} color="#64748B" />
+                <TextInput
+                  style={styles.authTextInput}
+                  placeholder="Enter your password"
+                  placeholderTextColor="#94A3B8"
+                  secureTextEntry={!showPassword}
+                  value={passwordInput}
+                  onChangeText={setPasswordInput}
+                />
+                <TouchableOpacity
+                  onPress={() => setShowPassword(!showPassword)}
+                  activeOpacity={0.7}
+                  style={styles.passwordEyeBtn}
+                >
+                  {showPassword ? (
+                    <EyeOff size={18} color="#64748B" />
+                  ) : (
+                    <Eye size={18} color="#64748B" />
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Submit Email Login Button */}
             <TouchableOpacity
-              style={styles.authBlackButton}
-              onPress={handleGoogleLogin}
-              disabled={isAuthLoading}
+              style={styles.authEmailButton}
+              onPress={handleEmailLogin}
+              disabled={isSubmittingAuth}
               activeOpacity={0.85}
             >
-              {isAuthLoading ? (
+              {isSubmittingAuth ? (
                 <ActivityIndicator size="small" color="#FFFFFF" />
               ) : (
-                <>
-                  <Text style={styles.authGoogleG}>G</Text>
-                  <Text style={styles.authBlackButtonText}>{t.continueGoogle}</Text>
-                </>
+                <Text style={styles.authEmailButtonText}>Sign In with Email →</Text>
               )}
             </TouchableOpacity>
+          </View>
 
-            {/* 2. White Outlined Mobile OTP */}
+          {/* Clean Divider */}
+          <View style={styles.authDividerWrap}>
+            <View style={styles.authDividerLine} />
+            <Text style={styles.authDividerText}>OR CONTINUE WITH</Text>
+            <View style={styles.authDividerLine} />
+          </View>
+
+          {/* Secondary Action Buttons */}
+          <View style={styles.signInActionsGroup}>
+            {/* 1. Mobile OTP */}
             <TouchableOpacity
               style={styles.authOutlineButton}
               onPress={() => {
@@ -1282,58 +1443,22 @@ function MainApp() {
               <Text style={styles.authOutlineButtonText}>{t.continueOTP}</Text>
             </TouchableOpacity>
 
-            {/* 3. Dev Quick Login Button */}
+            {/* 2. Continue with Google */}
             <TouchableOpacity
-              style={styles.authDevButton}
-              onPress={() => setShowDevForm(!showDevForm)}
-              activeOpacity={0.8}
+              style={styles.authGoogleOutlineBtn}
+              onPress={handleGoogleLogin}
+              disabled={isAuthLoading}
+              activeOpacity={0.85}
             >
-              <Zap size={18} color="#B45309" />
-              <Text style={styles.authDevButtonText}>{t.devLogin}</Text>
+              {isAuthLoading ? (
+                <ActivityIndicator size="small" color="#0F172A" />
+              ) : (
+                <>
+                  <Text style={styles.authGoogleGColored}>G</Text>
+                  <Text style={styles.authGoogleButtonText}>{t.continueGoogle}</Text>
+                </>
+              )}
             </TouchableOpacity>
-
-            {/* Inline Dev Credentials Form */}
-            {showDevForm && (
-              <View style={styles.devBox}>
-                <Text style={styles.devBoxTitle}>DEVELOPER TEST ACCOUNT</Text>
-                <TextInput
-                  style={styles.devInput}
-                  placeholder="Username (use: abc)"
-                  placeholderTextColor="#9CA3AF"
-                  value={devUser}
-                  onChangeText={setDevUser}
-                  autoCapitalize="none"
-                />
-                <TextInput
-                  style={styles.devInput}
-                  placeholder="Password (use: 1234)"
-                  placeholderTextColor="#9CA3AF"
-                  secureTextEntry
-                  value={devPass}
-                  onChangeText={setDevPass}
-                />
-                <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
-                  <TouchableOpacity
-                    style={[styles.devSubmitBtn, { flex: 1 }]}
-                    onPress={handleDevLogin}
-                  >
-                    <Text style={styles.devSubmitText}>Sign In (abc/1234) →</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.devSubmitBtn, { flex: 1, backgroundColor: '#059669' }]}
-                    onPress={async () => {
-                      setIsDev(true);
-                      await StorageService.setIsDev(true);
-                      await StorageService.setSession({ user: 'dev_user', role: 'CUSTOMER', isDev: true });
-                      setCustName('Developer User');
-                      setCurrentScreen('ROLE_SELECT');
-                    }}
-                  >
-                    <Text style={styles.devSubmitText}>⚡ 1-Tap Bypass</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
           </View>
 
           {/* Footer Terms & Legal notice */}
@@ -1345,117 +1470,214 @@ function MainApp() {
             </Text>
           </View>
         </ScrollView>
-      {/* ---------------------------------------------------------
-          LIVE PHONE OTP VERIFICATION BOTTOM SHEET / MODAL
-          --------------------------------------------------------- */}
-      <Modal visible={showOtpModal} animationType="slide" transparent>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.modalOverlay}
-        >
-          <View style={[styles.modalCard, { paddingBottom: Math.max(insets.bottom + 20, 28) }]}>
-            <View style={styles.modalHeader}>
-              <View>
-                <Text style={styles.modalStepBadge}>
-                  {isOtpSent ? 'STEP 2: VERIFY OTP' : 'STEP 1: ENTER MOBILE'}
-                </Text>
-                <Text style={styles.modalTitle}>
-                  {isOtpSent ? 'Verify Phone Number' : 'Mobile Authentication'}
-                </Text>
-              </View>
-              <TouchableOpacity
-                style={styles.modalCloseBtn}
-                onPress={() => {
-                  setShowOtpModal(false);
-                  setIsOtpSent(false);
-                  setOtpCode('');
-                }}
-              >
-                <X size={20} color="#0F172A" />
-              </TouchableOpacity>
-            </View>
 
-            {!isOtpSent ? (
-              // Step 1: Phone Number Input
-              <View style={styles.modalBody}>
-                <Text style={styles.inputLabel}>Enter 10-Digit Mobile Number</Text>
-                <View style={styles.phoneInputRow}>
-                  <View style={styles.phoneCountryCode}>
-                    <Text style={styles.phoneCountryCodeText}>🇮🇳 +91</Text>
+        {/* ---------------------------------------------------------
+            LIVE PHONE OTP VERIFICATION BOTTOM SHEET / MODAL
+            --------------------------------------------------------- */}
+        <Modal visible={showOtpModal} animationType="slide" transparent>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.modalOverlay}
+          >
+            <View style={[styles.modalCard, { paddingBottom: Math.max(insets.bottom + 20, 28) }]}>
+              <View style={styles.modalHeader}>
+                <View>
+                  <Text style={styles.modalStepBadge}>
+                    {isOtpSent ? 'STEP 2: VERIFY OTP' : 'STEP 1: ENTER MOBILE'}
+                  </Text>
+                  <Text style={styles.modalTitle}>
+                    {isOtpSent ? 'Verify Phone Number' : 'Mobile Authentication'}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.modalCloseBtn}
+                  onPress={() => {
+                    setShowOtpModal(false);
+                    setIsOtpSent(false);
+                    setOtpCode('');
+                  }}
+                >
+                  <X size={20} color="#0F172A" />
+                </TouchableOpacity>
+              </View>
+
+              {!isOtpSent ? (
+                // Step 1: Phone Number Input
+                <View style={styles.modalBody}>
+                  <Text style={styles.inputLabel}>Enter 10-Digit Mobile Number</Text>
+                  <View style={styles.phoneInputRow}>
+                    <View style={styles.phoneCountryCode}>
+                      <Text style={styles.phoneCountryCodeText}>🇮🇳 +91</Text>
+                    </View>
+                    <TextInput
+                      style={styles.phoneTextInput}
+                      placeholder="98765 43210"
+                      placeholderTextColor="#94A3B8"
+                      keyboardType="phone-pad"
+                      maxLength={10}
+                      value={phoneInput}
+                      onChangeText={setPhoneInput}
+                      autoFocus
+                    />
                   </View>
+                  <Text style={styles.otpNoticeHelp}>
+                    We will send a 6-digit verification code via SMS to this number.
+                  </Text>
+
+                  <TouchableOpacity
+                    style={styles.modalPublishBtn}
+                    onPress={handleSendOtp}
+                    disabled={isAuthLoading}
+                    activeOpacity={0.85}
+                  >
+                    {isAuthLoading ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Text style={styles.modalPublishBtnText}>Get Verification Code →</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                // Step 2: 6-Digit OTP Auto-Verification Input
+                <View style={styles.modalBody}>
+                  <Text style={styles.inputLabel}>Enter 6-Digit OTP Sent to +91 {phoneInput}</Text>
                   <TextInput
-                    style={styles.phoneTextInput}
-                    placeholder="98765 43210"
+                    style={styles.otpBoxesInput}
+                    placeholder="• • • • • •"
                     placeholderTextColor="#94A3B8"
-                    keyboardType="phone-pad"
-                    maxLength={10}
-                    value={phoneInput}
-                    onChangeText={setPhoneInput}
+                    keyboardType="number-pad"
+                    maxLength={6}
+                    value={otpCode}
+                    onChangeText={handleOtpChange}
                     autoFocus
                   />
+                  <Text style={styles.otpNoticeHelp}>
+                    ⚡ Automatically verifying when 6 digits are entered...
+                  </Text>
+
+                  <TouchableOpacity
+                    style={[styles.modalPublishBtn, { backgroundColor: '#16A34A' }]}
+                    onPress={() => handleVerifyOtp()}
+                    disabled={isAuthLoading}
+                    activeOpacity={0.85}
+                  >
+                    {isAuthLoading ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Text style={styles.modalPublishBtnText}>Verify & Proceed ✓</Text>
+                    )}
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.resendOtpRow}
+                    onPress={handleSendOtp}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.resendOtpText}>Didn't receive code? Resend SMS</Text>
+                  </TouchableOpacity>
                 </View>
-                <Text style={styles.otpNoticeHelp}>
-                  We will send a 6-digit verification code via SMS to this number.
-                </Text>
+              )}
+            </View>
+          </KeyboardAvoidingView>
+        </Modal>
 
+        {/* ---------------------------------------------------------
+            FORGOT PASSWORD RECOVERY MODAL (OTP RESET)
+            --------------------------------------------------------- */}
+        <Modal visible={showForgotModal} animationType="slide" transparent>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.modalOverlay}
+          >
+            <View style={[styles.modalCard, { paddingBottom: Math.max(insets.bottom + 20, 28) }]}>
+              <View style={styles.modalHeader}>
+                <View>
+                  <Text style={styles.modalStepBadge}>
+                    {isForgotOtpSent ? 'STEP 2: NEW PASSWORD' : 'STEP 1: RECOVERY OTP'}
+                  </Text>
+                  <Text style={styles.modalTitle}>Reset Your Password</Text>
+                </View>
                 <TouchableOpacity
-                  style={styles.modalPublishBtn}
-                  onPress={handleSendOtp}
-                  disabled={isAuthLoading}
-                  activeOpacity={0.85}
+                  style={styles.modalCloseBtn}
+                  onPress={() => {
+                    setShowForgotModal(false);
+                    setIsForgotOtpSent(false);
+                  }}
                 >
-                  {isAuthLoading ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                  ) : (
-                    <Text style={styles.modalPublishBtnText}>Get Verification Code →</Text>
-                  )}
+                  <X size={20} color="#0F172A" />
                 </TouchableOpacity>
               </View>
-            ) : (
-              // Step 2: 6-Digit OTP Auto-Verification Input
-              <View style={styles.modalBody}>
-                <Text style={styles.inputLabel}>Enter 6-Digit OTP Sent to +91 {phoneInput}</Text>
-                <TextInput
-                  style={styles.otpBoxesInput}
-                  placeholder="• • • • • •"
-                  placeholderTextColor="#94A3B8"
-                  keyboardType="number-pad"
-                  maxLength={6}
-                  value={otpCode}
-                  onChangeText={handleOtpChange}
-                  autoFocus
-                />
-                <Text style={styles.otpNoticeHelp}>
-                  ⚡ Automatically verifying when 6 digits are entered...
-                </Text>
 
-                <TouchableOpacity
-                  style={[styles.modalPublishBtn, { backgroundColor: '#16A34A' }]}
-                  onPress={() => handleVerifyOtp()}
-                  disabled={isAuthLoading}
-                  activeOpacity={0.85}
-                >
-                  {isAuthLoading ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                  ) : (
-                    <Text style={styles.modalPublishBtnText}>Verify & Proceed ✓</Text>
-                  )}
-                </TouchableOpacity>
+              {!isForgotOtpSent ? (
+                <View style={styles.modalBody}>
+                  <Text style={styles.inputLabel}>Registered Email ID or Phone Number</Text>
+                  <TextInput
+                    style={styles.phoneTextInput}
+                    placeholder="name@example.com or 9829012345"
+                    placeholderTextColor="#94A3B8"
+                    autoCapitalize="none"
+                    value={forgotTarget}
+                    onChangeText={setForgotTarget}
+                    autoFocus
+                  />
+                  <Text style={styles.otpNoticeHelp}>
+                    We will send a one-time reset code to verify your identity.
+                  </Text>
 
-                <TouchableOpacity
-                  style={styles.resendOtpRow}
-                  onPress={handleSendOtp}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.resendOtpText}>Didn't receive code? Resend SMS</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
+                  <TouchableOpacity
+                    style={styles.modalPublishBtn}
+                    onPress={handleSendForgotOtp}
+                    disabled={isForgotSubmitting}
+                    activeOpacity={0.85}
+                  >
+                    {isForgotSubmitting ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Text style={styles.modalPublishBtnText}>Send Reset Code →</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <View style={styles.modalBody}>
+                  <Text style={styles.inputLabel}>Enter Verification Code (OTP)</Text>
+                  <TextInput
+                    style={styles.phoneTextInput}
+                    placeholder="Enter 6-digit OTP"
+                    placeholderTextColor="#94A3B8"
+                    keyboardType="number-pad"
+                    maxLength={6}
+                    value={forgotOtp}
+                    onChangeText={setForgotOtp}
+                    autoFocus
+                  />
 
+                  <Text style={[styles.inputLabel, { marginTop: 12 }]}>Set New Password</Text>
+                  <TextInput
+                    style={styles.phoneTextInput}
+                    placeholder="Enter new password (min 6 chars)"
+                    placeholderTextColor="#94A3B8"
+                    secureTextEntry
+                    value={forgotNewPass}
+                    onChangeText={setForgotNewPass}
+                  />
 
+                  <TouchableOpacity
+                    style={[styles.modalPublishBtn, { backgroundColor: '#16A34A', marginTop: 16 }]}
+                    onPress={handleResetPasswordSubmit}
+                    disabled={isForgotSubmitting}
+                    activeOpacity={0.85}
+                  >
+                    {isForgotSubmitting ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Text style={styles.modalPublishBtnText}>Save Password & Login ✓</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          </KeyboardAvoidingView>
+        </Modal>
       </SafeAreaView>
     );
   }
@@ -1633,29 +1855,43 @@ function MainApp() {
           {/* Save Button */}
           <TouchableOpacity
             style={styles.formSubmitBtn}
+            disabled={isSubmittingCustomer}
             onPress={async () => {
               if (!custName.trim() || !custMobile.trim() || !custAddress.trim()) {
                 Alert.alert('Required Fields', 'Please fill in your name, mobile, and address.');
                 return;
               }
-              // Save to Supabase (Background sync) & Local Storage
-              try {
-                await LiveBackend.syncProfile({
-                  fullName: custName.trim(),
-                  mobile: custMobile.trim(),
-                  address: custAddress.trim(),
-                  role: 'CUSTOMER',
-                });
-                await StorageService.setSession({ name: custName.trim(), mobile: custMobile.trim(), role: 'CUSTOMER', isDev: false });
-                await StorageService.setRole('CUSTOMER');
-              } catch (e) {
-                console.log('Customer sync err:', e);
-              }
-              setCurrentScreen('CUSTOMER_READY');
+              setIsSubmittingCustomer(true);
+              DeviceFeedback.triggerSuccessHaptics();
+
+              // 1. Immediately store session locally for instant navigation & persistence
+              await StorageService.setSession({
+                name: custName.trim(),
+                mobile: custMobile.trim(),
+                address: custAddress.trim(),
+                role: 'CUSTOMER',
+              });
+              await StorageService.setRole('CUSTOMER');
+
+              // 2. Fire Supabase sync non-blockingly in background
+              LiveBackend.syncProfile({
+                fullName: custName.trim(),
+                mobile: custMobile.trim(),
+                address: custAddress.trim(),
+                role: 'CUSTOMER',
+              }).catch((e) => console.log('Background customer sync err:', e));
+
+              // 3. Immediately transition directly to MAIN screen without any delay!
+              setIsSubmittingCustomer(false);
+              setCurrentScreen('MAIN');
             }}
             activeOpacity={0.85}
           >
-            <Text style={styles.formSubmitBtnText}>Save & Continue →</Text>
+            {isSubmittingCustomer ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Text style={styles.formSubmitBtnText}>Start App →</Text>
+            )}
           </TouchableOpacity>
         </ScrollView>
       </SafeAreaView>
@@ -1906,33 +2142,46 @@ function MainApp() {
           {/* Submit Application Button */}
           <TouchableOpacity
             style={[styles.formSubmitBtn, { backgroundColor: '#16A34A' }]}
+            disabled={isSubmittingWorker}
             onPress={async () => {
               if (!workerName.trim() || !workerMobile.trim() || workerSkills.length === 0) {
                 Alert.alert('Required Fields', 'Please fill name, mobile, and select at least one skill.');
                 return;
               }
-              // Save to Supabase (Background sync) & Local Storage
-              try {
-                await LiveBackend.submitWorkerKYC({
-                  fullName: workerName.trim(),
-                  mobile: workerMobile.trim(),
-                  altMobile: workerAltMobile.trim() || null,
-                  address: workerAddress.trim(),
-                  skills: workerSkills,
-                  aadhaarFrontUri,
-                  aadhaarBackUri,
-                  photoUri: workerPhotoUri,
-                });
-                await StorageService.setSession({ name: workerName.trim(), mobile: workerMobile.trim(), role: 'WORKER', isDev: false });
-                await StorageService.setRole('WORKER');
-              } catch (e) {
-                console.log('Worker KYC submit err:', e);
-              }
+              setIsSubmittingWorker(true);
+              DeviceFeedback.triggerSuccessHaptics();
+
+              // 1. Immediately store session locally
+              await StorageService.setSession({
+                name: workerName.trim(),
+                mobile: workerMobile.trim(),
+                role: 'WORKER',
+              });
+              await StorageService.setRole('WORKER');
+
+              // 2. Fire KYC submit in background without stalling the screen
+              LiveBackend.submitWorkerKYC({
+                fullName: workerName.trim(),
+                mobile: workerMobile.trim(),
+                altMobile: workerAltMobile.trim() || null,
+                address: workerAddress.trim(),
+                skills: workerSkills,
+                aadhaarFrontUri,
+                aadhaarBackUri,
+                photoUri: workerPhotoUri,
+              }).catch((e) => console.log('Worker KYC submit err:', e));
+
+              // 3. Navigate instantly to WORKER_UNDER_REVIEW
+              setIsSubmittingWorker(false);
               setCurrentScreen('WORKER_UNDER_REVIEW');
             }}
             activeOpacity={0.85}
           >
-            <Text style={styles.formSubmitBtnText}>Submit KYC Application 📋</Text>
+            {isSubmittingWorker ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Text style={styles.formSubmitBtnText}>Submit KYC Application 📋</Text>
+            )}
           </TouchableOpacity>
         </ScrollView>
       </SafeAreaView>
@@ -1981,39 +2230,52 @@ function MainApp() {
 
           {/* Check Live Approval Status Button */}
           <TouchableOpacity
-            style={[styles.previewHomeBtn, { backgroundColor: '#16A34A', marginBottom: 10 }]}
+            style={[styles.previewHomeBtn, { backgroundColor: '#16A34A' }]}
+            disabled={isCheckingApproval}
             onPress={async () => {
-              const res = await LiveBackend.checkWorkerApprovalStatus(workerMobile);
-              if (res?.status === 'APPROVED') {
-                DeviceFeedback.triggerSuccessHaptics();
-                setNotifications((prev) => [
-                  {
-                    id: `NOTIF-${Date.now()}`,
-                    title: 'KYC Application Approved! 🎉',
-                    message: 'Congratulations! Your profile is verified. Your job alerts and wallet are now active.',
-                    time: 'Just now',
-                    type: 'success',
-                  },
-                  ...prev,
-                ]);
-                Alert.alert('Application Approved! 🎉', 'Your Mistri Pro profile has been verified and approved by the admin.');
-                setCurrentScreen('MAIN');
-              } else {
-                Alert.alert('Status: In Review', 'Your KYC application is currently being reviewed by the admin team. You can check again shortly or Preview Dashboard.');
+              setIsCheckingApproval(true);
+              DeviceFeedback.triggerSuccessHaptics();
+              try {
+                const checkPromise = LiveBackend.checkWorkerApprovalStatus(workerMobile);
+                const timeoutPromise = new Promise((resolve) =>
+                  setTimeout(() => resolve({ status: 'PENDING' }), 1200)
+                );
+                const res = await Promise.race([checkPromise, timeoutPromise]);
+                setIsCheckingApproval(false);
+
+                if (res?.status === 'APPROVED') {
+                  DeviceFeedback.triggerSuccessHaptics();
+                  setNotifications((prev) => [
+                    {
+                      id: `NOTIF-${Date.now()}`,
+                      title: 'KYC Application Approved! 🎉',
+                      message: 'Congratulations! Your profile is verified. Your job alerts and wallet are now active.',
+                      time: 'Just now',
+                      type: 'success',
+                    },
+                    ...prev,
+                  ]);
+                  Alert.alert('Application Approved! 🎉', 'Your Mistri Pro profile has been verified and approved by the admin desk.');
+                  setCurrentScreen('MAIN');
+                } else {
+                  DeviceFeedback.triggerAlertHaptics();
+                  Alert.alert(
+                    'Application Under Review ⏳',
+                    'Your Aadhaar and profile details are currently being verified by the compliance desk. You will receive an SMS as soon as approved.'
+                  );
+                }
+              } catch (e) {
+                setIsCheckingApproval(false);
+                Alert.alert('Status: In Review ⏳', 'Your application is safely in the review queue.');
               }
             }}
             activeOpacity={0.8}
           >
-            <Text style={styles.previewHomeBtnText}>Check Approval Status 🔄</Text>
-          </TouchableOpacity>
-
-          {/* Explore Demo Home / Preview */}
-          <TouchableOpacity
-            style={styles.previewHomeBtn}
-            onPress={() => setCurrentScreen('MAIN')}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.previewHomeBtnText}>Preview Dashboard (Demo Mode) →</Text>
+            {isCheckingApproval ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Text style={styles.previewHomeBtnText}>Check Approval Status 🔄</Text>
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -2108,7 +2370,6 @@ function MainApp() {
               t={t}
               role={role}
               lang={lang}
-              isDev={isDev}
               insets={insets}
               onSwitchRole={() => {
                 const nextRole = role === 'CUSTOMER' ? 'WORKER' : 'CUSTOMER';
@@ -2125,7 +2386,6 @@ function MainApp() {
                     style: 'destructive',
                     onPress: async () => {
                       await StorageService.clearSession();
-                      setIsDev(false);
                       setCurrentScreen('SIGN_IN');
                     },
                   },
@@ -2183,7 +2443,6 @@ function MainApp() {
               t={t}
               role={role}
               lang={lang}
-              isDev={isDev}
               insets={insets}
               onSwitchRole={() => {
                 const nextRole = role === 'CUSTOMER' ? 'WORKER' : 'CUSTOMER';
@@ -2200,7 +2459,6 @@ function MainApp() {
                     style: 'destructive',
                     onPress: async () => {
                       await StorageService.clearSession();
-                      setIsDev(false);
                       setCurrentScreen('SIGN_IN');
                     },
                   },
@@ -3131,7 +3389,7 @@ function ReviewsScreen({ t, insets, reviews, onOpenWriteReview }) {
 // =================================================================
 // SUB-SCREEN D: PROFILE SCREEN (ChoosingHer Settings Reference)
 // =================================================================
-function ProfileScreen({ t, role, lang, isDev, insets, onSwitchRole, onSwitchLang, onOpenInvoices, onLogout }) {
+function ProfileScreen({ t, role, lang, insets, onSwitchRole, onSwitchLang, onOpenInvoices, onLogout }) {
   const currentLangLabel = {
     en: 'English',
     hi: 'हिंदी (Hindi)',
@@ -3140,15 +3398,11 @@ function ProfileScreen({ t, role, lang, isDev, insets, onSwitchRole, onSwitchLan
   }[lang];
 
   const handleRoleSwitchPress = () => {
-    if (!isDev) {
-      Alert.alert(
-        'Role Locked 🔒',
-        `Your account is registered as ${role === 'CUSTOMER' ? 'Customer' : 'Mistri Worker'}. Switching roles is locked in production.\n\nTo test other roles, please log in with Developer Mode.`,
-        [{ text: 'Understood' }]
-      );
-    } else {
-      onSwitchRole();
-    }
+    Alert.alert(
+      'Account Persona Locked 🔒',
+      `Your account is registered as ${role === 'CUSTOMER' ? 'Customer (ग्राहक)' : 'Mistri Worker (कारीगर)'}. Persona is bound to your verified profile and cannot be changed.\n\nTo use another account type, please sign out and register a new profile.`,
+      [{ text: 'Understood' }]
+    );
   };
 
   return (
@@ -3197,7 +3451,7 @@ function ProfileScreen({ t, role, lang, isDev, insets, onSwitchRole, onSwitchLan
             <View style={styles.settingsRowTextCol}>
               <Text style={styles.settingsRowLabel}>{t.switchRole}</Text>
               <Text style={styles.settingsRowSub}>
-                Current: {role === 'CUSTOMER' ? 'Customer Mode' : 'Worker Mode'} {isDev ? '• (Dev Mode)' : '• (Locked)'}
+                Current: {role === 'CUSTOMER' ? 'Customer Mode' : 'Worker Mode'}
               </Text>
             </View>
             <ChevronRight size={18} color="#94A3B8" />
@@ -3596,59 +3850,112 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#0F172A',
   },
-  authDevButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FFFBEB',
-    height: 52,
-    borderRadius: 26,
-    borderWidth: 1.2,
-    borderColor: '#FDE68A',
-    gap: 8,
-  },
-  authDevButtonText: {
-    fontFamily: 'Satoshi-Bold',
-    fontSize: 14,
-    color: '#92400E',
-  },
-  devBox: {
+  emailFormCard: {
     backgroundColor: '#F8FAFC',
-    borderRadius: 16,
+    borderRadius: 20,
     padding: 16,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    marginTop: 6,
+    marginBottom: 4,
   },
-  devBoxTitle: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#64748B',
-    letterSpacing: 1,
-    marginBottom: 10,
+  authInputFieldGroup: {
+    marginBottom: 4,
   },
-  devInput: {
+  authInputLabel: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 13,
+    color: '#334155',
+    marginBottom: 6,
+  },
+  passwordLabelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  forgotPassLink: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 12,
+    color: '#4F46E5',
+  },
+  authInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    borderWidth: 1,
+    borderWidth: 1.2,
     borderColor: '#CBD5E1',
-    borderRadius: 10,
-    height: 42,
+    borderRadius: 14,
+    height: 48,
     paddingHorizontal: 12,
+  },
+  authTextInput: {
+    flex: 1,
     fontFamily: 'Satoshi-Regular',
     fontSize: 14,
     color: '#0F172A',
-    marginBottom: 10,
+    marginLeft: 10,
+    paddingVertical: 0,
   },
-  devSubmitBtn: {
-    backgroundColor: '#4F46E5',
-    paddingVertical: 10,
-    borderRadius: 10,
+  passwordEyeBtn: {
+    padding: 6,
+  },
+  authEmailButton: {
+    backgroundColor: '#0F172A',
+    height: 48,
+    borderRadius: 24,
     alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  devSubmitText: {
+  authEmailButtonText: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 15,
     color: '#FFFFFF',
+    letterSpacing: 0.2,
+  },
+  authDividerWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 14,
+  },
+  authDividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#E2E8F0',
+  },
+  authDividerText: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 11,
+    color: '#94A3B8',
+    letterSpacing: 1,
+    paddingHorizontal: 12,
+  },
+  authGoogleOutlineBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    height: 52,
+    borderRadius: 26,
+    paddingHorizontal: 20,
+    borderWidth: 1.2,
+    borderColor: '#E2E8F0',
+  },
+  authGoogleGColored: {
+    fontFamily: 'Satoshi-Black',
+    fontSize: 18,
+    color: '#4285F4',
+    marginRight: 10,
+  },
+  authGoogleButtonText: {
     fontFamily: 'Satoshi-Medium',
-    fontSize: 14,
+    fontSize: 15,
+    color: '#0F172A',
   },
   signInFooter: {
     paddingHorizontal: 12,
