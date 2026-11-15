@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -19,6 +19,7 @@ import {
   ChevronRight,
   Info,
 } from 'lucide-react-native';
+import { DeviceFeedback } from '../services/deviceFeedback';
 
 export default function WorkerAlertsScreen({
   insets,
@@ -29,6 +30,12 @@ export default function WorkerAlertsScreen({
 }) {
   const [filter, setFilter] = useState('ALL'); // 'ALL' | 'TODAY' | 'UPCOMING'
   const [localAlerts, setLocalAlerts] = useState(alerts);
+
+  useEffect(() => {
+    if (alerts && alerts.length > 0) {
+      DeviceFeedback.triggerAlertHaptics();
+    }
+  }, []);
 
   const filteredAlerts = localAlerts.filter((a) => {
     if (filter === 'TODAY') return a.date.toLowerCase().includes('today');
@@ -46,6 +53,7 @@ export default function WorkerAlertsScreen({
           text: 'Accept & Move to Bookings',
           style: 'default',
           onPress: () => {
+            DeviceFeedback.triggerSuccessHaptics();
             setLocalAlerts((prev) => prev.filter((item) => item.id !== alertItem.id));
             if (onApproveAlert) {
               onApproveAlert(alertItem);

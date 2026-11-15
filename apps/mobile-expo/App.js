@@ -65,6 +65,7 @@ import {
   Users,
   Compass,
   Wallet,
+  Download,
 } from 'lucide-react-native';
 
 import CustomerHomeScreen from './src/screens/CustomerHomeScreen';
@@ -82,6 +83,12 @@ import {
   INITIAL_WORKER_BOOKINGS,
   INITIAL_WALLET,
 } from './src/data/workerData';
+
+import { StorageService } from './src/services/storage';
+import { LiveBackend } from './src/services/liveBackend';
+import { InvoiceService } from './src/services/invoiceService';
+import { DeviceFeedback } from './src/services/deviceFeedback';
+import NotificationCenterModal from './src/components/NotificationCenterModal';
 
 const { width } = Dimensions.get('window');
 
@@ -556,14 +563,97 @@ function MainApp() {
   const [workerBookings, setWorkerBookings] = useState(INITIAL_WORKER_BOOKINGS);
   const [workerWallet, setWorkerWallet] = useState(INITIAL_WALLET);
 
+  const [isDev, setIsDev] = useState(false);
+  const [showNotifModal, setShowNotifModal] = useState(false);
+  const [notifications, setNotifications] = useState([
+    {
+      id: 'n1',
+      title: 'Welcome to Mistri Pro',
+      message: 'Explore verified mistris near you or book directly with 100% Escrow Protection.',
+      time: 'Just now',
+      type: 'info',
+    },
+  ]);
+  const [showInvoicesModal, setShowInvoicesModal] = useState(false);
+
   const handleUpdateWorkerProfile = (updates) => {
     setWorkerProfile((prev) => ({ ...prev, ...updates }));
   };
 
-  const handleApproveAlert = (alertItem) => {
+  const handleCustomerBookWorker = async (bookingDetails) => {
+    try {
+      const savedBooking = await LiveBackend.createBooking({
+        ...bookingDetails,
+        customerName: custName || 'Ramesh Sharma',
+        customerPhone: custMobile || '+91 98290 12345',
+        siteLocation: 'Sawai Madhopur, Rajasthan',
+        status: 'WAITING_CONFIRMATION',
+      });
+
+      const newBookingId = savedBooking?.id || `B-${Date.now().toString().slice(-4)}`;
+
+      const newAlert = {
+        id: `ALT-${Date.now().toString().slice(-4)}`,
+        bookingId: newBookingId,
+        customerName: custName || 'Ramesh Sharma',
+        customerAvatar: 'RS',
+        customerColor: '#4F46E5',
+        customerPhone: custMobile || '+91 98290 12345',
+        category: bookingDetails.workerSkill,
+        title: `${bookingDetails.workerSkill} Service Request`,
+        location: 'Sawai Madhopur, Rajasthan',
+        distance: '1.2 km',
+        date: 'Today, Immediate',
+        timing: '9:00 AM – 5:00 PM',
+        offeredRate: `₹${bookingDetails.workerFee || 950}`,
+        platformFee: 99,
+        escrowLocked: true,
+        timestamp: 'Just now',
+      };
+      setWorkerAlerts((prev) => [newAlert, ...prev]);
+
+      const newWorkerBooking = {
+        id: newBookingId,
+        customerName: custName || 'Ramesh Sharma',
+        customerAvatar: 'RS',
+        customerColor: '#4F46E5',
+        customerPhone: custMobile || '+91 98290 12345',
+        category: bookingDetails.workerSkill,
+        title: `${bookingDetails.workerSkill} Service Request`,
+        location: 'Sawai Madhopur, Rajasthan',
+        distance: '1.2 km',
+        date: 'Today, Immediate',
+        timing: '9:00 AM – 5:00 PM',
+        amount: `₹${bookingDetails.workerFee || 950}`,
+        duration: '1 Day',
+        status: 'waiting_confirmation',
+        step: 1,
+        escrowStatus: 'LOCKED_IN_ESCROW',
+      };
+      setWorkerBookings((prev) => [newWorkerBooking, ...prev]);
+
+      setNotifications((prev) => [
+        {
+          id: `NOTIF-${Date.now()}`,
+          title: 'Booking Sent to Mistri',
+          message: `Booking request sent to ${bookingDetails.workerName}. Status: Waiting confirmation.`,
+          time: 'Just now',
+          type: 'booking',
+        },
+        ...prev,
+      ]);
+
+      DeviceFeedback.triggerAlertHaptics();
+      setActiveTab('BOOKINGS');
+    } catch (e) {
+      console.log('handleCustomerBookWorker err:', e);
+    }
+  };
+
+  const handleApproveAlert = async (alertItem) => {
     setWorkerAlerts((prev) => prev.filter((a) => a.id !== alertItem.id));
     const newBooking = {
-      id: `WB-${Date.now().toString().slice(-4)}`,
+      id: alertItem.bookingId || `WB-${Date.now().toString().slice(-4)}`,
       customerName: alertItem.customerName,
       customerAvatar: alertItem.customerAvatar || 'CU',
       customerColor: alertItem.customerColor || '#0284C7',
@@ -576,15 +666,57 @@ function MainApp() {
       timing: alertItem.timing || '9:00 AM – 5:00 PM',
       amount: alertItem.offeredRate,
       duration: alertItem.duration || '1 Day',
-      status: 'active',
+      status: 'confirmed',
       step: 1, // Approved
       escrowStatus: 'LOCKED_IN_ESCROW',
     };
-    setWorkerBookings((prev) => [newBooking, ...prev]);
+    setWorkerBookings((prev) => [
+      newBooking,
+      ...prev.filter((b) => b.id !== newBooking.id),
+    ]);
+
+    if (alertItem.bookingId) {
+      await LiveBackend.updateBookingStatus(alertItem.bookingId, 'confirmed', 1);
+    }
+
+    DeviceFeedback.triggerSuccessHaptics();
+
+    setNotifications((prev) => [
+      {
+        id: `NOTIF-${Date.now()}`,
+        title: 'Booking Confirmed! 🎉',
+        message: `${workerProfile.name} accepted the booking. You can now call and track live work.`,
+        time: 'Just now',
+        type: 'success',
+      },
+      ...prev,
+    ]);
   };
 
-  const handleRejectAlert = (alertId) => {
+  const handleRejectAlert = async (alertItem) => {
+    const alertId = alertItem?.id || alertItem;
+    const bookingId = alertItem?.bookingId;
     setWorkerAlerts((prev) => prev.filter((a) => a.id !== alertId));
+
+    if (bookingId) {
+      setWorkerBookings((prev) =>
+        prev.map((b) => (b.id === bookingId ? { ...b, status: 'rejected' } : b))
+      );
+      await LiveBackend.updateBookingStatus(bookingId, 'rejected');
+    }
+
+    DeviceFeedback.triggerAlertHaptics();
+
+    setNotifications((prev) => [
+      {
+        id: `NOTIF-${Date.now()}`,
+        title: 'Booking Declined',
+        message: 'The mistri declined your booking. Choose "Auto-Assign Another Mistri" or "Instant Refund".',
+        time: 'Just now',
+        type: 'alert',
+      },
+      ...prev,
+    ]);
   };
 
   const handleUpdateWorkerBookingStep = (bookingId, nextStep) => {
@@ -655,13 +787,65 @@ function MainApp() {
 
   const t = I18N[lang] || I18N.en;
 
-  // Auto transition from Splash Screen
+  // Auto transition from Splash Screen with StorageService
   useEffect(() => {
+    let isMounted = true;
+    const checkInitialState = async () => {
+      try {
+        const savedLang = await StorageService.getLanguage();
+        if (savedLang && isMounted) {
+          setLang(savedLang);
+        }
+
+        const savedSession = await StorageService.getSession();
+        const savedIsDev = await StorageService.getIsDev();
+        const savedRole = await StorageService.getRole();
+
+        if (savedIsDev && isMounted) {
+          setIsDev(true);
+        }
+
+        // If user already logged in
+        if (savedSession && isMounted) {
+          if (savedRole) {
+            setRole(savedRole);
+          }
+          if (savedRole === 'WORKER' && !savedIsDev) {
+            const approval = await LiveBackend.checkWorkerApprovalStatus(savedSession.mobile || '9414088990');
+            if (approval?.status === 'APPROVED') {
+              setCurrentScreen('MAIN');
+            } else {
+              setCurrentScreen('WORKER_UNDER_REVIEW');
+            }
+          } else {
+            setCurrentScreen('MAIN');
+          }
+          return;
+        }
+
+        // If language was chosen before but not logged in -> go to SIGN_IN
+        if (savedLang && isMounted) {
+          setCurrentScreen('SIGN_IN');
+          return;
+        }
+
+        // Fresh install -> ask language
+        if (isMounted) {
+          setCurrentScreen('LANGUAGE');
+        }
+      } catch (err) {
+        if (isMounted) setCurrentScreen('LANGUAGE');
+      }
+    };
+
     if (currentScreen === 'SPLASH') {
       const timer = setTimeout(() => {
-        setCurrentScreen('LANGUAGE');
-      }, 3500);
-      return () => clearTimeout(timer);
+        checkInitialState();
+      }, 2000);
+      return () => {
+        isMounted = false;
+        clearTimeout(timer);
+      };
     }
   }, [currentScreen]);
 
@@ -791,9 +975,12 @@ function MainApp() {
   }, [currentScreen]);
 
   // Handle Dev Login
-  const handleDevLogin = () => {
+  const handleDevLogin = async () => {
     if (devUser.trim() === 'abc' && devPass.trim() === '1234') {
       setShowDevForm(false);
+      setIsDev(true);
+      await StorageService.setIsDev(true);
+      await StorageService.setSession({ user: 'abc', role: 'CUSTOMER', isDev: true });
       setCurrentScreen('ROLE_SELECT');
     } else {
       Alert.alert('Invalid Credentials', 'Please use Username: abc and Password: 1234');
@@ -945,7 +1132,10 @@ function MainApp() {
 
           <TouchableOpacity
             style={styles.primaryBlackBtn}
-            onPress={() => setCurrentScreen('SIGN_IN')}
+            onPress={async () => {
+              await StorageService.setLanguage(lang);
+              setCurrentScreen('SIGN_IN');
+            }}
             activeOpacity={0.85}
           >
             <Text style={styles.primaryBlackBtnText}>{t.continueBtn} →</Text>
@@ -1052,9 +1242,11 @@ function MainApp() {
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.devSubmitBtn, { flex: 1, backgroundColor: '#059669' }]}
-                    onPress={() => {
+                    onPress={async () => {
+                      setIsDev(true);
+                      await StorageService.setIsDev(true);
+                      await StorageService.setSession({ user: 'dev_user', role: 'CUSTOMER', isDev: true });
                       setCustName('Developer User');
-                      setCustPhone('+91 98765 43210');
                       setCurrentScreen('ROLE_SELECT');
                     }}
                   >
@@ -1214,8 +1406,9 @@ function MainApp() {
             {/* Customer Role Card */}
             <TouchableOpacity
               style={[styles.roleCard, role === 'CUSTOMER' && styles.roleCardActive]}
-              onPress={() => {
+              onPress={async () => {
                 setRole('CUSTOMER');
+                await StorageService.setRole('CUSTOMER');
                 setCurrentScreen('CUSTOMER_ONBOARDING');
               }}
               activeOpacity={0.85}
@@ -1238,8 +1431,9 @@ function MainApp() {
             {/* Worker Role Card */}
             <TouchableOpacity
               style={[styles.roleCard, role === 'WORKER' && styles.roleCardActiveWorker]}
-              onPress={() => {
+              onPress={async () => {
                 setRole('WORKER');
+                await StorageService.setRole('WORKER');
                 setCurrentScreen('WORKER_ONBOARDING');
               }}
               activeOpacity={0.85}
@@ -1263,7 +1457,7 @@ function MainApp() {
           </View>
 
           <Text style={styles.roleNote}>
-            💡 You can freely switch between Customer and Worker personas anytime from your Profile tab.
+            🔒 Profile Persona Lock: Your registered persona determines account verification and live tools.
           </Text>
         </View>
       </SafeAreaView>
@@ -1360,27 +1554,23 @@ function MainApp() {
           {/* Save Button */}
           <TouchableOpacity
             style={styles.formSubmitBtn}
-            onPress={() => {
+            onPress={async () => {
               if (!custName.trim() || !custMobile.trim() || !custAddress.trim()) {
                 Alert.alert('Required Fields', 'Please fill in your name, mobile, and address.');
                 return;
               }
-              // Save to Supabase (Background sync)
+              // Save to Supabase (Background sync) & Local Storage
               try {
-                supabase.from('profiles').upsert({
-                  full_name: custName.trim(),
-                  phone: custMobile.trim(),
+                await LiveBackend.syncProfile({
+                  fullName: custName.trim(),
+                  mobile: custMobile.trim(),
                   address: custAddress.trim(),
                   role: 'CUSTOMER',
-                  avatar_url: custPhotoUri || null,
-                  kyc_status: 'VERIFIED',
-                  updated_at: new Date().toISOString(),
-                }).then(({ error }) => {
-                  if (error) console.log('Supabase Customer Sync Notice:', error.message);
-                  else console.log('Customer successfully synced to Supabase!');
                 });
+                await StorageService.setSession({ name: custName.trim(), mobile: custMobile.trim(), role: 'CUSTOMER', isDev: false });
+                await StorageService.setRole('CUSTOMER');
               } catch (e) {
-                console.log('Sync err:', e);
+                console.log('Customer sync err:', e);
               }
               setCurrentScreen('CUSTOMER_READY');
             }}
@@ -1637,38 +1827,27 @@ function MainApp() {
           {/* Submit Application Button */}
           <TouchableOpacity
             style={[styles.formSubmitBtn, { backgroundColor: '#16A34A' }]}
-            onPress={() => {
+            onPress={async () => {
               if (!workerName.trim() || !workerMobile.trim() || workerSkills.length === 0) {
                 Alert.alert('Required Fields', 'Please fill name, mobile, and select at least one skill.');
                 return;
               }
-              // Save to Supabase (Background sync)
+              // Save to Supabase (Background sync) & Local Storage
               try {
-                supabase.from('profiles').upsert({
-                  full_name: workerName.trim(),
-                  phone: workerMobile.trim(),
-                  alt_phone: workerAltMobile.trim() || null,
+                await LiveBackend.submitWorkerKYC({
+                  fullName: workerName.trim(),
+                  mobile: workerMobile.trim(),
+                  altMobile: workerAltMobile.trim() || null,
                   address: workerAddress.trim(),
-                  role: 'WORKER',
-                  avatar_url: workerPhotoUri || null,
-                  kyc_status: 'PENDING',
-                  updated_at: new Date().toISOString(),
-                }).then(({ error }) => {
-                  if (error) console.log('Supabase Worker Profile Sync Notice:', error.message);
-                  else {
-                    console.log('Worker profile synced to Supabase!');
-                    supabase.from('worker_profiles').upsert({
-                      skills: workerSkills,
-                      aadhaar_front_url: aadhaarFrontUri || null,
-                      aadhaar_back_url: aadhaarBackUri || null,
-                      is_available: true,
-                    }).then(({ error: wErr }) => {
-                      if (wErr) console.log('Worker skills sync notice:', wErr.message);
-                    });
-                  }
+                  skills: workerSkills,
+                  aadhaarFrontUri,
+                  aadhaarBackUri,
+                  photoUri: workerPhotoUri,
                 });
+                await StorageService.setSession({ name: workerName.trim(), mobile: workerMobile.trim(), role: 'WORKER', isDev: false });
+                await StorageService.setRole('WORKER');
               } catch (e) {
-                console.log('Sync err:', e);
+                console.log('Worker KYC submit err:', e);
               }
               setCurrentScreen('WORKER_UNDER_REVIEW');
             }}
@@ -1721,6 +1900,34 @@ function MainApp() {
             Once approved, you will get SMS confirmation and your Worker App tools will unlock automatically.
           </Text>
 
+          {/* Check Live Approval Status Button */}
+          <TouchableOpacity
+            style={[styles.previewHomeBtn, { backgroundColor: '#16A34A', marginBottom: 10 }]}
+            onPress={async () => {
+              const res = await LiveBackend.checkWorkerApprovalStatus(workerMobile);
+              if (res?.status === 'APPROVED') {
+                DeviceFeedback.triggerSuccessHaptics();
+                setNotifications((prev) => [
+                  {
+                    id: `NOTIF-${Date.now()}`,
+                    title: 'KYC Application Approved! 🎉',
+                    message: 'Congratulations! Your profile is verified. Your job alerts and wallet are now active.',
+                    time: 'Just now',
+                    type: 'success',
+                  },
+                  ...prev,
+                ]);
+                Alert.alert('Application Approved! 🎉', 'Your Mistri Pro profile has been verified and approved by the admin.');
+                setCurrentScreen('MAIN');
+              } else {
+                Alert.alert('Status: In Review', 'Your KYC application is currently being reviewed by the admin team. You can check again shortly or Preview Dashboard.');
+              }
+            }}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.previewHomeBtnText}>Check Approval Status 🔄</Text>
+          </TouchableOpacity>
+
           {/* Explore Demo Home / Preview */}
           <TouchableOpacity
             style={styles.previewHomeBtn}
@@ -1747,6 +1954,9 @@ function MainApp() {
             <CustomerHomeScreen
               insets={insets}
               onNavigateTab={(tab) => setActiveTab(tab)}
+              onBookWorker={(details) => handleCustomerBookWorker(details)}
+              onOpenNotifications={() => setShowNotifModal(true)}
+              notificationsCount={notifications.length}
             />
           )}
 
@@ -1754,6 +1964,7 @@ function MainApp() {
             <FindWorkersScreen
               insets={insets}
               onNavigateTab={(tab) => setActiveTab(tab)}
+              onBookWorker={(details) => handleCustomerBookWorker(details)}
             />
           )}
 
@@ -1761,6 +1972,8 @@ function MainApp() {
             <MyBookingsScreen
               insets={insets}
               onNavigateTab={(tab) => setActiveTab(tab)}
+              onOpenNotifications={() => setShowNotifModal(true)}
+              notificationsCount={notifications.length}
             />
           )}
 
@@ -1768,6 +1981,16 @@ function MainApp() {
             <ContractorScreen
               insets={insets}
               onNavigateTab={(tab) => setActiveTab(tab)}
+              onDeployContractorBooking={async (payload) => {
+                try {
+                  await LiveBackend.createContractorBooking(payload);
+                  DeviceFeedback.triggerSuccessHaptics();
+                  Alert.alert('Contractor Crew Dispatched! 🚀', 'Available nearby workers have been assigned to your project.');
+                  setActiveTab('BOOKINGS');
+                } catch (e) {
+                  console.log('Contractor booking error:', e);
+                }
+              }}
             />
           )}
 
@@ -1776,6 +1999,7 @@ function MainApp() {
               t={t}
               role={role}
               lang={lang}
+              isDev={isDev}
               insets={insets}
               onSwitchRole={() => {
                 const nextRole = role === 'CUSTOMER' ? 'WORKER' : 'CUSTOMER';
@@ -1783,13 +2007,18 @@ function MainApp() {
                 setActiveTab('HOME');
               }}
               onSwitchLang={() => setCurrentScreen('LANGUAGE')}
-              onLogout={() => {
+              onOpenInvoices={() => setShowInvoicesModal(true)}
+              onLogout={async () => {
                 Alert.alert(t.logout, 'Are you sure you want to sign out?', [
                   { text: 'Cancel', style: 'cancel' },
                   {
                     text: 'Sign Out',
                     style: 'destructive',
-                    onPress: () => setCurrentScreen('SIGN_IN'),
+                    onPress: async () => {
+                      await StorageService.clearSession();
+                      setIsDev(false);
+                      setCurrentScreen('SIGN_IN');
+                    },
                   },
                 ]);
               }}
@@ -1806,6 +2035,8 @@ function MainApp() {
               alertsCount={workerAlerts.length}
               walletBalance={workerWallet.availableBalance}
               onNavigateTab={(tab) => setActiveTab(tab)}
+              onOpenNotifications={() => setShowNotifModal(true)}
+              notificationsCount={notifications.length}
             />
           )}
 
@@ -1843,6 +2074,7 @@ function MainApp() {
               t={t}
               role={role}
               lang={lang}
+              isDev={isDev}
               insets={insets}
               onSwitchRole={() => {
                 const nextRole = role === 'CUSTOMER' ? 'WORKER' : 'CUSTOMER';
@@ -1850,13 +2082,18 @@ function MainApp() {
                 setActiveTab('HOME');
               }}
               onSwitchLang={() => setCurrentScreen('LANGUAGE')}
-              onLogout={() => {
+              onOpenInvoices={() => setShowInvoicesModal(true)}
+              onLogout={async () => {
                 Alert.alert(t.logout, 'Are you sure you want to sign out?', [
                   { text: 'Cancel', style: 'cancel' },
                   {
                     text: 'Sign Out',
                     style: 'destructive',
-                    onPress: () => setCurrentScreen('SIGN_IN'),
+                    onPress: async () => {
+                      await StorageService.clearSession();
+                      setIsDev(false);
+                      setCurrentScreen('SIGN_IN');
+                    },
                   },
                 ]);
               }}
@@ -1891,7 +2128,7 @@ function MainApp() {
                   strokeWidth={activeTab === 'HOME' ? 2.5 : 2}
                 />
               </View>
-              <Text style={[styles.navLabel, activeTab === 'HOME' && styles.navLabelActive]} numberOfLines={1}>
+              <Text style={[styles.navLabel, activeTab === 'HOME' && styles.navLabelActive]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                 Home
               </Text>
             </TouchableOpacity>
@@ -1909,7 +2146,7 @@ function MainApp() {
                   strokeWidth={activeTab === 'FIND_WORKERS' ? 2.5 : 2}
                 />
               </View>
-              <Text style={[styles.navLabel, activeTab === 'FIND_WORKERS' && styles.navLabelActive]} numberOfLines={1}>
+              <Text style={[styles.navLabel, activeTab === 'FIND_WORKERS' && styles.navLabelActive]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                 Find
               </Text>
             </TouchableOpacity>
@@ -1927,7 +2164,7 @@ function MainApp() {
                   strokeWidth={activeTab === 'BOOKINGS' ? 2.5 : 2}
                 />
               </View>
-              <Text style={[styles.navLabel, activeTab === 'BOOKINGS' && styles.navLabelActive]} numberOfLines={1}>
+              <Text style={[styles.navLabel, activeTab === 'BOOKINGS' && styles.navLabelActive]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                 Bookings
               </Text>
             </TouchableOpacity>
@@ -1945,7 +2182,7 @@ function MainApp() {
                   strokeWidth={activeTab === 'CONTRACTOR' ? 2.5 : 2}
                 />
               </View>
-              <Text style={[styles.navLabel, activeTab === 'CONTRACTOR' && styles.navLabelActive]} numberOfLines={1}>
+              <Text style={[styles.navLabel, activeTab === 'CONTRACTOR' && styles.navLabelActive]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                 Contractor
               </Text>
             </TouchableOpacity>
@@ -1963,7 +2200,7 @@ function MainApp() {
                   strokeWidth={activeTab === 'PROFILE' ? 2.5 : 2}
                 />
               </View>
-              <Text style={[styles.navLabel, activeTab === 'PROFILE' && styles.navLabelActive]} numberOfLines={1}>
+              <Text style={[styles.navLabel, activeTab === 'PROFILE' && styles.navLabelActive]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                 Profile
               </Text>
             </TouchableOpacity>
@@ -1983,7 +2220,7 @@ function MainApp() {
                   strokeWidth={activeTab === 'HOME' ? 2.5 : 2}
                 />
               </View>
-              <Text style={[styles.navLabel, activeTab === 'HOME' && styles.navLabelActive]} numberOfLines={1}>
+              <Text style={[styles.navLabel, activeTab === 'HOME' && styles.navLabelActive]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                 Home
               </Text>
             </TouchableOpacity>
@@ -2004,7 +2241,7 @@ function MainApp() {
                   <View style={styles.navAlertDot} />
                 )}
               </View>
-              <Text style={[styles.navLabel, activeTab === 'ALERTS' && styles.navLabelActive]} numberOfLines={1}>
+              <Text style={[styles.navLabel, activeTab === 'ALERTS' && styles.navLabelActive]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                 Alerts
               </Text>
             </TouchableOpacity>
@@ -2022,7 +2259,7 @@ function MainApp() {
                   strokeWidth={activeTab === 'BOOKINGS' ? 2.5 : 2}
                 />
               </View>
-              <Text style={[styles.navLabel, activeTab === 'BOOKINGS' && styles.navLabelActive]} numberOfLines={1}>
+              <Text style={[styles.navLabel, activeTab === 'BOOKINGS' && styles.navLabelActive]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                 Bookings
               </Text>
             </TouchableOpacity>
@@ -2040,7 +2277,7 @@ function MainApp() {
                   strokeWidth={activeTab === 'EARNINGS' ? 2.5 : 2}
                 />
               </View>
-              <Text style={[styles.navLabel, activeTab === 'EARNINGS' && styles.navLabelActive]} numberOfLines={1}>
+              <Text style={[styles.navLabel, activeTab === 'EARNINGS' && styles.navLabelActive]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                 Earnings
               </Text>
             </TouchableOpacity>
@@ -2058,7 +2295,7 @@ function MainApp() {
                   strokeWidth={activeTab === 'PROFILE' ? 2.5 : 2}
                 />
               </View>
-              <Text style={[styles.navLabel, activeTab === 'PROFILE' && styles.navLabelActive]} numberOfLines={1}>
+              <Text style={[styles.navLabel, activeTab === 'PROFILE' && styles.navLabelActive]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                 Profile
               </Text>
             </TouchableOpacity>
@@ -2286,6 +2523,98 @@ function MainApp() {
                 <Text style={styles.modalPublishBtnText}>Submit Verified Review ⭐</Text>
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ─── FLOATING NOTIFICATION CENTER MODAL ─── */}
+      <NotificationCenterModal
+        visible={showNotifModal}
+        onClose={() => setShowNotifModal(false)}
+        notifications={notifications}
+        onDismissItem={(id) => setNotifications((prev) => prev.filter((n) => n.id !== id))}
+        onClearAll={() => setNotifications([])}
+      />
+
+      {/* ─── TAX INVOICES & RECEIPTS MODAL ─── */}
+      <Modal visible={showInvoicesModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { maxHeight: '80%', paddingBottom: Math.max(insets.bottom + 20, 24) }]}>
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={styles.modalStepBadge}>OFFICIAL GST RECORDS</Text>
+                <Text style={styles.modalTitle}>Tax Invoices & Receipts</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.modalCloseBtn}
+                onPress={() => setShowInvoicesModal(false)}
+              >
+                <X size={20} color="#0F172A" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ marginTop: 12 }}>
+              {[
+                {
+                  id: 'INV-2026-089',
+                  workerName: 'Ram Singh Mistri',
+                  skill: 'Mason',
+                  date: '12 Nov 2026',
+                  totalAmount: 1098,
+                  workerFee: 950,
+                  platformFee: 99,
+                  txFee: 49,
+                },
+                {
+                  id: 'INV-2026-064',
+                  workerName: 'Mukesh Sharma',
+                  skill: 'Electrician',
+                  date: '04 Nov 2026',
+                  totalAmount: 994,
+                  workerFee: 850,
+                  platformFee: 99,
+                  txFee: 45,
+                },
+              ].map((inv) => (
+                <View
+                  key={inv.id}
+                  style={{
+                    backgroundColor: '#F8FAFC',
+                    borderRadius: 14,
+                    padding: 14,
+                    marginBottom: 10,
+                    borderWidth: 1,
+                    borderColor: '#E2E8F0',
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={{ fontFamily: 'Satoshi-Bold', fontSize: 14, color: '#0F172A' }}>{inv.id}</Text>
+                    <Text style={{ fontFamily: 'Satoshi-Bold', fontSize: 14, color: '#16A34A' }}>₹{inv.totalAmount}</Text>
+                  </View>
+                  <Text style={{ fontFamily: 'Satoshi-Medium', fontSize: 12, color: '#64748B', marginTop: 3 }}>
+                    {inv.workerName} • {inv.skill} • {inv.date}
+                  </Text>
+                  <TouchableOpacity
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6,
+                      backgroundColor: '#4F46E5',
+                      borderRadius: 10,
+                      paddingVertical: 8,
+                      marginTop: 10,
+                    }}
+                    onPress={() => InvoiceService.downloadInvoicePdf(inv)}
+                  >
+                    <Download size={14} color="#FFFFFF" />
+                    <Text style={{ fontFamily: 'Satoshi-Bold', fontSize: 12, color: '#FFFFFF' }}>
+                      Download Official Tax Invoice PDF
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -2693,13 +3022,25 @@ function ReviewsScreen({ t, insets, reviews, onOpenWriteReview }) {
 // =================================================================
 // SUB-SCREEN D: PROFILE SCREEN (ChoosingHer Settings Reference)
 // =================================================================
-function ProfileScreen({ t, role, lang, insets, onSwitchRole, onSwitchLang, onLogout }) {
+function ProfileScreen({ t, role, lang, isDev, insets, onSwitchRole, onSwitchLang, onOpenInvoices, onLogout }) {
   const currentLangLabel = {
     en: 'English',
     hi: 'हिंदी (Hindi)',
     gu: 'ગુજરાતી (Gujarati)',
     mr: 'मराठी (Marathi)',
   }[lang];
+
+  const handleRoleSwitchPress = () => {
+    if (!isDev) {
+      Alert.alert(
+        'Role Locked 🔒',
+        `Your account is registered as ${role === 'CUSTOMER' ? 'Customer' : 'Mistri Worker'}. Switching roles is locked in production.\n\nTo test other roles, please log in with Developer Mode.`,
+        [{ text: 'Understood' }]
+      );
+    } else {
+      onSwitchRole();
+    }
+  };
 
   return (
     <SafeAreaView style={styles.profileSafeArea}>
@@ -2740,14 +3081,14 @@ function ProfileScreen({ t, role, lang, insets, onSwitchRole, onSwitchLang, onLo
         {/* Settings Clean Rows (ChoosingHer exact layout) */}
         <View style={styles.settingsGroupCard}>
           {/* 1. Switch Role Persona */}
-          <TouchableOpacity style={styles.settingsRow} onPress={onSwitchRole} activeOpacity={0.7}>
+          <TouchableOpacity style={styles.settingsRow} onPress={handleRoleSwitchPress} activeOpacity={0.7}>
             <View style={[styles.settingsRowIconWrap, { backgroundColor: '#EEF2FF' }]}>
               <RotateCcw size={18} color="#4F46E5" />
             </View>
             <View style={styles.settingsRowTextCol}>
               <Text style={styles.settingsRowLabel}>{t.switchRole}</Text>
               <Text style={styles.settingsRowSub}>
-                Current: {role === 'CUSTOMER' ? 'Customer Mode' : 'Worker Mode'}
+                Current: {role === 'CUSTOMER' ? 'Customer Mode' : 'Worker Mode'} {isDev ? '• (Dev Mode)' : '• (Locked)'}
               </Text>
             </View>
             <ChevronRight size={18} color="#94A3B8" />
@@ -2785,18 +3126,18 @@ function ProfileScreen({ t, role, lang, insets, onSwitchRole, onSwitchLang, onLo
 
           <View style={styles.settingsRowDivider} />
 
-          {/* 4. Payment History */}
+          {/* 4. Tax Invoices & Receipts */}
           <TouchableOpacity
             style={styles.settingsRow}
-            onPress={() => Alert.alert('Payments', 'All payments and GST invoices are recorded.')}
+            onPress={onOpenInvoices}
             activeOpacity={0.7}
           >
             <View style={[styles.settingsRowIconWrap, { backgroundColor: '#FEF3C7' }]}>
-              <CreditCard size={18} color="#D97706" />
+              <FileText size={18} color="#D97706" />
             </View>
             <View style={styles.settingsRowTextCol}>
-              <Text style={styles.settingsRowLabel}>{t.manageSub}</Text>
-              <Text style={styles.settingsRowSub}>Wallet balance: ₹2,450</Text>
+              <Text style={styles.settingsRowLabel}>Tax Invoices & Receipts</Text>
+              <Text style={styles.settingsRowSub}>Download official GST PDF invoices</Text>
             </View>
             <ChevronRight size={18} color="#94A3B8" />
           </TouchableOpacity>
@@ -3340,15 +3681,15 @@ const styles = StyleSheet.create({
   // BOTTOM NAVIGATION CAPSULE (FIONIX DOCK)
   bottomNavCapsule: {
     position: 'absolute',
-    left: 16,
-    right: 16,
+    left: 10,
+    right: 10,
     height: 64,
     backgroundColor: '#FFFFFF',
     borderRadius: 32,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-evenly',
-    paddingHorizontal: 4,
+    paddingHorizontal: 6,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.12,
@@ -3360,13 +3701,11 @@ const styles = StyleSheet.create({
   },
   navItem: {
     flex: 1,
-    flexBasis: 0,
-    width: '20%',
-    maxWidth: '20%',
     alignItems: 'center',
     justifyContent: 'center',
     height: '100%',
     paddingVertical: 4,
+    paddingHorizontal: 1,
   },
   navIconBox: {
     width: 34,
@@ -3389,11 +3728,11 @@ const styles = StyleSheet.create({
   },
   navLabel: {
     fontFamily: 'Satoshi-Medium',
-    fontSize: 10,
+    fontSize: 9.5,
     color: '#94A3B8',
     marginTop: 2,
     textAlign: 'center',
-    letterSpacing: -0.3,
+    letterSpacing: -0.2,
   },
   navLabelActive: {
     color: '#4F46E5',

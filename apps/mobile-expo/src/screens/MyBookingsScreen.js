@@ -2,130 +2,171 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
+  StyleSheet,
   ScrollView,
   TouchableOpacity,
-  StyleSheet,
   Alert,
-  StatusBar,
+  Modal,
+  TextInput,
+  Linking,
 } from 'react-native';
 import {
   Calendar,
   Clock,
   MapPin,
   Phone,
+  RotateCcw,
   CheckCircle2,
   XCircle,
-  RotateCcw,
   Star,
   FileText,
   ChevronRight,
   ShieldCheck,
   Plus,
+  RefreshCw,
+  ArrowRight,
+  Check,
+  Download,
+  AlertCircle,
+  UserCheck,
 } from 'lucide-react-native';
-import { MOCK_BOOKINGS } from '../data/mockWorkers';
+import { InvoiceService } from '../services/invoiceService';
 
-export default function MyBookingsScreen({ insets, onNavigateTab }) {
+const TRACK_STEPS = [
+  { step: 1, title: 'Approved', hindi: 'स्वीकृत' },
+  { step: 2, title: 'Arrived at Site', hindi: 'साइट पर पहुंचे' },
+  { step: 3, title: 'Work in Progress', hindi: 'काम चालू' },
+  { step: 4, title: 'Work Completed', hindi: 'काम पूरा हुआ' },
+];
+
+export default function MyBookingsScreen({
+  insets,
+  onNavigateTab,
+  bookings = [],
+  onAutoAssignAnother,
+  onRefundBooking,
+  onSubmitReview,
+}) {
   const [activeTab, setActiveTab] = useState('active'); // 'active' | 'completed' | 'cancelled'
-  const [bookingsList, setBookingsList] = useState(MOCK_BOOKINGS);
+  
+  // Track Work Modal
+  const [trackingBooking, setTrackingBooking] = useState(null);
 
-  const filteredBookings = bookingsList.filter((b) => b.status === activeTab);
+  // Review Modal
+  const [reviewBooking, setReviewBooking] = useState(null);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewText, setReviewText] = useState('');
+
+  // Filter bookings based on active tab
+  const filteredBookings = bookings.filter((b) => {
+    const s = (b.status || '').toLowerCase();
+    if (activeTab === 'active') {
+      return s === 'active' || s === 'waiting_confirmation' || s === 'confirmed' || s === 'in_progress';
+    }
+    if (activeTab === 'completed') {
+      return s === 'completed';
+    }
+    if (activeTab === 'cancelled') {
+      return s === 'cancelled' || s === 'rejected' || s === 'refunded';
+    }
+    return true;
+  });
 
   const getStatusCounts = () => {
-    const active = bookingsList.filter((b) => b.status === 'active').length;
-    const completed = bookingsList.filter((b) => b.status === 'completed').length;
-    const cancelled = bookingsList.filter((b) => b.status === 'cancelled').length;
+    const active = bookings.filter((b) => {
+      const s = (b.status || '').toLowerCase();
+      return s === 'active' || s === 'waiting_confirmation' || s === 'confirmed' || s === 'in_progress';
+    }).length;
+    const completed = bookings.filter((b) => (b.status || '').toLowerCase() === 'completed').length;
+    const cancelled = bookings.filter((b) => {
+      const s = (b.status || '').toLowerCase();
+      return s === 'cancelled' || s === 'rejected' || s === 'refunded';
+    }).length;
     return { active, completed, cancelled };
   };
 
   const counts = getStatusCounts();
 
-  const handleAction = (booking, action) => {
-    if (action === 'call') {
-      Alert.alert('Calling Worker', `Dialing ${booking.workerName}...`);
-    } else if (action === 'track') {
+  // Call worker (only when booking is confirmed)
+  const handleCall = (booking) => {
+    const s = (booking.status || '').toLowerCase();
+    if (s === 'waiting_confirmation') {
       Alert.alert(
-        'Live Job Tracking',
-        `Job: ${booking.title}\nWorker: ${booking.workerName}\nSite: ${booking.location}\nStatus: Work in progress (Day 2 of ${booking.duration})`
+        'Waiting for Confirmation',
+        'Direct phone number will unlock as soon as the mistri accepts your booking request.'
       );
-    } else if (action === 'review') {
-      Alert.alert('Rate & Review', `Leave a 5-star review for ${booking.workerName}?`, [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Submit 5 ★', onPress: () => Alert.alert('Thank You!', 'Review submitted successfully.') },
-      ]);
-    } else if (action === 'rebook') {
-      Alert.alert('Rebooking', `Creating new booking with ${booking.workerName}...`, [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Confirm',
-          onPress: () => {
-            const newBooking = {
-              ...booking,
-              id: `B-${Date.now().toString().slice(-3)}`,
-              status: 'active',
-              date: 'Tomorrow, 9:00 AM',
-            };
-            setBookingsList([newBooking, ...bookingsList]);
-            setActiveTab('active');
-            Alert.alert('Success', 'Worker rebooked for tomorrow!');
-          },
-        },
-      ]);
+      return;
     }
+    const phone = booking.worker_phone || booking.workerPhone;
+    if (phone) {
+      const cleaned = phone.replace(/[^0-9+]/g, '');
+      Linking.openURL(`tel:${cleaned}`).catch(() => {
+        Alert.alert('Call Mistri', `Calling ${booking.worker_name || booking.workerName} at ${phone}`);
+      });
+    } else {
+      Alert.alert('Calling Mistri', 'Connecting you via Mistri Pro secure dialer...');
+    }
+  };
+
+  // Submit Rating & Review
+  const handleSendReview = () => {
+    if (!reviewBooking) return;
+    if (onSubmitReview) {
+      onSubmitReview(reviewBooking.id, reviewRating, reviewText);
+    }
+    Alert.alert('Thank You! ⭐', 'Your verified rating and review have been saved.');
+    setReviewBooking(null);
+    setReviewText('');
+    setReviewRating(5);
+  };
+
+  // Download PDF Invoice
+  const handleDownloadInvoice = (booking) => {
+    InvoiceService.downloadInvoicePdf(booking);
   };
 
   return (
     <View style={[styles.container, { paddingTop: insets?.top || 0 }]}>
-      <StatusBar barStyle="dark-content" backgroundColor="#F6F7FB" />
-
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeftCol}>
           <Text style={styles.headerTitle}>My Bookings</Text>
-          <Text style={styles.headerSub} numberOfLines={1}>
-            Track your daily labour & contractor bookings
+          <Text style={styles.headerSubtitle}>
+            Track all active jobs, site visits & escrow payments
           </Text>
         </View>
+
         <TouchableOpacity
           style={styles.newBookingBtn}
-          onPress={() => onNavigateTab && onNavigateTab('HOME')}
-          activeOpacity={0.8}
+          onPress={() => onNavigateTab && onNavigateTab('FIND_WORKERS')}
+          activeOpacity={0.85}
         >
-          <Plus size={15} color="#FFFFFF" strokeWidth={2.5} />
+          <Plus size={15} color="#FFFFFF" />
           <Text style={styles.newBookingBtnText}>Book Mistri</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Status Filter Tabs */}
-      <View style={styles.tabBar}>
-        <TouchableOpacity
-          style={[styles.tabItem, activeTab === 'active' && styles.tabItemActive]}
-          onPress={() => setActiveTab('active')}
-          activeOpacity={0.8}
-        >
-          <Text style={[styles.tabText, activeTab === 'active' && styles.tabTextActive]}>
-            Active ({counts.active})
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.tabItem, activeTab === 'completed' && styles.tabItemActive]}
-          onPress={() => setActiveTab('completed')}
-          activeOpacity={0.8}
-        >
-          <Text style={[styles.tabText, activeTab === 'completed' && styles.tabTextActive]}>
-            Completed ({counts.completed})
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.tabItem, activeTab === 'cancelled' && styles.tabItemActive]}
-          onPress={() => setActiveTab('cancelled')}
-          activeOpacity={0.8}
-        >
-          <Text style={[styles.tabText, activeTab === 'cancelled' && styles.tabTextActive]}>
-            Cancelled ({counts.cancelled})
-          </Text>
-        </TouchableOpacity>
+      {/* Tabs */}
+      <View style={styles.tabContainer}>
+        {[
+          { key: 'active', label: `Active (${counts.active})` },
+          { key: 'completed', label: `Completed (${counts.completed})` },
+          { key: 'cancelled', label: `Cancelled (${counts.cancelled})` },
+        ].map((tabItem) => {
+          const isActive = activeTab === tabItem.key;
+          return (
+            <TouchableOpacity
+              key={tabItem.key}
+              style={[styles.tabButton, isActive && styles.tabButtonActive]}
+              onPress={() => setActiveTab(tabItem.key)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.tabButtonText, isActive && styles.tabButtonTextActive]}>
+                {tabItem.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
       {/* Bookings List */}
@@ -144,13 +185,13 @@ export default function MyBookingsScreen({ insets, onNavigateTab }) {
             <Text style={styles.emptyTitle}>No {activeTab} bookings</Text>
             <Text style={styles.emptySub}>
               {activeTab === 'active'
-                ? 'You have no ongoing or upcoming bookings. Hire a mistri today!'
+                ? 'You have no ongoing or upcoming bookings. Book a verified mistri today!'
                 : `You don't have any ${activeTab} bookings.`}
             </Text>
             {activeTab === 'active' && (
               <TouchableOpacity
                 style={styles.emptyActionBtn}
-                onPress={() => onNavigateTab && onNavigateTab('HOME')}
+                onPress={() => onNavigateTab && onNavigateTab('FIND_WORKERS')}
                 activeOpacity={0.85}
               >
                 <Text style={styles.emptyActionBtnText}>Find Available Workers</Text>
@@ -158,131 +199,358 @@ export default function MyBookingsScreen({ insets, onNavigateTab }) {
             )}
           </View>
         ) : (
-          filteredBookings.map((booking) => (
-            <View key={booking.id} style={styles.bookingCard}>
-              {/* Card Top */}
-              <View style={styles.cardHeader}>
-                <View style={styles.workerRow}>
-                  <View style={[styles.workerAvatar, { backgroundColor: booking.workerColor }]}>
-                    <Text style={styles.avatarText}>{booking.workerAvatar}</Text>
-                  </View>
-                  <View style={styles.workerMeta}>
-                    <View style={styles.workerNameRow}>
+          filteredBookings.map((booking) => {
+            const rawStatus = (booking.status || 'active').toLowerCase();
+            const isWaiting = rawStatus === 'waiting_confirmation';
+            const isConfirmed = rawStatus === 'confirmed' || rawStatus === 'active';
+            const isRejected = rawStatus === 'rejected';
+            const isCompleted = rawStatus === 'completed';
+            const isRefunded = rawStatus === 'refunded';
+
+            const workerName = booking.worker_name || booking.workerName || 'Assigned Mistri';
+            const workerAvatar = booking.workerAvatar || workerName.slice(0, 2).toUpperCase();
+            const workerColor = booking.workerColor || '#4F46E5';
+            const category = booking.worker_skill || booking.category || 'General Labour';
+            const title = booking.title || `${category} Service`;
+            const location = booking.site_location || booking.location || 'Sawai Madhopur, Rajasthan';
+            const date = booking.scheduled_date || booking.date || 'Today, Immediate';
+            const amount = booking.total_amount ? `₹${booking.total_amount}` : (booking.amount || '₹1,098');
+            const currentStep = booking.progress_step || booking.step || 1;
+
+            return (
+              <View key={booking.id || booking.booking_code} style={styles.bookingCard}>
+                {/* Card Top */}
+                <View style={styles.cardHeader}>
+                  <View style={styles.workerRow}>
+                    <View style={[styles.workerAvatar, { backgroundColor: workerColor }]}>
+                      <Text style={styles.avatarText}>{workerAvatar}</Text>
+                    </View>
+                    <View style={styles.workerMeta}>
                       <Text style={styles.workerName} numberOfLines={1}>
-                        {booking.workerName}
+                        {workerName}
                       </Text>
-                      <View style={styles.kycBadge}>
-                        <ShieldCheck size={10} color="#15803D" />
-                        <Text style={styles.kycText}>Verified</Text>
+                      <View style={styles.categorySubRow}>
+                        <Text style={styles.categoryPillText}>{category}</Text>
+                        <View style={styles.subDot} />
+                        <View style={styles.kycBadge}>
+                          <ShieldCheck size={10} color="#15803D" />
+                          <Text style={styles.kycText}>Verified</Text>
+                        </View>
                       </View>
                     </View>
-                    <Text style={styles.categoryPillText}>{booking.category}</Text>
                   </View>
-                </View>
 
-                {/* Status Indicator Pill */}
-                <View
-                  style={[
-                    styles.statusPill,
-                    booking.status === 'active' && styles.statusPillActive,
-                    booking.status === 'completed' && styles.statusPillCompleted,
-                    booking.status === 'cancelled' && styles.statusPillCancelled,
-                  ]}
-                >
-                  {booking.status === 'active' && <View style={styles.activeDot} />}
-                  {booking.status === 'completed' && <CheckCircle2 size={12} color="#15803D" />}
-                  {booking.status === 'cancelled' && <XCircle size={12} color="#DC2626" />}
-                  <Text
+                  {/* Status Indicator Pill */}
+                  <View
                     style={[
-                      styles.statusPillLabel,
-                      booking.status === 'active' && styles.statusLabelActive,
-                      booking.status === 'completed' && styles.statusLabelCompleted,
-                      booking.status === 'cancelled' && styles.statusLabelCancelled,
+                      styles.statusPill,
+                      isWaiting && styles.statusPillWaiting,
+                      isConfirmed && styles.statusPillActive,
+                      isCompleted && styles.statusPillCompleted,
+                      (isRejected || rawStatus === 'cancelled') && styles.statusPillCancelled,
+                      isRefunded && styles.statusPillRefunded,
                     ]}
                   >
-                    {booking.status.toUpperCase()}
-                  </Text>
+                    {isWaiting && <Clock size={11} color="#D97706" />}
+                    {isConfirmed && <View style={styles.activeDot} />}
+                    {isCompleted && <CheckCircle2 size={12} color="#15803D" />}
+                    {(isRejected || rawStatus === 'cancelled') && <XCircle size={12} color="#DC2626" />}
+                    {isRefunded && <RotateCcw size={12} color="#7C3AED" />}
+                    <Text
+                      style={[
+                        styles.statusPillLabel,
+                        isWaiting && { color: '#B45309' },
+                        isConfirmed && styles.statusLabelActive,
+                        isCompleted && styles.statusLabelCompleted,
+                        (isRejected || rawStatus === 'cancelled') && styles.statusLabelCancelled,
+                        isRefunded && { color: '#6D28D9' },
+                      ]}
+                    >
+                      {isWaiting
+                        ? 'WAITING CONFIRMATION'
+                        : isConfirmed
+                        ? 'CONFIRMED'
+                        : isRejected
+                        ? 'MISTRI BUSY'
+                        : isRefunded
+                        ? 'REFUNDED'
+                        : rawStatus.toUpperCase()}
+                    </Text>
+                  </View>
                 </View>
-              </View>
 
-              {/* Booking Title */}
-              <Text style={styles.bookingTitle}>{booking.title}</Text>
+                {/* Booking Title */}
+                <Text style={styles.bookingTitle}>{title}</Text>
 
-              {/* Info Rows */}
-              <View style={styles.infoBox}>
-                <View style={styles.infoRow}>
-                  <MapPin size={14} color="#64748B" />
-                  <Text style={styles.infoText} numberOfLines={1}>
-                    {booking.location}
-                  </Text>
+                {/* Waiting confirmation notice */}
+                {isWaiting && (
+                  <View style={styles.waitingBanner}>
+                    <Clock size={14} color="#D97706" />
+                    <Text style={styles.waitingBannerText}>
+                      Waiting for {workerName} to confirm request. Escrow deposit is locked safely.
+                    </Text>
+                  </View>
+                )}
+
+                {/* Rejected Banner with 2 Options */}
+                {isRejected && (
+                  <View style={styles.rejectedBanner}>
+                    <AlertCircle size={15} color="#DC2626" />
+                    <View style={styles.rejectedTextCol}>
+                      <Text style={styles.rejectedTitle}>Mistri is Currently Busy</Text>
+                      <Text style={styles.rejectedSub}>
+                        {workerName} cannot take this job right now. Choose how you would like to proceed:
+                      </Text>
+
+                      <View style={styles.rejectedActionsRow}>
+                        <TouchableOpacity
+                          style={styles.autoAssignBtn}
+                          onPress={() => onAutoAssignAnother && onAutoAssignAnother(booking)}
+                          activeOpacity={0.85}
+                        >
+                          <UserCheck size={14} color="#FFFFFF" />
+                          <Text style={styles.autoAssignBtnText}>Auto-Assign Nearby Mistri</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={styles.refundBtn}
+                          onPress={() => onRefundBooking && onRefundBooking(booking)}
+                          activeOpacity={0.85}
+                        >
+                          <RotateCcw size={14} color="#B91C1C" />
+                          <Text style={styles.refundBtnText}>Instant 100% Refund</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </View>
+                )}
+
+                {/* Info Rows */}
+                <View style={styles.infoBox}>
+                  <View style={styles.infoRow}>
+                    <MapPin size={14} color="#64748B" />
+                    <Text style={styles.infoText} numberOfLines={1}>
+                      {location}
+                    </Text>
+                  </View>
+                  <View style={styles.infoRow}>
+                    <Calendar size={14} color="#64748B" />
+                    <Text style={styles.infoText}>
+                      {date} • {booking.duration || '1 Day'}
+                    </Text>
+                    <View style={styles.durationBadge}>
+                      <ShieldCheck size={11} color="#4F46E5" />
+                      <Text style={styles.durationBadgeText}>Escrow Safe</Text>
+                    </View>
+                  </View>
                 </View>
-                <View style={styles.infoRow}>
-                  <Calendar size={14} color="#64748B" />
-                  <Text style={styles.infoText}>
-                    {booking.date} • {booking.time}
-                  </Text>
-                  <View style={styles.durationBadge}>
-                    <Clock size={11} color="#4F46E5" />
-                    <Text style={styles.durationBadgeText}>{booking.duration}</Text>
+
+                {/* Price & Actions Row */}
+                <View style={styles.cardFooter}>
+                  <View>
+                    <Text style={styles.amountLabel}>Total Escrow Paid</Text>
+                    <Text style={styles.amountValue}>{amount}</Text>
+                  </View>
+
+                  <View style={styles.actionsGroup}>
+                    {/* Confirmed / Active Actions */}
+                    {isConfirmed && (
+                      <>
+                        <TouchableOpacity
+                          style={styles.callSmallBtn}
+                          onPress={() => handleCall(booking)}
+                          activeOpacity={0.8}
+                        >
+                          <Phone size={14} color="#4F46E5" />
+                          <Text style={styles.callSmallText}>Call</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.primaryActionBtn}
+                          onPress={() => setTrackingBooking(booking)}
+                          activeOpacity={0.85}
+                        >
+                          <Text style={styles.primaryActionBtnText}>Track Work</Text>
+                          <ChevronRight size={14} color="#FFFFFF" />
+                        </TouchableOpacity>
+                      </>
+                    )}
+
+                    {/* Waiting actions */}
+                    {isWaiting && (
+                      <TouchableOpacity
+                        style={styles.primaryActionBtn}
+                        onPress={() => setTrackingBooking(booking)}
+                        activeOpacity={0.85}
+                      >
+                        <Text style={styles.primaryActionBtnText}>View Status</Text>
+                        <ChevronRight size={14} color="#FFFFFF" />
+                      </TouchableOpacity>
+                    )}
+
+                    {/* Completed actions: Rate + Invoice */}
+                    {isCompleted && (
+                      <View style={{ flexDirection: 'row', gap: 6 }}>
+                        <TouchableOpacity
+                          style={styles.invoiceBtn}
+                          onPress={() => handleDownloadInvoice(booking)}
+                          activeOpacity={0.85}
+                        >
+                          <Download size={13} color="#4F46E5" />
+                          <Text style={styles.invoiceBtnText}>Invoice</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={[styles.primaryActionBtn, { backgroundColor: '#059669' }]}
+                          onPress={() => setReviewBooking(booking)}
+                          activeOpacity={0.85}
+                        >
+                          <Star size={13} color="#FFFFFF" fill="#FFFFFF" />
+                          <Text style={styles.primaryActionBtnText}>Rate Mistri</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+
+                    {/* Cancelled / Rejected action: Rebook */}
+                    {(isRejected || rawStatus === 'cancelled') && (
+                      <TouchableOpacity
+                        style={styles.rebookBtn}
+                        onPress={() => onNavigateTab && onNavigateTab('FIND_WORKERS')}
+                        activeOpacity={0.85}
+                      >
+                        <RotateCcw size={13} color="#EA580C" />
+                        <Text style={styles.rebookBtnText}>Rebook</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 </View>
               </View>
-
-              {/* Price & Actions Row */}
-              <View style={styles.cardFooter}>
-                <View>
-                  <Text style={styles.amountLabel}>Total Escrow</Text>
-                  <Text style={styles.amountValue}>{booking.amount}</Text>
-                </View>
-
-                <View style={styles.actionsGroup}>
-                  {booking.status === 'active' && (
-                    <>
-                      <TouchableOpacity
-                        style={styles.callSmallBtn}
-                        onPress={() => handleAction(booking, 'call')}
-                        activeOpacity={0.8}
-                      >
-                        <Phone size={14} color="#4F46E5" />
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.primaryActionBtn}
-                        onPress={() => handleAction(booking, 'track')}
-                        activeOpacity={0.85}
-                      >
-                        <Text style={styles.primaryActionBtnText}>Track Work</Text>
-                        <ChevronRight size={14} color="#FFFFFF" />
-                      </TouchableOpacity>
-                    </>
-                  )}
-
-                  {booking.status === 'completed' && (
-                    <TouchableOpacity
-                      style={[styles.primaryActionBtn, { backgroundColor: '#059669' }]}
-                      onPress={() => handleAction(booking, 'review')}
-                      activeOpacity={0.85}
-                    >
-                      <Star size={14} color="#FFFFFF" fill="#FFFFFF" />
-                      <Text style={styles.primaryActionBtnText}>Rate Mistri</Text>
-                    </TouchableOpacity>
-                  )}
-
-                  {booking.status === 'cancelled' && (
-                    <TouchableOpacity
-                      style={styles.rebookBtn}
-                      onPress={() => handleAction(booking, 'rebook')}
-                      activeOpacity={0.85}
-                    >
-                      <RotateCcw size={14} color="#EA580C" />
-                      <Text style={styles.rebookBtnText}>Rebook</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </View>
-            </View>
-          ))
+            );
+          })
         )}
       </ScrollView>
+
+      {/* ─── LIVE WORK PROGRESS TRACKER MODAL ─── */}
+      <Modal visible={!!trackingBooking} transparent animationType="fade">
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={styles.modalTitle}>Live Job Progress Tracker</Text>
+                <Text style={styles.modalSub}>
+                  {trackingBooking?.worker_name || trackingBooking?.workerName} • {trackingBooking?.category}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setTrackingBooking(null)}>
+                <Text style={styles.modalCloseText}>Done</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Stepper Display */}
+            <View style={styles.trackerBox}>
+              {TRACK_STEPS.map((s, idx) => {
+                const current = trackingBooking?.progress_step || trackingBooking?.step || 1;
+                const isPassed = current >= s.step;
+                const isCurrent = current === s.step;
+
+                return (
+                  <View key={s.step} style={styles.trackerStepRow}>
+                    <View style={styles.stepIndicatorCol}>
+                      <View
+                        style={[
+                          styles.stepCircle,
+                          isPassed && styles.stepCirclePassed,
+                          isCurrent && styles.stepCircleCurrent,
+                        ]}
+                      >
+                        {isPassed ? (
+                          <Check size={12} color="#FFFFFF" strokeWidth={3} />
+                        ) : (
+                          <Text style={styles.stepNum}>{s.step}</Text>
+                        )}
+                      </View>
+                      {idx < TRACK_STEPS.length - 1 && (
+                        <View style={[styles.stepLine, isPassed && styles.stepLinePassed]} />
+                      )}
+                    </View>
+
+                    <View style={styles.stepTextCol}>
+                      <Text style={[styles.stepTitleText, isPassed && styles.stepTitlePassed]}>
+                        {s.title} ({s.hindi})
+                      </Text>
+                      <Text style={styles.stepDescText}>
+                        {s.step === 1 && 'Mistri has accepted your booking and is assigned to the site.'}
+                        {s.step === 2 && 'Mistri has arrived at your location and is inspecting the work.'}
+                        {s.step === 3 && 'Active construction & repair in progress onsite.'}
+                        {s.step === 4 && 'Work successfully completed. Escrow released.'}
+                      </Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+
+            {/* Contact Call Button */}
+            <TouchableOpacity
+              style={styles.modalCallBtn}
+              onPress={() => {
+                const b = trackingBooking;
+                setTrackingBooking(null);
+                handleCall(b);
+              }}
+              activeOpacity={0.85}
+            >
+              <Phone size={16} color="#FFFFFF" />
+              <Text style={styles.modalCallBtnText}>Call {trackingBooking?.worker_name || 'Mistri'}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ─── RATE & REVIEW MODAL ─── */}
+      <Modal visible={!!reviewBooking} transparent animationType="slide">
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={styles.modalTitle}>Rate Your Mistri Experience</Text>
+                <Text style={styles.modalSub}>{reviewBooking?.worker_name || 'Worker'} • {reviewBooking?.category}</Text>
+              </View>
+              <TouchableOpacity onPress={() => setReviewBooking(null)}>
+                <Text style={styles.modalCloseText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Star Selector */}
+            <View style={styles.starsSelectorRow}>
+              {[1, 2, 3, 4, 5].map((num) => (
+                <TouchableOpacity key={num} onPress={() => setReviewRating(num)}>
+                  <Star
+                    size={32}
+                    color={num <= reviewRating ? '#EAB308' : '#CBD5E1'}
+                    fill={num <= reviewRating ? '#EAB308' : 'transparent'}
+                  />
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={styles.ratingLabel}>{reviewRating} out of 5 Stars</Text>
+
+            {/* Comment */}
+            <TextInput
+              style={styles.reviewInput}
+              placeholder="Write your feedback regarding punctuality, skill quality, and cleanliness..."
+              placeholderTextColor="#94A3B8"
+              multiline
+              numberOfLines={4}
+              value={reviewText}
+              onChangeText={setReviewText}
+            />
+
+            <TouchableOpacity style={styles.submitReviewBtn} onPress={handleSendReview} activeOpacity={0.85}>
+              <Text style={styles.submitReviewBtnText}>Submit Verified Review</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -296,78 +564,74 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 14,
-    paddingBottom: 16,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 10,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
   },
   headerLeftCol: {
     flex: 1,
-    marginRight: 12,
+    marginRight: 10,
   },
   headerTitle: {
     fontFamily: 'Satoshi-Bold',
-    fontSize: 22,
+    fontSize: 20,
     color: '#0F172A',
   },
-  headerSub: {
+  headerSubtitle: {
     fontFamily: 'Satoshi-Regular',
-    fontSize: 12,
+    fontSize: 11.5,
     color: '#64748B',
     marginTop: 2,
   },
   newBookingBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 6,
     backgroundColor: '#4F46E5',
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
     flexShrink: 0,
   },
   newBookingBtnText: {
     fontFamily: 'Satoshi-Bold',
-    fontSize: 13,
+    fontSize: 12,
     color: '#FFFFFF',
   },
-  tabBar: {
+  tabContainer: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
-    gap: 10,
+    gap: 8,
   },
-  tabItem: {
+  tabButton: {
     flex: 1,
     paddingVertical: 8,
     borderRadius: 10,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#F1F5F9',
     alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
   },
-  tabItemActive: {
-    backgroundColor: '#4F46E5',
-    borderColor: '#4F46E5',
+  tabButtonActive: {
+    backgroundColor: '#0F172A',
   },
-  tabText: {
+  tabButtonText: {
     fontFamily: 'Satoshi-Medium',
-    fontSize: 13,
+    fontSize: 11.5,
     color: '#64748B',
   },
-  tabTextActive: {
-    color: '#FFFFFF',
+  tabButtonTextActive: {
     fontFamily: 'Satoshi-Bold',
+    color: '#FFFFFF',
   },
   scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingHorizontal: 16,
+    paddingTop: 14,
   },
   bookingCard: {
     backgroundColor: '#FFFFFF',
@@ -377,8 +641,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E2E8F0',
     shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
     shadowRadius: 6,
     elevation: 2,
   },
@@ -414,11 +678,33 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
   },
-  workerNameRow: {
+  categorySubRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    flexWrap: 'wrap',
+    marginTop: 2,
+  },
+  subDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: '#94A3B8',
+  },
+  rebookBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    borderWidth: 1.2,
+    borderColor: '#FDBA74',
+    backgroundColor: '#FFF7ED',
+  },
+  rebookBtnText: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 13,
+    color: '#EA580C',
   },
   workerName: {
     fontFamily: 'Satoshi-Bold',
@@ -457,6 +743,9 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     alignSelf: 'flex-start',
   },
+  statusPillWaiting: {
+    backgroundColor: '#FEF3C7',
+  },
   statusPillActive: {
     backgroundColor: '#EEF2FF',
   },
@@ -465,6 +754,9 @@ const styles = StyleSheet.create({
   },
   statusPillCancelled: {
     backgroundColor: '#FEE2E2',
+  },
+  statusPillRefunded: {
+    backgroundColor: '#EDE9FE',
   },
   activeDot: {
     width: 6,
@@ -475,7 +767,7 @@ const styles = StyleSheet.create({
   statusPillLabel: {
     fontFamily: 'Satoshi-Bold',
     fontSize: 10,
-    letterSpacing: 0.5,
+    letterSpacing: 0.4,
   },
   statusLabelActive: {
     color: '#4F46E5',
@@ -488,25 +780,102 @@ const styles = StyleSheet.create({
   },
   bookingTitle: {
     fontFamily: 'Satoshi-Bold',
-    fontSize: 16,
+    fontSize: 15,
     color: '#0F172A',
     marginBottom: 10,
+  },
+  waitingBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FEF3C7',
+    padding: 10,
+    borderRadius: 10,
+    marginBottom: 10,
+  },
+  waitingBannerText: {
+    fontFamily: 'Satoshi-Medium',
+    fontSize: 11.5,
+    color: '#92400E',
+    flex: 1,
+  },
+  rejectedBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+  },
+  rejectedTextCol: {
+    flex: 1,
+  },
+  rejectedTitle: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 13,
+    color: '#B91C1C',
+  },
+  rejectedSub: {
+    fontFamily: 'Satoshi-Regular',
+    fontSize: 11.5,
+    color: '#991B1B',
+    marginTop: 2,
+    lineHeight: 16,
+  },
+  rejectedActionsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 10,
+    flexWrap: 'wrap',
+  },
+  autoAssignBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#15803D',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 8,
+  },
+  autoAssignBtnText: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 11.5,
+    color: '#FFFFFF',
+  },
+  refundBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 8,
+  },
+  refundBtnText: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 11.5,
+    color: '#B91C1C',
   },
   infoBox: {
     backgroundColor: '#F8FAFC',
     borderRadius: 12,
     padding: 10,
-    gap: 8,
-    marginBottom: 14,
+    marginBottom: 12,
+    gap: 6,
   },
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   infoText: {
     fontFamily: 'Satoshi-Regular',
-    fontSize: 13,
+    fontSize: 12,
     color: '#475569',
     flex: 1,
   },
@@ -528,7 +897,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 8,
+    paddingTop: 10,
     borderTopWidth: 1,
     borderTopColor: '#F1F5F9',
   },
@@ -538,7 +907,7 @@ const styles = StyleSheet.create({
     color: '#64748B',
   },
   amountValue: {
-    fontFamily: 'Satoshi-Bold',
+    fontFamily: 'Satoshi-Black',
     fontSize: 17,
     color: '#0F172A',
   },
@@ -548,84 +917,243 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   callSmallBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#EEF2FF',
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: '#EEF2FF',
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  callSmallText: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 11.5,
+    color: '#4F46E5',
   },
   primaryActionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
     backgroundColor: '#4F46E5',
-    paddingHorizontal: 14,
-    height: 36,
-    borderRadius: 18,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 8,
   },
   primaryActionBtnText: {
     fontFamily: 'Satoshi-Bold',
-    fontSize: 13,
+    fontSize: 12,
     color: '#FFFFFF',
   },
-  rebookBtn: {
+  invoiceBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#FFF7ED',
+    backgroundColor: '#EEF2FF',
     borderWidth: 1,
-    borderColor: '#FED7AA',
-    paddingHorizontal: 14,
-    height: 36,
-    borderRadius: 18,
+    borderColor: '#C7D2FE',
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 8,
   },
-  rebookBtnText: {
+  invoiceBtnText: {
     fontFamily: 'Satoshi-Bold',
-    fontSize: 13,
-    color: '#EA580C',
+    fontSize: 11.5,
+    color: '#4F46E5',
   },
   emptyContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    padding: 32,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    marginTop: 20,
+    justifyContent: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 24,
   },
   emptyIconCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   emptyTitle: {
     fontFamily: 'Satoshi-Bold',
-    fontSize: 17,
+    fontSize: 16,
     color: '#0F172A',
-    marginBottom: 6,
   },
   emptySub: {
     fontFamily: 'Satoshi-Regular',
-    fontSize: 13,
+    fontSize: 12.5,
     color: '#64748B',
     textAlign: 'center',
+    marginTop: 4,
     lineHeight: 18,
-    marginBottom: 20,
   },
   emptyActionBtn: {
+    marginTop: 16,
     backgroundColor: '#4F46E5',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     borderRadius: 12,
   },
   emptyActionBtnText: {
     fontFamily: 'Satoshi-Bold',
+    fontSize: 12.5,
+    color: '#FFFFFF',
+  },
+
+  /* Modals */
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.55)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalSheet: {
+    width: '100%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 22,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 6,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 16,
+    color: '#0F172A',
+  },
+  modalSub: {
+    fontFamily: 'Satoshi-Regular',
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  modalCloseText: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 13,
+    color: '#4F46E5',
+  },
+  trackerBox: {
+    marginVertical: 10,
+  },
+  trackerStepRow: {
+    flexDirection: 'row',
+    gap: 12,
+    minHeight: 52,
+  },
+  stepIndicatorCol: {
+    alignItems: 'center',
+    width: 24,
+  },
+  stepCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepCirclePassed: {
+    backgroundColor: '#16A34A',
+  },
+  stepCircleCurrent: {
+    backgroundColor: '#4F46E5',
+    borderWidth: 2,
+    borderColor: '#C7D2FE',
+  },
+  stepNum: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 10,
+    color: '#64748B',
+  },
+  stepLine: {
+    width: 2,
+    flex: 1,
+    backgroundColor: '#E2E8F0',
+    marginVertical: 2,
+  },
+  stepLinePassed: {
+    backgroundColor: '#16A34A',
+  },
+  stepTextCol: {
+    flex: 1,
+    paddingBottom: 14,
+  },
+  stepTitleText: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 13,
+    color: '#64748B',
+  },
+  stepTitlePassed: {
+    color: '#0F172A',
+  },
+  stepDescText: {
+    fontFamily: 'Satoshi-Regular',
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  modalCallBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#2563EB',
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginTop: 10,
+  },
+  modalCallBtnText: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 13.5,
+    color: '#FFFFFF',
+  },
+  starsSelectorRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 10,
+    marginVertical: 14,
+  },
+  ratingLabel: {
+    fontFamily: 'Satoshi-Bold',
     fontSize: 14,
+    color: '#0F172A',
+    textAlign: 'center',
+    marginBottom: 14,
+  },
+  reviewInput: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 12,
+    padding: 12,
+    fontFamily: 'Satoshi-Regular',
+    fontSize: 13,
+    color: '#0F172A',
+    minHeight: 80,
+    textAlignVertical: 'top',
+    marginBottom: 16,
+  },
+  submitReviewBtn: {
+    backgroundColor: '#059669',
+    paddingVertical: 13,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  submitReviewBtnText: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 13.5,
     color: '#FFFFFF',
   },
 });

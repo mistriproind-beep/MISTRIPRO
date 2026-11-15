@@ -45,7 +45,7 @@ function RatingStars({ rating }) {
   return <View style={styles.starsRow}>{stars}</View>;
 }
 
-function WorkerCard({ worker, isSelected, onSelect }) {
+function WorkerCard({ worker, isSelected, onSelect, onOpenProfile, onProceedBooking }) {
   return (
     <TouchableOpacity
       style={[styles.workerCard, isSelected && styles.workerCardSelected]}
@@ -93,22 +93,16 @@ function WorkerCard({ worker, isSelected, onSelect }) {
         <View style={styles.workerActions}>
           <TouchableOpacity
             style={styles.viewProfileBtn}
-            onPress={() =>
-              Alert.alert(
-                worker.name,
-                `Trade: ${worker.skill}\nExperience: ${worker.exp} years\nRate: ₹${worker.rate}/day\nLocation: Near your GPS location\nStatus: Available for instant deployment.`
-              )
-            }
+            onPress={() => onOpenProfile && onOpenProfile(worker)}
           >
             <User size={13} color="#4F46E5" />
             <Text style={styles.viewProfileText}>Profile</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={styles.callBtn}
-            onPress={() => Linking.openURL(`tel:${worker.phone}`)}
+            style={styles.bookActionBtn}
+            onPress={() => onProceedBooking && onProceedBooking(worker)}
           >
-            <Phone size={13} color="#FFFFFF" />
-            <Text style={styles.callText}>Call Now</Text>
+            <Text style={styles.bookActionText}>Book</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -116,13 +110,17 @@ function WorkerCard({ worker, isSelected, onSelect }) {
   );
 }
 
-export default function FindWorkersScreen({ insets }) {
+export default function FindWorkersScreen({ insets, onBookWorker, onNavigateTab }) {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedWorkerId, setSelectedWorkerId] = useState(null);
   const [userLocation, setUserLocation] = useState(null); // { latitude, longitude, areaName }
   const [isLocLoading, setIsLocLoading] = useState(true);
   const [mapStyle, setMapStyle] = useState('google'); // 'google' | 'voyager'
   const webViewRef = useRef(null);
+
+  // Modals for Worker Details & Checkout
+  const [selectedProfileWorker, setSelectedProfileWorker] = useState(null);
+  const [checkoutWorker, setCheckoutWorker] = useState(null);
 
   // Auto fetch user's real live GPS coordinates on mount
   useEffect(() => {
@@ -454,12 +452,10 @@ export default function FindWorkersScreen({ insets }) {
             activeOpacity={0.8}
           >
             <Layers size={13} color="#4F46E5" />
-            <Text style={styles.styleToggleText}>
-              {mapStyle === 'google' ? 'Google' : 'Apple Style'}
-            </Text>
+            <Text style={styles.styleToggleText}>Map Style</Text>
           </TouchableOpacity>
 
-          {/* Re-center GPS */}
+          {/* Re-center */}
           <TouchableOpacity
             style={styles.recenterBtn}
             onPress={fetchLiveLocation}
@@ -470,7 +466,7 @@ export default function FindWorkersScreen({ insets }) {
             ) : (
               <>
                 <LocateFixed size={13} color="#2563EB" />
-                <Text style={styles.recenterBtnText}>GPS</Text>
+                <Text style={styles.recenterBtnText}>Locate</Text>
               </>
             )}
           </TouchableOpacity>
@@ -538,7 +534,7 @@ export default function FindWorkersScreen({ insets }) {
             <View style={styles.mapLivePill}>
               <View style={styles.greenLiveDot} />
               <Text style={styles.mapLiveText}>
-                {mapStyle === 'google' ? 'Google Roadmap' : 'Apple Voyager'} • {liveWorkers.length} Mistris
+                Live Radar • {liveWorkers.length} Active Mistris
               </Text>
             </View>
           </View>
@@ -569,10 +565,169 @@ export default function FindWorkersScreen({ insets }) {
               worker={worker}
               isSelected={selectedWorkerId === worker.id}
               onSelect={(w) => setSelectedWorkerId(w.id)}
+              onOpenProfile={(w) => setSelectedProfileWorker(w)}
+              onProceedBooking={(w) => setCheckoutWorker(w)}
             />
           ))}
         </View>
       </ScrollView>
+
+      {/* ─── WORKER DETAIL POPUP MODAL CARD ─── */}
+      <Modal visible={!!selectedProfileWorker} transparent animationType="fade">
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalSheetHeader}>
+              <View style={styles.modalWorkerAvatarRow}>
+                <View style={[styles.avatar, { backgroundColor: selectedProfileWorker?.color || '#4F46E5', width: 48, height: 48, borderRadius: 24, marginRight: 0 }]}>
+                  <Text style={[styles.avatarText, { fontSize: 17 }]}>{selectedProfileWorker?.avatar}</Text>
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={styles.modalWorkerName} numberOfLines={1}>{selectedProfileWorker?.name}</Text>
+                    {selectedProfileWorker?.verified && (
+                      <View style={styles.verifiedBadge}>
+                        <Text style={styles.verifiedText}>KYC ✓</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={styles.modalWorkerSkill}>{selectedProfileWorker?.skill}</Text>
+                </View>
+              </View>
+              <TouchableOpacity onPress={() => setSelectedProfileWorker(null)}>
+                <X size={20} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalStatsRow}>
+              <View style={styles.modalStatCol}>
+                <Text style={styles.modalStatNum}>{selectedProfileWorker?.rating} ★</Text>
+                <Text style={styles.modalStatLabel}>{selectedProfileWorker?.reviews} reviews</Text>
+              </View>
+              <View style={styles.modalStatDivider} />
+              <View style={styles.modalStatCol}>
+                <Text style={styles.modalStatNum}>{selectedProfileWorker?.exp} Yrs</Text>
+                <Text style={styles.modalStatLabel}>Experience</Text>
+              </View>
+              <View style={styles.modalStatDivider} />
+              <View style={styles.modalStatCol}>
+                <Text style={styles.modalStatNum}>{selectedProfileWorker?.distance} km</Text>
+                <Text style={styles.modalStatLabel}>Distance</Text>
+              </View>
+            </View>
+
+            <View style={styles.credentialsBox}>
+              <ShieldCheck size={16} color="#15803D" />
+              <Text style={styles.credentialsText}>
+                Aadhaar Verified Mistri • Escrow Safe • Police Verification Cleared
+              </Text>
+            </View>
+
+            <View style={styles.modalFooterRow}>
+              <View>
+                <Text style={styles.modalRateLabel}>Daily Wage</Text>
+                <Text style={styles.modalRateVal}>₹{selectedProfileWorker?.rate} <Text style={{ fontSize: 13, color: '#64748B' }}>/day</Text></Text>
+              </View>
+
+              <TouchableOpacity
+                style={styles.modalBookBtn}
+                onPress={() => {
+                  const w = selectedProfileWorker;
+                  setSelectedProfileWorker(null);
+                  setCheckoutWorker(w);
+                }}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.modalBookBtnText}>Proceed to Book</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ─── CHECKOUT & ESCROW PAYMENT SHEET ─── */}
+      <Modal visible={!!checkoutWorker} transparent animationType="slide">
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalSheetHeader}>
+              <View>
+                <Text style={styles.modalSheetTitle}>Confirm Booking & Escrow</Text>
+                <Text style={styles.modalSheetSub}>{checkoutWorker?.name} • {checkoutWorker?.skill}</Text>
+              </View>
+              <TouchableOpacity onPress={() => setCheckoutWorker(null)}>
+                <X size={20} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.billBox}>
+              <View style={styles.billRow}>
+                <Text style={styles.billItem}>Worker Fee (1 Day)</Text>
+                <Text style={styles.billVal}>₹{checkoutWorker?.rate || 950}</Text>
+              </View>
+              <View style={styles.billRow}>
+                <Text style={styles.billItem}>Mistri Pro Platform Fee</Text>
+                <Text style={styles.billVal}>₹99</Text>
+              </View>
+              <View style={styles.billRow}>
+                <Text style={styles.billItem}>Digital Escrow & Processing (5%)</Text>
+                <Text style={styles.billVal}>₹{Math.round((checkoutWorker?.rate || 950) * 0.05)}</Text>
+              </View>
+              <View style={styles.billDivider} />
+              <View style={styles.billRowGrand}>
+                <Text style={styles.billTotalLabel}>Total to Pay</Text>
+                <Text style={styles.billTotalVal}>
+                  ₹{(checkoutWorker?.rate || 950) + 99 + Math.round((checkoutWorker?.rate || 950) * 0.05)}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.escrowNotice}>
+              <ShieldCheck size={16} color="#15803D" />
+              <Text style={styles.escrowNoticeText}>
+                Your money is held safely in Digital Escrow and only released after you confirm the work is completed onsite.
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              style={styles.payBtn}
+              onPress={() => {
+                if (!checkoutWorker) return;
+                const worker = checkoutWorker;
+                const workerFee = Number(worker.rate || 950);
+                const platformFee = 99;
+                const txnFee = Math.round(workerFee * 0.05);
+                const totalAmount = workerFee + platformFee + txnFee;
+
+                const bookingDetails = {
+                  workerId: worker.id,
+                  workerName: worker.name,
+                  workerAvatar: worker.avatar,
+                  workerColor: worker.color,
+                  workerPhone: worker.phone,
+                  workerSkill: worker.skill,
+                  category: worker.category || worker.skill,
+                  title: `${worker.skill} Service`,
+                  siteLocation: areaLabel,
+                  scheduledDate: 'Today, Immediate',
+                  duration: '1 Day',
+                  workerFee,
+                  platformFee,
+                  transactionFee: txnFee,
+                  totalAmount,
+                };
+
+                setCheckoutWorker(null);
+                if (onBookWorker) {
+                  onBookWorker(bookingDetails);
+                }
+              }}
+              activeOpacity={0.85}
+            >
+              <CheckCircle2 size={18} color="#FFFFFF" />
+              <Text style={styles.payBtnText}>Pay & Request Booking</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -820,7 +975,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    flexWrap: 'wrap',
+    flexWrap: 'nowrap',
   },
   workerName: {
     fontFamily: 'Satoshi-Bold',
@@ -924,18 +1079,218 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#4F46E5',
   },
-  callBtn: {
+  bookActionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#16A34A',
-    paddingHorizontal: 12,
+    backgroundColor: '#4F46E5',
+    paddingHorizontal: 14,
     paddingVertical: 7,
     borderRadius: 8,
-    gap: 4,
   },
-  callText: {
+  bookActionText: {
     fontFamily: 'Satoshi-Bold',
+    fontSize: 12,
+    color: '#FFFFFF',
+  },
+
+  /* Modals */
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.55)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  modalSheet: {
+    width: '100%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 22,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 6,
+  },
+  modalSheetHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  modalWorkerAvatarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  modalWorkerName: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 16,
+    color: '#0F172A',
+  },
+  modalWorkerSkill: {
+    fontFamily: 'Satoshi-Medium',
+    fontSize: 12.5,
+    color: '#4F46E5',
+    marginTop: 2,
+  },
+  modalStatsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 14,
+  },
+  modalStatCol: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  modalStatNum: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 14,
+    color: '#0F172A',
+  },
+  modalStatLabel: {
+    fontFamily: 'Satoshi-Regular',
     fontSize: 11,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  modalStatDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: '#E2E8F0',
+  },
+  credentialsBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#F0FDF4',
+    padding: 10,
+    borderRadius: 10,
+    marginBottom: 16,
+  },
+  credentialsText: {
+    fontFamily: 'Satoshi-Medium',
+    fontSize: 11,
+    color: '#15803D',
+    flex: 1,
+  },
+  modalFooterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  modalRateLabel: {
+    fontFamily: 'Satoshi-Regular',
+    fontSize: 11,
+    color: '#64748B',
+  },
+  modalRateVal: {
+    fontFamily: 'Satoshi-Black',
+    fontSize: 18,
+    color: '#0F172A',
+  },
+  modalBookBtn: {
+    backgroundColor: '#4F46E5',
+    paddingHorizontal: 20,
+    paddingVertical: 11,
+    borderRadius: 12,
+  },
+  modalBookBtnText: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 13,
+    color: '#FFFFFF',
+  },
+  modalSheetTitle: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 16,
+    color: '#0F172A',
+  },
+  modalSheetSub: {
+    fontFamily: 'Satoshi-Regular',
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  billBox: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
+    padding: 14,
+    marginVertical: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  billRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 5,
+  },
+  billItem: {
+    fontFamily: 'Satoshi-Regular',
+    fontSize: 12.5,
+    color: '#475569',
+  },
+  billVal: {
+    fontFamily: 'Satoshi-Medium',
+    fontSize: 13,
+    color: '#0F172A',
+  },
+  billDivider: {
+    height: 1,
+    backgroundColor: '#E2E8F0',
+    marginVertical: 8,
+  },
+  billRowGrand: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    paddingTop: 2,
+  },
+  billTotalLabel: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 14,
+    color: '#0F172A',
+  },
+  billTotalVal: {
+    fontFamily: 'Satoshi-Black',
+    fontSize: 20,
+    color: '#4F46E5',
+  },
+  escrowNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#F0FDF4',
+    padding: 10,
+    borderRadius: 10,
+    marginBottom: 16,
+  },
+  escrowNoticeText: {
+    fontFamily: 'Satoshi-Regular',
+    fontSize: 11,
+    color: '#15803D',
+    flex: 1,
+    lineHeight: 15,
+  },
+  payBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#16A34A',
+    paddingVertical: 14,
+    borderRadius: 14,
+  },
+  payBtnText: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 14,
     color: '#FFFFFF',
   },
 });

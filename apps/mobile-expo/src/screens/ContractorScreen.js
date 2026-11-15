@@ -25,6 +25,8 @@ import {
   Check,
 } from 'lucide-react-native';
 import * as Location from 'expo-location';
+import { MOCK_WORKERS } from '../data/mockWorkers';
+import { DeviceFeedback } from '../services/deviceFeedback';
 
 const CREW_ROLES = [
   { id: 'mason', name: 'Mason (Raj Mistri)', icon: '🧱', baseRate: 1100, unit: 'day' },
@@ -37,7 +39,7 @@ const CREW_ROLES = [
   { id: 'plumber', name: 'Plumber', icon: '🔧', baseRate: 950, unit: 'day' },
 ];
 
-export default function ContractorScreen({ insets, onNavigateTab }) {
+export default function ContractorScreen({ insets, onNavigateTab, onDeployContractorBooking }) {
   // Crew selection: { [roleId]: count }
   const [crewCounts, setCrewCounts] = useState({
     mason: 2,
@@ -152,9 +154,44 @@ export default function ContractorScreen({ insets, onNavigateTab }) {
         {
           text: 'Confirm & Book',
           onPress: () => {
+            DeviceFeedback.triggerSuccessHaptics();
+            const availableWorkers = MOCK_WORKERS.filter((w) => w.available === true);
+            const assigned = availableWorkers.slice(0, totalWorkers).map((w) => ({
+              workerId: w.id,
+              name: w.name,
+              skill: w.skill,
+              phone: w.phone,
+              rate: w.rate,
+              avatar: w.avatar,
+              color: w.color,
+            }));
+
+            const contractorPayload = {
+              totalWorkers,
+              crewBreakdown: crewCounts,
+              assignedWorkers: assigned,
+              siteLocation,
+              duration:
+                durationType === 'hourly'
+                  ? `${hoursCount} Hours`
+                  : durationType === 'half'
+                  ? 'Half Day (4 hrs)'
+                  : durationType === 'full'
+                  ? 'Full Day (8 hrs)'
+                  : `${daysCount} Days`,
+              subtotal,
+              platformFee: 99,
+              transactionFee: Math.round(subtotal * 0.05),
+              totalAmount: subtotal + 99 + Math.round(subtotal * 0.05),
+            };
+
+            if (onDeployContractorBooking) {
+              onDeployContractorBooking(contractorPayload);
+            }
+
             Alert.alert(
               '🎉 Crew Booked Successfully!',
-              `Your ${totalWorkers}-member crew has been assigned and will report to ${siteLocation}. Tracking updates sent via SMS.`,
+              `Your ${totalWorkers}-member crew (${assigned.map((w) => w.name).join(', ')}) has been assigned and will report to ${siteLocation}. Tracking updates active in Bookings.`,
               [
                 {
                   text: 'View in My Bookings',

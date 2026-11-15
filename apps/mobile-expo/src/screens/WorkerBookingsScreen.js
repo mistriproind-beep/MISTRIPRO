@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Alert,
   Linking,
+  Platform,
 } from 'react-native';
 import {
   Calendar,
@@ -20,7 +21,9 @@ import {
   Star,
   Check,
   Navigation,
+  ExternalLink,
 } from 'lucide-react-native';
+import { DeviceFeedback } from '../services/deviceFeedback';
 
 const STEPS = [
   { step: 1, title: 'Approved', hindi: 'स्वीकृत' },
@@ -58,6 +61,19 @@ export default function WorkerBookingsScreen({
     );
     Linking.openURL(`whatsapp://send?phone=${cleaned}&text=${text}`).catch(() => {
       Alert.alert('WhatsApp', `Opening WhatsApp chat with ${customerName} (${phoneNumber}).`);
+    });
+  };
+
+  // Google Maps navigation
+  const handleOpenMap = (locationAddress) => {
+    const query = encodeURIComponent(locationAddress || 'Sawai Madhopur, Rajasthan');
+    const url = Platform.select({
+      ios: `maps:0,0?q=${query}`,
+      android: `geo:0,0?q=${query}`,
+      default: `https://www.google.com/maps/search/?api=1&query=${query}`,
+    });
+    Linking.openURL(url).catch(() => {
+      Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${query}`);
     });
   };
 
@@ -216,16 +232,17 @@ export default function WorkerBookingsScreen({
                         <Text style={styles.avatarText}>{booking.customerAvatar || 'CU'}</Text>
                       </View>
                       <View style={styles.customerMeta}>
-                        <View style={styles.nameRow}>
-                          <Text style={styles.customerName} numberOfLines={1}>
-                            {booking.customerName}
-                          </Text>
+                        <Text style={styles.customerName} numberOfLines={1}>
+                          {booking.customerName}
+                        </Text>
+                        <View style={styles.categorySubRow}>
+                          <Text style={styles.categoryText}>{booking.category}</Text>
+                          <View style={styles.subDot} />
                           <View style={styles.verifiedBadge}>
                             <ShieldCheck size={10} color="#15803D" />
                             <Text style={styles.verifiedText}>Verified</Text>
                           </View>
                         </View>
-                        <Text style={styles.categoryText}>{booking.category}</Text>
                       </View>
                     </View>
 
@@ -240,15 +257,25 @@ export default function WorkerBookingsScreen({
 
                   {/* Customer Location & Contact Details */}
                   <View style={styles.locationContactCard}>
-                    {/* Location */}
-                    <View style={styles.locRow}>
-                      <MapPin size={14} color="#DC2626" />
+                    {/* Location with Google Map direct navigation */}
+                    <TouchableOpacity
+                      style={styles.locRow}
+                      onPress={() => handleOpenMap(booking.location)}
+                      activeOpacity={0.7}
+                    >
+                      <MapPin size={16} color="#DC2626" style={{ marginTop: 2 }} />
                       <View style={styles.locTextCol}>
-                        <Text style={styles.locLabel}>Working Site Location:</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <Text style={styles.locLabel}>Working Site Location:</Text>
+                          <View style={styles.openMapLink}>
+                            <Text style={styles.openMapLinkText}>Open Google Map</Text>
+                            <ExternalLink size={11} color="#2563EB" />
+                          </View>
+                        </View>
                         <Text style={styles.locAddress}>{booking.location}</Text>
-                        <Text style={styles.locDistance}>Distance: {booking.distance || '2.4 km'} from your current location</Text>
+                        <Text style={styles.locDistance}>Distance: {booking.distance || '2.4 km'} from your location</Text>
                       </View>
-                    </View>
+                    </TouchableOpacity>
 
                     <View style={styles.locDivider} />
 
@@ -549,11 +576,17 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
   },
-  nameRow: {
+  categorySubRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    flexWrap: 'wrap',
+    marginTop: 2,
+  },
+  subDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: '#94A3B8',
   },
   customerName: {
     fontFamily: 'Satoshi-Bold',
@@ -622,6 +655,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 8,
+  },
+  openMapLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  openMapLinkText: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 10,
+    color: '#2563EB',
   },
   locTextCol: {
     flex: 1,

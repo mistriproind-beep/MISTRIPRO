@@ -9,8 +9,18 @@ import {
   StyleSheet,
   ActivityIndicator,
   StatusBar,
+  Modal,
 } from 'react-native';
-import { Bell, MapPin, ChevronDown, Search, Star } from 'lucide-react-native';
+import {
+  Bell,
+  MapPin,
+  ChevronDown,
+  Search,
+  Star,
+  ShieldCheck,
+  X,
+  CheckCircle2,
+} from 'lucide-react-native';
 import * as Location from 'expo-location';
 
 import { CATEGORIES, CATEGORY_GROUPS } from '../data/categories';
@@ -18,20 +28,33 @@ import { MOCK_WORKERS } from '../data/mockWorkers';
 
 /* ─── helpers ─── */
 const shortName = (full) => {
-  // Take text before first parenthesis / slash, trim
   const cleaned = full.split('(')[0].split('/')[0].trim();
+  if (cleaned.includes('Tile')) return 'Tile Worker';
+  if (cleaned.includes('POP')) return 'POP Ceiling';
+  if (cleaned.includes('Glass')) return 'Glass Work';
+  if (cleaned.includes('Cleaning')) return 'Cleaning';
+  if (cleaned.includes('Earth')) return 'Earth Worker';
   const words = cleaned.split(' ');
   if (words.length <= 2) return cleaned;
   if (words[1] === '&' && words[2]) return `${words[0]} & ${words[2]}`;
   return words.slice(0, 2).join(' ');
 };
 
-/* ─── Component ─── */
-export default function CustomerHomeScreen({ insets }) {
-  const [locationText, setLocationText] = useState('Jaipur, Rajasthan');
+export default function CustomerHomeScreen({
+  insets,
+  onNavigateTab,
+  onBookWorker,
+  onOpenNotifications,
+  notificationsCount = 0,
+}) {
+  const [locationText, setLocationText] = useState('Sawai Madhopur, Rajasthan');
   const [locationLoading, setLocationLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeGroup, setActiveGroup] = useState('all');
+
+  // Modals for Worker Details & Checkout
+  const [selectedWorker, setSelectedWorker] = useState(null);
+  const [checkoutWorker, setCheckoutWorker] = useState(null);
 
   /* GPS Location */
   useEffect(() => {
@@ -42,40 +65,78 @@ export default function CustomerHomeScreen({ insets }) {
           setLocationLoading(false);
           return;
         }
+
         const loc = await Location.getCurrentPositionAsync({});
-        const reverseGeo = await Location.reverseGeocodeAsync({
+        const [address] = await Location.reverseGeocodeAsync({
           latitude: loc.coords.latitude,
           longitude: loc.coords.longitude,
         });
-        if (reverseGeo && reverseGeo.length > 0) {
-          const place = reverseGeo[0];
-          const area = place.subregion || place.district || place.city || '';
-          const region = place.region || '';
-          setLocationText(area ? `${area}, ${region}` : region || 'Jaipur, Rajasthan');
+
+        if (address) {
+          const area = address.subregion || address.district || address.city || address.name || 'Sawai Madhopur';
+          const st = address.region || 'Rajasthan';
+          setLocationText(`${area}, ${st}`);
         }
-      } catch {
-        // fallback already set
+      } catch (err) {
+        // fallback
       } finally {
         setLocationLoading(false);
       }
     })();
   }, []);
 
-  /* Filtered categories */
   const filteredCategories =
     activeGroup === 'all'
       ? CATEGORIES
       : CATEGORIES.filter((c) => c.group === activeGroup);
 
-  /* Nearby available workers */
   const nearbyWorkers = MOCK_WORKERS.filter((w) => w.distance <= 15 && w.available === true);
 
-  /* ── Render helpers ── */
+  const handleProceedToBooking = (worker) => {
+    setSelectedWorker(null);
+    setCheckoutWorker(worker);
+  };
+
+  const handleConfirmBooking = () => {
+    if (!checkoutWorker) return;
+    const worker = checkoutWorker;
+    const workerFee = Number(worker.rate || 950);
+    const platformFee = 99;
+    const txnFee = Math.round(workerFee * 0.05);
+    const totalAmount = workerFee + platformFee + txnFee;
+
+    const bookingDetails = {
+      workerId: worker.id,
+      workerName: worker.name,
+      workerAvatar: worker.avatar,
+      workerColor: worker.color,
+      workerPhone: worker.phone,
+      workerSkill: worker.skill,
+      category: worker.category || worker.skill,
+      title: `${worker.skill} Service`,
+      siteLocation: locationText,
+      scheduledDate: 'Today, Immediate',
+      duration: '1 Day',
+      workerFee,
+      platformFee,
+      transactionFee: txnFee,
+      totalAmount,
+    };
+
+    setCheckoutWorker(null);
+    if (onBookWorker) {
+      onBookWorker(bookingDetails);
+    }
+  };
 
   const renderCategoryItem = useCallback(
     ({ item }) => (
-      <TouchableOpacity style={styles.categoryItem} activeOpacity={0.7}>
-        <View style={[styles.categoryIconCircle, { backgroundColor: `${item.group === 'construction' ? '#EEF2FF' : item.group === 'technical' ? '#F0FDFA' : '#FFF7ED'}` }]}>
+      <TouchableOpacity
+        style={styles.categoryItem}
+        activeOpacity={0.7}
+        onPress={() => onNavigateTab && onNavigateTab('FIND_WORKERS')}
+      >
+        <View style={[styles.categoryIconCircle, { backgroundColor: item.group === 'construction' ? '#EEF2FF' : item.group === 'technical' ? '#F0FDFA' : '#FFF7ED' }]}>
           <Text style={styles.categoryEmoji}>{item.icon}</Text>
         </View>
         <Text style={styles.categoryLabel} numberOfLines={2}>
@@ -83,12 +144,16 @@ export default function CustomerHomeScreen({ insets }) {
         </Text>
       </TouchableOpacity>
     ),
-    [],
+    [onNavigateTab],
   );
 
   const renderWorkerCard = useCallback(
     ({ item }) => (
-      <View style={styles.workerCard}>
+      <TouchableOpacity
+        style={styles.workerCard}
+        activeOpacity={0.85}
+        onPress={() => setSelectedWorker(item)}
+      >
         {/* Avatar */}
         <View style={[styles.workerAvatar, { backgroundColor: item.color }]}>
           <Text style={styles.workerAvatarText}>{item.avatar}</Text>
@@ -120,16 +185,19 @@ export default function CustomerHomeScreen({ insets }) {
             <MapPin size={11} color="#4F46E5" />
             <Text style={styles.distanceText}>{item.distance} km</Text>
           </View>
-          <TouchableOpacity style={styles.hireBtn} activeOpacity={0.8}>
-            <Text style={styles.hireBtnText}>Hire</Text>
+          <TouchableOpacity
+            style={styles.hireBtn}
+            activeOpacity={0.8}
+            onPress={() => setSelectedWorker(item)}
+          >
+            <Text style={styles.hireBtnText}>Book</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </TouchableOpacity>
     ),
     [],
   );
 
-  /* ── Main render ── */
   return (
     <View style={[styles.container, { paddingTop: insets?.top || 0 }]}>
       <StatusBar barStyle="dark-content" backgroundColor="#F6F7FB" />
@@ -150,9 +218,13 @@ export default function CustomerHomeScreen({ insets }) {
               <Text style={styles.greetingName}>Hello, Ramesh!</Text>
             </View>
           </View>
-          <TouchableOpacity style={styles.bellWrapper} activeOpacity={0.7}>
+          <TouchableOpacity
+            style={styles.bellWrapper}
+            activeOpacity={0.7}
+            onPress={onOpenNotifications}
+          >
             <Bell size={22} color="#0F172A" />
-            <View style={styles.bellDot} />
+            {notificationsCount > 0 && <View style={styles.bellDot} />}
           </TouchableOpacity>
         </View>
 
@@ -169,12 +241,11 @@ export default function CustomerHomeScreen({ insets }) {
           <ChevronDown size={16} color="#64748B" />
         </TouchableOpacity>
 
-        {/* ─── 3 & 4. Prompt Card + Search Bar ─── */}
-        <View style={styles.promptCard}>
-          <Text style={styles.promptHeading}>Which worker do you need today?</Text>
-
+        {/* ─── 3. Main Hero Card with Search ─── */}
+        <View style={styles.heroCard}>
+          <Text style={styles.heroTitle}>Which worker do you need today?</Text>
           <View style={styles.searchBar}>
-            <Search size={18} color="#94A3B8" />
+            <Search size={18} color="#94A3B8" style={{ marginRight: 8 }} />
             <TextInput
               style={styles.searchInput}
               placeholder="Search mason, plumber, electrician..."
@@ -185,7 +256,7 @@ export default function CustomerHomeScreen({ insets }) {
           </View>
         </View>
 
-        {/* ─── 5. Category Filter Tabs ─── */}
+        {/* ─── 4. Category Filter Tabs ─── */}
         <View style={styles.tabsRow}>
           {CATEGORY_GROUPS.map((g) => {
             const active = activeGroup === g.key;
@@ -207,36 +278,163 @@ export default function CustomerHomeScreen({ insets }) {
           })}
         </View>
 
-        {/* ─── 6. Categories Grid ─── */}
+        {/* ─── 5. 25 Labour Categories Grid ─── */}
         <FlatList
           data={filteredCategories}
-          renderItem={renderCategoryItem}
           keyExtractor={(item) => item.id}
           numColumns={4}
+          renderItem={renderCategoryItem}
           scrollEnabled={false}
-          contentContainerStyle={styles.gridContainer}
-          columnWrapperStyle={styles.gridRow}
+          columnWrapperStyle={styles.categoryRow}
+          contentContainerStyle={styles.categoryGrid}
         />
 
-        {/* ─── 7. Available Near You ─── */}
+        {/* ─── 6. Nearby Workers (<15km) ─── */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Workers near you (within 15km)</Text>
-          <TouchableOpacity activeOpacity={0.7}>
-            <Text style={styles.seeAll}>See All</Text>
+          <View style={styles.nearbyTitleRow}>
+            <Text style={styles.sectionTitle}>Workers near you (within 15km)</Text>
+            <View style={styles.rangeBadge}>
+              <Text style={styles.rangeBadgeText}>Live GPS</Text>
+            </View>
+          </View>
+          <TouchableOpacity onPress={() => onNavigateTab && onNavigateTab('FIND_WORKERS')}>
+            <Text style={styles.seeAll}>Open Map →</Text>
           </TouchableOpacity>
         </View>
 
-        {nearbyWorkers.map((worker) => (
+        {nearbyWorkers.slice(0, 5).map((worker) => (
           <View key={worker.id}>{renderWorkerCard({ item: worker })}</View>
         ))}
 
         <View style={{ height: 100 }} />
       </ScrollView>
+
+      {/* ─── WORKER DETAIL POPUP MODAL CARD ─── */}
+      <Modal visible={!!selectedWorker} transparent animationType="fade">
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalSheetHeader}>
+              <View style={styles.modalWorkerAvatarRow}>
+                <View style={[styles.avatarCircle, { backgroundColor: selectedWorker?.color || '#4F46E5', width: 48, height: 48, borderRadius: 24 }]}>
+                  <Text style={[styles.avatarInitials, { fontSize: 17 }]}>{selectedWorker?.avatar}</Text>
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={styles.modalWorkerName} numberOfLines={1}>{selectedWorker?.name}</Text>
+                    {selectedWorker?.verified && (
+                      <View style={styles.verifiedBadge}>
+                        <Text style={styles.verifiedText}>✓</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={styles.modalWorkerSkill}>{selectedWorker?.skill}</Text>
+                </View>
+              </View>
+              <TouchableOpacity onPress={() => setSelectedWorker(null)}>
+                <X size={20} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalStatsRow}>
+              <View style={styles.modalStatCol}>
+                <Text style={styles.modalStatNum}>{selectedWorker?.rating} ★</Text>
+                <Text style={styles.modalStatLabel}>{selectedWorker?.reviews} reviews</Text>
+              </View>
+              <View style={styles.modalStatDivider} />
+              <View style={styles.modalStatCol}>
+                <Text style={styles.modalStatNum}>{selectedWorker?.exp} Yrs</Text>
+                <Text style={styles.modalStatLabel}>Experience</Text>
+              </View>
+              <View style={styles.modalStatDivider} />
+              <View style={styles.modalStatCol}>
+                <Text style={styles.modalStatNum}>{selectedWorker?.distance} km</Text>
+                <Text style={styles.modalStatLabel}>Distance</Text>
+              </View>
+            </View>
+
+            <View style={styles.credentialsBox}>
+              <ShieldCheck size={16} color="#15803D" />
+              <Text style={styles.credentialsText}>
+                Aadhaar Verified Mistri • Escrow Safe • Police Verification Cleared
+              </Text>
+            </View>
+
+            <View style={styles.modalFooterRow}>
+              <View>
+                <Text style={styles.modalRateLabel}>Daily Wage</Text>
+                <Text style={styles.modalRateVal}>₹{selectedWorker?.rate} <Text style={{ fontSize: 13, color: '#64748B' }}>/day</Text></Text>
+              </View>
+
+              <TouchableOpacity
+                style={styles.modalBookBtn}
+                onPress={() => handleProceedToBooking(selectedWorker)}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.modalBookBtnText}>Proceed to Book</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ─── CHECKOUT & ESCROW PAYMENT SHEET ─── */}
+      <Modal visible={!!checkoutWorker} transparent animationType="slide">
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalSheetHeader}>
+              <View>
+                <Text style={styles.modalTitle}>Confirm Booking & Escrow</Text>
+                <Text style={styles.modalSub}>{checkoutWorker?.name} • {checkoutWorker?.skill}</Text>
+              </View>
+              <TouchableOpacity onPress={() => setCheckoutWorker(null)}>
+                <X size={20} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.billBox}>
+              <View style={styles.billRow}>
+                <Text style={styles.billItem}>Worker Fee (1 Day)</Text>
+                <Text style={styles.billVal}>₹{checkoutWorker?.rate || 950}</Text>
+              </View>
+              <View style={styles.billRow}>
+                <Text style={styles.billItem}>Mistri Pro Platform Fee</Text>
+                <Text style={styles.billVal}>₹99</Text>
+              </View>
+              <View style={styles.billRow}>
+                <Text style={styles.billItem}>Digital Escrow & Processing (5%)</Text>
+                <Text style={styles.billVal}>₹{Math.round((checkoutWorker?.rate || 950) * 0.05)}</Text>
+              </View>
+              <View style={styles.billDivider} />
+              <View style={styles.billRowGrand}>
+                <Text style={styles.billTotalLabel}>Total to Pay</Text>
+                <Text style={styles.billTotalVal}>
+                  ₹{(checkoutWorker?.rate || 950) + 99 + Math.round((checkoutWorker?.rate || 950) * 0.05)}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.escrowNotice}>
+              <ShieldCheck size={16} color="#15803D" />
+              <Text style={styles.escrowNoticeText}>
+                Your money is held safely in Digital Escrow and only released after you confirm the work is completed onsite.
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              style={styles.payBtn}
+              onPress={handleConfirmBooking}
+              activeOpacity={0.85}
+            >
+              <CheckCircle2 size={18} color="#FFFFFF" />
+              <Text style={styles.payBtnText}>Pay & Request Booking</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
 
-/* ═══════════════════════ STYLES ═══════════════════════ */
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -246,8 +444,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 32,
   },
-
-  /* ── Header ── */
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -298,68 +494,63 @@ const styles = StyleSheet.create({
   },
   bellDot: {
     position: 'absolute',
-    top: 10,
-    right: 11,
+    top: 9,
+    right: 10,
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#EF4444',
+    backgroundColor: '#DC2626',
     borderWidth: 1.5,
     borderColor: '#FFFFFF',
   },
-
-  /* ── Location ── */
   locationPill: {
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
     backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     marginBottom: 16,
     gap: 6,
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
   },
   locationText: {
     fontFamily: 'Satoshi-Medium',
     fontSize: 13,
-    color: '#0F172A',
-    maxWidth: 200,
+    color: '#334155',
+    maxWidth: 240,
   },
-
-  /* ── Prompt Card ── */
-  promptCard: {
+  heroCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 20,
+    borderRadius: 24,
     padding: 20,
     marginBottom: 16,
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: 'rgba(226, 232, 240, 0.8)',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 12,
+    elevation: 2,
   },
-  promptHeading: {
+  heroTitle: {
     fontFamily: 'Satoshi-Bold',
-    fontSize: 20,
+    fontSize: 22,
     color: '#0F172A',
-    marginBottom: 14,
+    marginBottom: 16,
+    lineHeight: 28,
   },
-
-  /* ── Search Bar ── */
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F6F7FB',
-    borderRadius: 14,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
     paddingHorizontal: 14,
-    paddingVertical: 10,
-    gap: 10,
+    height: 48,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   searchInput: {
     flex: 1,
@@ -368,8 +559,6 @@ const styles = StyleSheet.create({
     color: '#0F172A',
     padding: 0,
   },
-
-  /* ── Filter Tabs ── */
   tabsRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -402,14 +591,12 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontFamily: 'Satoshi-Bold',
   },
-
-  /* ── Category Grid ── */
-  gridContainer: {
+  categoryGrid: {
     paddingBottom: 8,
   },
-  gridRow: {
+  categoryRow: {
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   categoryItem: {
     width: '23%',
@@ -422,58 +609,71 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(226, 232, 240, 0.6)',
   },
   categoryEmoji: {
     fontSize: 24,
   },
   categoryLabel: {
     fontFamily: 'Satoshi-Medium',
-    fontSize: 11,
-    color: '#0F172A',
+    fontSize: 10.5,
+    color: '#334155',
     textAlign: 'center',
-    lineHeight: 14,
+    lineHeight: 13.5,
+    minHeight: 28,
   },
-
-  /* ── Section Header ── */
   sectionHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 12,
+    justifyContent: 'space-between',
+    marginTop: 8,
     marginBottom: 12,
+  },
+  nearbyTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   sectionTitle: {
     fontFamily: 'Satoshi-Bold',
-    fontSize: 16,
+    fontSize: 15,
     color: '#0F172A',
   },
+  rangeBadge: {
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  rangeBadgeText: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 9.5,
+    color: '#15803D',
+  },
   seeAll: {
-    fontFamily: 'Satoshi-Medium',
-    fontSize: 13,
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 12,
     color: '#4F46E5',
   },
-
-  /* ── Worker Card ── */
   workerCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 14,
     marginBottom: 10,
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   workerAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
+    flexShrink: 0,
   },
   workerAvatarText: {
     color: '#FFFFFF',
@@ -489,7 +689,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    flexWrap: 'wrap',
+    flexWrap: 'nowrap',
   },
   workerName: {
     fontFamily: 'Satoshi-Bold',
@@ -537,16 +737,14 @@ const styles = StyleSheet.create({
     width: 3,
     height: 3,
     borderRadius: 1.5,
-    backgroundColor: '#CBD5E1',
+    backgroundColor: '#94A3B8',
     marginHorizontal: 2,
   },
   workerRate: {
-    fontFamily: 'Satoshi-Medium',
+    fontFamily: 'Satoshi-Bold',
     fontSize: 12,
     color: '#4F46E5',
   },
-
-  /* ── Worker Right ── */
   workerRight: {
     alignItems: 'flex-end',
     gap: 8,
@@ -555,26 +753,223 @@ const styles = StyleSheet.create({
   distanceBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#EEF2FF',
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
     gap: 3,
   },
   distanceText: {
-    fontFamily: 'Satoshi-Medium',
+    fontFamily: 'Satoshi-Regular',
     fontSize: 11,
-    color: '#4F46E5',
+    color: '#64748B',
   },
   hireBtn: {
     backgroundColor: '#4F46E5',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
     borderRadius: 10,
-    paddingHorizontal: 18,
-    paddingVertical: 7,
   },
   hireBtnText: {
+    color: '#FFFFFF',
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 12,
+  },
+
+  /* Modals */
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.55)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  modalSheet: {
+    width: '100%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 22,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 6,
+  },
+  modalSheetHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  modalWorkerAvatarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  modalWorkerName: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 16,
+    color: '#0F172A',
+  },
+  modalWorkerSkill: {
+    fontFamily: 'Satoshi-Medium',
+    fontSize: 12.5,
+    color: '#4F46E5',
+    marginTop: 2,
+  },
+  modalStatsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 14,
+  },
+  modalStatCol: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  modalStatNum: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 14,
+    color: '#0F172A',
+  },
+  modalStatLabel: {
+    fontFamily: 'Satoshi-Regular',
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  modalStatDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: '#E2E8F0',
+  },
+  credentialsBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#F0FDF4',
+    padding: 10,
+    borderRadius: 10,
+    marginBottom: 16,
+  },
+  credentialsText: {
+    fontFamily: 'Satoshi-Medium',
+    fontSize: 11,
+    color: '#15803D',
+    flex: 1,
+  },
+  modalFooterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  modalRateLabel: {
+    fontFamily: 'Satoshi-Regular',
+    fontSize: 11,
+    color: '#64748B',
+  },
+  modalRateVal: {
+    fontFamily: 'Satoshi-Black',
+    fontSize: 18,
+    color: '#0F172A',
+  },
+  modalBookBtn: {
+    backgroundColor: '#4F46E5',
+    paddingHorizontal: 20,
+    paddingVertical: 11,
+    borderRadius: 12,
+  },
+  modalBookBtnText: {
     fontFamily: 'Satoshi-Bold',
     fontSize: 13,
+    color: '#FFFFFF',
+  },
+  modalTitle: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 16,
+    color: '#0F172A',
+  },
+  modalSub: {
+    fontFamily: 'Satoshi-Regular',
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  billBox: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
+    padding: 14,
+    marginVertical: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  billRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 5,
+  },
+  billItem: {
+    fontFamily: 'Satoshi-Regular',
+    fontSize: 12.5,
+    color: '#475569',
+  },
+  billVal: {
+    fontFamily: 'Satoshi-Medium',
+    fontSize: 13,
+    color: '#0F172A',
+  },
+  billDivider: {
+    height: 1,
+    backgroundColor: '#E2E8F0',
+    marginVertical: 8,
+  },
+  billRowGrand: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    paddingTop: 2,
+  },
+  billTotalLabel: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 14,
+    color: '#0F172A',
+  },
+  billTotalVal: {
+    fontFamily: 'Satoshi-Black',
+    fontSize: 20,
+    color: '#4F46E5',
+  },
+  escrowNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#F0FDF4',
+    padding: 10,
+    borderRadius: 10,
+    marginBottom: 16,
+  },
+  escrowNoticeText: {
+    fontFamily: 'Satoshi-Regular',
+    fontSize: 11,
+    color: '#15803D',
+    flex: 1,
+    lineHeight: 15,
+  },
+  payBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#16A34A',
+    paddingVertical: 14,
+    borderRadius: 14,
+  },
+  payBtnText: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 14,
     color: '#FFFFFF',
   },
 });
