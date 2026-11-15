@@ -30,6 +30,7 @@ import { WebView } from 'react-native-webview';
 import * as Location from 'expo-location';
 import { CATEGORIES } from '../data/categories';
 import { MOCK_WORKERS } from '../data/mockWorkers';
+import RazorpayModal from '../components/RazorpayModal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -125,6 +126,8 @@ export default function FindWorkersScreen({ insets, onBookWorker, onNavigateTab 
   // Modals for Worker Details & Checkout
   const [selectedProfileWorker, setSelectedProfileWorker] = useState(null);
   const [checkoutWorker, setCheckoutWorker] = useState(null);
+  const [showRazorpayModal, setShowRazorpayModal] = useState(false);
+  const [razorpayBookingData, setRazorpayBookingData] = useState(null);
 
   // Auto fetch user's real live GPS coordinates on mount
   useEffect(() => {
@@ -179,13 +182,17 @@ export default function FindWorkersScreen({ insets, onBookWorker, onNavigateTab 
   const userLng = userLocation?.longitude || 76.3533;
   const areaLabel = userLocation?.areaName || 'Detecting GPS...';
 
-  // Base filtered list
+  // Base filtered list: Only online workers matching selected trade
   const baseWorkers = useMemo(() => {
     if (selectedCategory === 'All') {
-      return MOCK_WORKERS.filter((w) => w.available);
+      return MOCK_WORKERS.filter((w) => w.available === true);
     }
+    const cleanCat = selectedCategory.toLowerCase().replace(/ worker| mistri| expert| installer|\(.*\)/g, '').trim();
     return MOCK_WORKERS.filter(
-      (w) => w.available && (w.category === selectedCategory || w.skill.includes(selectedCategory))
+      (w) =>
+        w.available === true &&
+        ((w.category && w.category.toLowerCase().includes(cleanCat)) ||
+          (w.skill && w.skill.toLowerCase().includes(cleanCat)))
     );
   }, [selectedCategory]);
 
@@ -720,9 +727,8 @@ export default function FindWorkersScreen({ insets, onBookWorker, onNavigateTab 
                 };
 
                 setCheckoutWorker(null);
-                if (onBookWorker) {
-                  onBookWorker(bookingDetails);
-                }
+                setRazorpayBookingData(bookingDetails);
+                setShowRazorpayModal(true);
               }}
               activeOpacity={0.85}
             >
@@ -732,6 +738,18 @@ export default function FindWorkersScreen({ insets, onBookWorker, onNavigateTab 
           </View>
         </View>
       </Modal>
+
+      {/* ─── RAZORPAY TEST MODE CHECKOUT MODAL ─── */}
+      <RazorpayModal
+        visible={showRazorpayModal}
+        onClose={() => setShowRazorpayModal(false)}
+        bookingData={razorpayBookingData}
+        onPaymentSuccess={(completedDetails) => {
+          if (onBookWorker) {
+            onBookWorker(completedDetails);
+          }
+        }}
+      />
     </View>
   );
 }

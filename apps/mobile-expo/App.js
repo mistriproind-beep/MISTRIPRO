@@ -83,6 +83,7 @@ import {
   INITIAL_WORKER_BOOKINGS,
   INITIAL_WALLET,
 } from './src/data/workerData';
+import { MOCK_BOOKINGS, MOCK_WORKERS } from './src/data/mockWorkers';
 
 import { StorageService } from './src/services/storage';
 import { LiveBackend } from './src/services/liveBackend';
@@ -563,6 +564,9 @@ function MainApp() {
   const [workerBookings, setWorkerBookings] = useState(INITIAL_WORKER_BOOKINGS);
   const [workerWallet, setWorkerWallet] = useState(INITIAL_WALLET);
 
+  // Customer Bookings State (Connected to Live DB + Mock Bookings)
+  const [customerBookings, setCustomerBookings] = useState(MOCK_BOOKINGS);
+
   const [isDev, setIsDev] = useState(false);
   const [showNotifModal, setShowNotifModal] = useState(false);
   const [notifications, setNotifications] = useState([
@@ -580,6 +584,45 @@ function MainApp() {
     setWorkerProfile((prev) => ({ ...prev, ...updates }));
   };
 
+  const handleAutoAssignAnother = async (oldBooking) => {
+    const candidate = MOCK_WORKERS.find(
+      (w) => w.name !== oldBooking.workerName && (w.category === oldBooking.category || w.skill === oldBooking.worker_skill)
+    ) || MOCK_WORKERS[0];
+
+    const updatedBooking = {
+      ...oldBooking,
+      workerName: candidate.name,
+      workerAvatar: candidate.avatar,
+      workerColor: candidate.color,
+      workerPhone: candidate.phone,
+      status: 'confirmed',
+      progress_step: 1,
+    };
+
+    setCustomerBookings((prev) =>
+      prev.map((b) => (b.id === oldBooking.id ? updatedBooking : b))
+    );
+    await StorageService.setBookings(
+      customerBookings.map((b) => (b.id === oldBooking.id ? updatedBooking : b))
+    );
+    await LiveBackend.updateBookingStatus(oldBooking.id, 'confirmed', 1);
+    DeviceFeedback.triggerSuccessHaptics();
+    Alert.alert('New Mistri Assigned! 👷‍♂️', `${candidate.name} (${candidate.skill}) has been assigned to your booking. You can now call and track live progress.`);
+  };
+
+  const handleRefundBooking = async (booking) => {
+    const updated = { ...booking, status: 'refunded' };
+    setCustomerBookings((prev) =>
+      prev.map((b) => (b.id === booking.id ? updated : b))
+    );
+    await StorageService.setBookings(
+      customerBookings.map((b) => (b.id === booking.id ? updated : b))
+    );
+    await LiveBackend.updateBookingStatus(booking.id, 'refunded');
+    DeviceFeedback.triggerSuccessHaptics();
+    Alert.alert('100% Refund Initiated! 💳', `Amount of ${booking.amount || '₹1,097'} has been refunded to your original payment method via Razorpay. It will reflect within 2-4 hours.`);
+  };
+
   const handleCustomerBookWorker = async (bookingDetails) => {
     try {
       const savedBooking = await LiveBackend.createBooking({
@@ -592,6 +635,33 @@ function MainApp() {
 
       const newBookingId = savedBooking?.id || `B-${Date.now().toString().slice(-4)}`;
 
+      // 1. Add to Customer Bookings List
+      const newCustBooking = {
+        id: newBookingId,
+        booking_code: `BK-${Date.now().toString().slice(-4)}`,
+        workerName: bookingDetails.workerName,
+        workerAvatar: bookingDetails.workerAvatar || bookingDetails.workerName.slice(0, 2).toUpperCase(),
+        workerColor: bookingDetails.workerColor || '#4F46E5',
+        workerPhone: bookingDetails.workerPhone || '+91 94140 88990',
+        worker_skill: bookingDetails.workerSkill,
+        category: bookingDetails.workerSkill,
+        title: `${bookingDetails.workerSkill} Service Request`,
+        location: bookingDetails.siteLocation || 'Civil Lines, Sawai Madhopur',
+        site_location: bookingDetails.siteLocation || 'Civil Lines, Sawai Madhopur',
+        date: 'Today, Immediate',
+        scheduled_date: 'Today, Immediate',
+        duration: '1 Day',
+        total_amount: bookingDetails.totalAmount,
+        amount: `₹${bookingDetails.totalAmount}`,
+        status: 'waiting_confirmation',
+        progress_step: 1,
+        razorpay_payment_id: bookingDetails.paymentId || `pay_test_${Date.now().toString().slice(-8)}`,
+      };
+
+      setCustomerBookings((prev) => [newCustBooking, ...prev]);
+      await StorageService.setBookings([newCustBooking, ...customerBookings]);
+
+      // 2. Add alert for worker
       const newAlert = {
         id: `ALT-${Date.now().toString().slice(-4)}`,
         bookingId: newBookingId,
@@ -612,6 +682,7 @@ function MainApp() {
       };
       setWorkerAlerts((prev) => [newAlert, ...prev]);
 
+      // 3. Add to worker bookings
       const newWorkerBooking = {
         id: newBookingId,
         customerName: custName || 'Ramesh Sharma',
@@ -632,11 +703,12 @@ function MainApp() {
       };
       setWorkerBookings((prev) => [newWorkerBooking, ...prev]);
 
+      // 4. Notifications & Haptics
       setNotifications((prev) => [
         {
           id: `NOTIF-${Date.now()}`,
-          title: 'Booking Sent to Mistri',
-          message: `Booking request sent to ${bookingDetails.workerName}. Status: Waiting confirmation.`,
+          title: 'Booking Sent & Escrow Locked',
+          message: `Booking request sent to ${bookingDetails.workerName}. Payment ₹${bookingDetails.totalAmount} secured via Razorpay Test.`,
           time: 'Just now',
           type: 'booking',
         },
@@ -803,6 +875,11 @@ function MainApp() {
 
         if (savedIsDev && isMounted) {
           setIsDev(true);
+        }
+
+        const savedBookings = await StorageService.getBookings();
+        if (savedBookings && savedBookings.length > 0 && isMounted) {
+          setCustomerBookings(savedBookings);
         }
 
         // If user already logged in
@@ -1972,6 +2049,9 @@ function MainApp() {
             <MyBookingsScreen
               insets={insets}
               onNavigateTab={(tab) => setActiveTab(tab)}
+              bookings={customerBookings}
+              onAutoAssignAnother={handleAutoAssignAnother}
+              onRefundBooking={handleRefundBooking}
               onOpenNotifications={() => setShowNotifModal(true)}
               notificationsCount={notifications.length}
             />

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -35,6 +35,17 @@ export default function WorkerEarningsScreen({
 }) {
   const [balance, setBalance] = useState(walletData?.availableBalance || 4850);
   const [transactions, setTransactions] = useState(walletData?.transactions || []);
+
+  useEffect(() => {
+    if (walletData) {
+      if (typeof walletData.availableBalance === 'number') {
+        setBalance(walletData.availableBalance);
+      }
+      if (Array.isArray(walletData.transactions)) {
+        setTransactions(walletData.transactions);
+      }
+    }
+  }, [walletData]);
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState('1000');
   const [payoutMethod, setPayoutMethod] = useState('UPI'); // 'UPI' | 'BANK'
@@ -134,6 +145,7 @@ export default function WorkerEarningsScreen({
           : `Bank (${bankName} • **${accountNumber.slice(-4)})`,
     };
 
+    setBalance((prev) => Math.max(0, prev - num));
     setTransactions([newTxn, ...transactions]);
     setShowWithdrawModal(false);
 

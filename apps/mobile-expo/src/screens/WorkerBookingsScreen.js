@@ -382,8 +382,8 @@ export default function WorkerBookingsScreen({
                       )}
                       {currentStep === 3 && (
                         <>
-                          <CheckCircle2 size={16} color="#FFFFFF" />
-                          <Text style={styles.advanceBtnText}>Work Completed • Release Payment (काम पूरा हुआ)</Text>
+                          <CheckCircle2 size={18} color="#FFFFFF" />
+                          <Text style={styles.advanceBtnText}>Mark Work Completed (काम पूरा हुआ)</Text>
                         </>
                       )}
                       {currentStep === 4 && (
@@ -838,8 +838,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    paddingVertical: 11,
-    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 14,
   },
   advanceBtnNormal: {
     backgroundColor: '#4F46E5',
@@ -851,6 +852,8 @@ const styles = StyleSheet.create({
     fontFamily: 'Satoshi-Bold',
     fontSize: 13,
     color: '#FFFFFF',
+    flexShrink: 1,
+    textAlign: 'center',
   },
 
   /* History Card */

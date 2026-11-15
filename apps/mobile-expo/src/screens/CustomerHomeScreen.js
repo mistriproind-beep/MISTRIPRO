@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -20,11 +20,13 @@ import {
   ShieldCheck,
   X,
   CheckCircle2,
+  AlertCircle,
 } from 'lucide-react-native';
 import * as Location from 'expo-location';
 
 import { CATEGORIES, CATEGORY_GROUPS } from '../data/categories';
 import { MOCK_WORKERS } from '../data/mockWorkers';
+import RazorpayModal from '../components/RazorpayModal';
 
 /* ─── helpers ─── */
 const shortName = (full) => {
@@ -52,9 +54,12 @@ export default function CustomerHomeScreen({
   const [searchQuery, setSearchQuery] = useState('');
   const [activeGroup, setActiveGroup] = useState('all');
 
-  // Modals for Worker Details & Checkout
+  // Modals for Worker Details, Checkout & Razorpay
   const [selectedWorker, setSelectedWorker] = useState(null);
   const [checkoutWorker, setCheckoutWorker] = useState(null);
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [showRazorpayModal, setShowRazorpayModal] = useState(false);
+  const [razorpayBookingData, setRazorpayBookingData] = useState(null);
 
   /* GPS Location */
   useEffect(() => {
@@ -90,7 +95,32 @@ export default function CustomerHomeScreen({
       ? CATEGORIES
       : CATEGORIES.filter((c) => c.group === activeGroup);
 
-  const nearbyWorkers = MOCK_WORKERS.filter((w) => w.distance <= 15 && w.available === true);
+  // Filter Workers: Online Only + Category Filter + Search Query Filter
+  const nearbyWorkers = useMemo(() => {
+    return MOCK_WORKERS.filter((w) => {
+      // 1. Online / Available only
+      if (w.available !== true) return false;
+
+      // 2. Category selection filter
+      if (selectedCategory) {
+        const catTarget = selectedCategory.toLowerCase().replace(/ worker| mistri| expert| labour/g, '').trim();
+        const wCat = (w.category || '').toLowerCase();
+        const wSkill = (w.skill || '').toLowerCase();
+        if (!wCat.includes(catTarget) && !wSkill.includes(catTarget)) return false;
+      }
+
+      // 3. Search query filter
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const matchesName = (w.name || '').toLowerCase().includes(q);
+        const matchesSkill = (w.skill || '').toLowerCase().includes(q);
+        const matchesCat = (w.category || '').toLowerCase().includes(q);
+        if (!matchesName && !matchesSkill && !matchesCat) return false;
+      }
+
+      return true;
+    });
+  }, [searchQuery, selectedCategory]);
 
   const handleProceedToBooking = (worker) => {
     setSelectedWorker(null);
@@ -119,32 +149,58 @@ export default function CustomerHomeScreen({
       duration: '1 Day',
       workerFee,
       platformFee,
-      transactionFee: txnFee,
+      txnFee,
       totalAmount,
     };
 
     setCheckoutWorker(null);
-    if (onBookWorker) {
-      onBookWorker(bookingDetails);
-    }
+    setRazorpayBookingData(bookingDetails);
+    setShowRazorpayModal(true);
   };
 
   const renderCategoryItem = useCallback(
-    ({ item }) => (
-      <TouchableOpacity
-        style={styles.categoryItem}
-        activeOpacity={0.7}
-        onPress={() => onNavigateTab && onNavigateTab('FIND_WORKERS')}
-      >
-        <View style={[styles.categoryIconCircle, { backgroundColor: item.group === 'construction' ? '#EEF2FF' : item.group === 'technical' ? '#F0FDFA' : '#FFF7ED' }]}>
-          <Text style={styles.categoryEmoji}>{item.icon}</Text>
-        </View>
-        <Text style={styles.categoryLabel} numberOfLines={2}>
-          {shortName(item.name)}
-        </Text>
-      </TouchableOpacity>
-    ),
-    [onNavigateTab],
+    ({ item }) => {
+      const catLabel = shortName(item.name);
+      const isSelected = selectedCategory === catLabel;
+      return (
+        <TouchableOpacity
+          style={styles.categoryItem}
+          activeOpacity={0.7}
+          onPress={() => {
+            setSelectedCategory((prev) => (prev === catLabel ? null : catLabel));
+          }}
+        >
+          <View
+            style={[
+              styles.categoryIconCircle,
+              {
+                backgroundColor: isSelected
+                  ? '#4F46E5'
+                  : item.group === 'construction'
+                  ? '#EEF2FF'
+                  : item.group === 'technical'
+                  ? '#F0FDFA'
+                  : '#FFF7ED',
+                borderWidth: isSelected ? 2 : 1,
+                borderColor: isSelected ? '#3730A3' : 'rgba(226, 232, 240, 0.6)',
+              },
+            ]}
+          >
+            <Text style={styles.categoryEmoji}>{item.icon}</Text>
+          </View>
+          <Text
+            style={[
+              styles.categoryLabel,
+              isSelected && { color: '#4F46E5', fontFamily: 'Satoshi-Bold' },
+            ]}
+            numberOfLines={2}
+          >
+            {catLabel}
+          </Text>
+        </TouchableOpacity>
+      );
+    },
+    [selectedCategory],
   );
 
   const renderWorkerCard = useCallback(
@@ -292,19 +348,49 @@ export default function CustomerHomeScreen({
         {/* ─── 6. Nearby Workers (<15km) ─── */}
         <View style={styles.sectionHeader}>
           <View style={styles.nearbyTitleRow}>
-            <Text style={styles.sectionTitle}>Workers near you (within 15km)</Text>
+            <Text style={styles.sectionTitle}>
+              {selectedCategory
+                ? `${selectedCategory}s Online (${nearbyWorkers.length})`
+                : searchQuery
+                ? `Search: "${searchQuery}" (${nearbyWorkers.length})`
+                : `Workers near you (${nearbyWorkers.length})`}
+            </Text>
             <View style={styles.rangeBadge}>
               <Text style={styles.rangeBadgeText}>Live GPS</Text>
             </View>
           </View>
-          <TouchableOpacity onPress={() => onNavigateTab && onNavigateTab('FIND_WORKERS')}>
-            <Text style={styles.seeAll}>Open Map →</Text>
-          </TouchableOpacity>
+          {(selectedCategory || searchQuery) ? (
+            <TouchableOpacity onPress={() => { setSelectedCategory(null); setSearchQuery(''); }}>
+              <Text style={[styles.seeAll, { color: '#DC2626', fontFamily: 'Satoshi-Bold' }]}>Clear Filter ✕</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity onPress={() => onNavigateTab && onNavigateTab('FIND_WORKERS')}>
+              <Text style={styles.seeAll}>Open Map →</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
-        {nearbyWorkers.slice(0, 5).map((worker) => (
-          <View key={worker.id}>{renderWorkerCard({ item: worker })}</View>
-        ))}
+        {nearbyWorkers.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <Text style={{ fontSize: 30, marginBottom: 8 }}>👷‍♂️</Text>
+            <Text style={styles.emptyTitle}>
+              No Online {selectedCategory || searchQuery} Near You
+            </Text>
+            <Text style={styles.emptySub}>
+              All workers in this trade are currently offline or engaged in active contracts. Please check back shortly or explore another skill.
+            </Text>
+            <TouchableOpacity
+              style={styles.clearBtn}
+              onPress={() => { setSelectedCategory(null); setSearchQuery(''); }}
+            >
+              <Text style={styles.clearBtnText}>Show All Available Mistris</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          nearbyWorkers.slice(0, 8).map((worker) => (
+            <View key={worker.id}>{renderWorkerCard({ item: worker })}</View>
+          ))
+        )}
 
         <View style={{ height: 100 }} />
       </ScrollView>
@@ -431,6 +517,18 @@ export default function CustomerHomeScreen({
           </View>
         </View>
       </Modal>
+
+      {/* ─── RAZORPAY TEST MODE CHECKOUT MODAL ─── */}
+      <RazorpayModal
+        visible={showRazorpayModal}
+        onClose={() => setShowRazorpayModal(false)}
+        bookingData={razorpayBookingData}
+        onPaymentSuccess={(completedDetails) => {
+          if (onBookWorker) {
+            onBookWorker(completedDetails);
+          }
+        }}
+      />
     </View>
   );
 }
@@ -655,6 +753,42 @@ const styles = StyleSheet.create({
     fontFamily: 'Satoshi-Bold',
     fontSize: 12,
     color: '#4F46E5',
+  },
+  emptyCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  emptyTitle: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 15,
+    color: '#0F172A',
+    marginBottom: 6,
+    textAlign: 'center',
+  },
+  emptySub: {
+    fontFamily: 'Satoshi-Regular',
+    fontSize: 12.5,
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 16,
+  },
+  clearBtn: {
+    backgroundColor: '#4F46E5',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+  },
+  clearBtnText: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 12.5,
+    color: '#FFFFFF',
   },
   workerCard: {
     backgroundColor: '#FFFFFF',

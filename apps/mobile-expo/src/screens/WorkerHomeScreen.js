@@ -47,10 +47,18 @@ export default function WorkerHomeScreen({
   const [activeVideo, setActiveVideo] = useState(null);
 
   // Toggle Availability
-  const handleToggleAvailability = (val) => {
+  const handleToggleAvailability = async (val) => {
     setIsAvailable(val);
     if (onUpdateProfile) {
       onUpdateProfile({ isAvailable: val });
+    }
+    try {
+      await supabase
+        .from('worker_profiles')
+        .update({ is_available: val, updated_at: new Date().toISOString() })
+        .eq('phone', workerProfile?.phone || '+91 94140 88990');
+    } catch (e) {
+      console.log('Worker availability sync error:', e);
     }
     if (val) {
       Alert.alert(
