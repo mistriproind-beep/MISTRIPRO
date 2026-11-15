@@ -95,27 +95,75 @@ export default function CustomerHomeScreen({
       ? CATEGORIES
       : CATEGORIES.filter((c) => c.group === activeGroup);
 
-  // Filter Workers: Online Only + Category Filter + Search Query Filter
+  // Filter Workers: Online Only + Category Filter + Search Query Filter (Uber/Ola Real-Time Logic)
   const nearbyWorkers = useMemo(() => {
     return MOCK_WORKERS.filter((w) => {
-      // 1. Online / Available only
+      // 1. Online / Available only (Offline workers are strictly hidden from customers)
       if (w.available !== true) return false;
 
-      // 2. Category selection filter
+      // 2. Category selection filter (e.g., clicking Mason shows only Masons)
       if (selectedCategory) {
-        const catTarget = selectedCategory.toLowerCase().replace(/ worker| mistri| expert| labour/g, '').trim();
+        const catTarget = selectedCategory.toLowerCase();
         const wCat = (w.category || '').toLowerCase();
         const wSkill = (w.skill || '').toLowerCase();
-        if (!wCat.includes(catTarget) && !wSkill.includes(catTarget)) return false;
+
+        // Exact match or substring contains
+        let isMatch = wCat === catTarget || wCat.includes(catTarget) || catTarget.includes(wCat);
+
+        if (!isMatch) {
+          // Tokenize category words (length >= 3, excluding stopwords)
+          const cleanTokens = catTarget
+            .replace(/[^a-z0-9]/g, ' ')
+            .split(/\s+/)
+            .filter((t) => t.length >= 3 && !['and', 'for', 'the', 'other'].includes(t));
+
+          const workerCombined = `${wCat} ${wSkill}`.toLowerCase();
+          isMatch = cleanTokens.some((tok) => workerCombined.includes(tok));
+        }
+
+        if (!isMatch) return false;
       }
 
-      // 3. Search query filter
+      // 3. Search query filter (Tag-aware + Typo-tolerant: e.g. "puber" -> Plumber)
       if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
-        const matchesName = (w.name || '').toLowerCase().includes(q);
-        const matchesSkill = (w.skill || '').toLowerCase().includes(q);
-        const matchesCat = (w.category || '').toLowerCase().includes(q);
-        if (!matchesName && !matchesSkill && !matchesCat) return false;
+        const rawQ = searchQuery.toLowerCase().trim();
+        const wName = (w.name || '').toLowerCase();
+        const wSkill = (w.skill || '').toLowerCase();
+        const wCat = (w.category || '').toLowerCase();
+        const wArea = (w.area || '').toLowerCase();
+
+        // Direct substring check
+        let matches =
+          wName.includes(rawQ) ||
+          wSkill.includes(rawQ) ||
+          wCat.includes(rawQ) ||
+          wArea.includes(rawQ);
+
+        // Smart trade tag & typo mapping (e.g. "puber", "pipe", "leak" -> plumber)
+        if (!matches) {
+          const SYNONYMS = {
+            plumber: ['puber', 'pumber', 'plumb', 'pipe', 'leak', 'tap', 'nal', 'fitting', 'sanitary'],
+            mason: ['masn', 'maosn', 'raj', 'mistri', 'brick', 'cement', 'wall', 'chunaee', 'mortar'],
+            electrician: ['elect', 'bijli', 'wire', 'wiring', 'switch', 'light', 'fan', 'fuse', 'mcb'],
+            carpenter: ['carpent', 'wood', 'furniture', 'door', 'table', 'lakdi', 'shuttering'],
+            tile: ['tile', 'marble', 'floor', 'flooring', 'granite', 'stone'],
+            painter: ['paint', 'paintr', 'wall paint', 'color', 'putti', 'distemper'],
+            welder: ['weld', 'loha', 'iron', 'gate', 'grill', 'fabricat'],
+            'ac technician': ['ac', 'aircon', 'cooler', 'cooling'],
+            cleaning: ['clean', 'safai', 'housekeep', 'dusting'],
+          };
+
+          for (const [trade, keywords] of Object.entries(SYNONYMS)) {
+            if (keywords.some((kw) => rawQ.includes(kw) || kw.includes(rawQ))) {
+              if (wCat.includes(trade) || wSkill.includes(trade)) {
+                matches = true;
+                break;
+              }
+            }
+          }
+        }
+
+        if (!matches) return false;
       }
 
       return true;

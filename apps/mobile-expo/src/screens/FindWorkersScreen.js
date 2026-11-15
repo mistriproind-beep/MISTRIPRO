@@ -182,18 +182,29 @@ export default function FindWorkersScreen({ insets, onBookWorker, onNavigateTab 
   const userLng = userLocation?.longitude || 76.3533;
   const areaLabel = userLocation?.areaName || 'Detecting GPS...';
 
-  // Base filtered list: Only online workers matching selected trade
+  // Base filtered list: Only online workers matching selected trade (Strict Uber/Ola online filter)
   const baseWorkers = useMemo(() => {
     if (selectedCategory === 'All') {
       return MOCK_WORKERS.filter((w) => w.available === true);
     }
-    const cleanCat = selectedCategory.toLowerCase().replace(/ worker| mistri| expert| installer|\(.*\)/g, '').trim();
-    return MOCK_WORKERS.filter(
-      (w) =>
-        w.available === true &&
-        ((w.category && w.category.toLowerCase().includes(cleanCat)) ||
-          (w.skill && w.skill.toLowerCase().includes(cleanCat)))
-    );
+    const catTarget = selectedCategory.toLowerCase();
+    return MOCK_WORKERS.filter((w) => {
+      if (w.available !== true) return false;
+      const wCat = (w.category || '').toLowerCase();
+      const wSkill = (w.skill || '').toLowerCase();
+
+      if (wCat === catTarget || wCat.includes(catTarget) || catTarget.includes(wCat)) {
+        return true;
+      }
+
+      const cleanTokens = catTarget
+        .replace(/[^a-z0-9]/g, ' ')
+        .split(/\s+/)
+        .filter((t) => t.length >= 3 && !['and', 'for', 'the', 'other'].includes(t));
+
+      const workerCombined = `${wCat} ${wSkill}`.toLowerCase();
+      return cleanTokens.some((tok) => workerCombined.includes(tok));
+    });
   }, [selectedCategory]);
 
   // Dynamically place workers around the user's REAL live GPS location

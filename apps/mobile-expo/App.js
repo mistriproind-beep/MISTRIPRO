@@ -829,6 +829,7 @@ function MainApp() {
   const handleWithdrawSuccess = (amount, newTxn) => {
     setWorkerWallet((prev) => ({
       ...prev,
+      availableBalance: Math.max(0, prev.availableBalance - (amount || 0)),
       transactions: [newTxn, ...prev.transactions],
     }));
   };
@@ -2064,8 +2065,31 @@ function MainApp() {
               onDeployContractorBooking={async (payload) => {
                 try {
                   await LiveBackend.createContractorBooking(payload);
+                  const newContractorBooking = {
+                    id: `CB-${Date.now().toString().slice(-4)}`,
+                    booking_code: `BK-CREW-${Date.now().toString().slice(-4)}`,
+                    workerName: `${payload.totalWorkers} Worker Crew (${payload.assignedWorkers?.[0]?.name || 'Raj Mistri'} & Team)`,
+                    workerAvatar: 'CR',
+                    workerColor: '#4F46E5',
+                    workerPhone: payload.assignedWorkers?.[0]?.phone || '+91 94140 88990',
+                    worker_skill: 'Contractor Crew',
+                    category: 'Contractor',
+                    title: `${payload.totalWorkers} Workers Crew Deployment`,
+                    location: payload.siteLocation || 'Sawai Madhopur, Rajasthan',
+                    site_location: payload.siteLocation || 'Sawai Madhopur, Rajasthan',
+                    date: 'Today, Immediate',
+                    scheduled_date: 'Today, Immediate',
+                    duration: payload.duration || '1 Day',
+                    total_amount: payload.totalAmount,
+                    amount: `₹${payload.totalAmount}`,
+                    status: 'active',
+                    progress_step: 1,
+                    razorpay_payment_id: `pay_test_${Date.now().toString().slice(-8)}`,
+                  };
+                  setCustomerBookings((prev) => [newContractorBooking, ...prev]);
+                  await StorageService.setBookings([newContractorBooking, ...customerBookings]);
                   DeviceFeedback.triggerSuccessHaptics();
-                  Alert.alert('Contractor Crew Dispatched! 🚀', 'Available nearby workers have been assigned to your project.');
+                  Alert.alert('Contractor Crew Dispatched! 🚀', 'Available nearby workers have been assigned to your project. Visible in My Bookings.');
                   setActiveTab('BOOKINGS');
                 } catch (e) {
                   console.log('Contractor booking error:', e);

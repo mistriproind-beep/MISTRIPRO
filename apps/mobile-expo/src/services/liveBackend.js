@@ -178,12 +178,16 @@ export const LiveBackend = {
   },
 
   // 5. Update Booking Status (e.g. Worker Confirms, Rejects, or Progresses Steps)
-  updateBookingStatus: async (bookingId, updates) => {
+  updateBookingStatus: async (bookingId, updates, progressStep) => {
     try {
+      const payload = typeof updates === 'string' ? { status: updates } : { ...updates };
+      if (progressStep !== undefined) {
+        payload.progress_step = progressStep;
+      }
       const { data, error } = await supabase
         .from('bookings')
         .update({
-          ...updates,
+          ...payload,
           updated_at: new Date().toISOString(),
         })
         .eq('id', bookingId)

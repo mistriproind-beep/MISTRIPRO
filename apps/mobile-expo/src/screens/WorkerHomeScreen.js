@@ -29,6 +29,7 @@ import {
   Zap,
 } from 'lucide-react-native';
 import { WORKER_TUTORIALS } from '../data/workerData';
+import { supabase } from '../services/supabase';
 
 export default function WorkerHomeScreen({
   insets,

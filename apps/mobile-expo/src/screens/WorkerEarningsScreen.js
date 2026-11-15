@@ -95,8 +95,9 @@ export default function WorkerEarningsScreen({
 
     setIsSubmitting(true);
 
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(workerProfile?.id);
     const withdrawalRecord = {
-      worker_id: workerProfile?.id || 'w-me',
+      worker_id: isUUID ? workerProfile.id : null,
       worker_name: workerProfile?.name || 'Ram Singh Mistri',
       worker_phone: workerProfile?.phone || '+91 98290 12345',
       amount: num,
