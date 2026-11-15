@@ -64,12 +64,24 @@ import {
   Smartphone,
   Users,
   Compass,
+  Wallet,
 } from 'lucide-react-native';
 
 import CustomerHomeScreen from './src/screens/CustomerHomeScreen';
 import FindWorkersScreen from './src/screens/FindWorkersScreen';
 import MyBookingsScreen from './src/screens/MyBookingsScreen';
 import ContractorScreen from './src/screens/ContractorScreen';
+
+import WorkerHomeScreen from './src/screens/WorkerHomeScreen';
+import WorkerAlertsScreen from './src/screens/WorkerAlertsScreen';
+import WorkerBookingsScreen from './src/screens/WorkerBookingsScreen';
+import WorkerEarningsScreen from './src/screens/WorkerEarningsScreen';
+import {
+  INITIAL_WORKER_PROFILE,
+  INITIAL_ALERTS,
+  INITIAL_WORKER_BOOKINGS,
+  INITIAL_WALLET,
+} from './src/data/workerData';
 
 const { width } = Dimensions.get('window');
 
@@ -537,6 +549,85 @@ function MainApp() {
   const [workerSkills, setWorkerSkills] = useState(['Mason (Raj Mistri)', 'Tile & Marble Installer']);
   const [aadhaarFrontUri, setAadhaarFrontUri] = useState(null);
   const [aadhaarBackUri, setAadhaarBackUri] = useState(null);
+
+  // Dedicated Worker State (Profile, Availability, Alerts, Bookings, Wallet)
+  const [workerProfile, setWorkerProfile] = useState(INITIAL_WORKER_PROFILE);
+  const [workerAlerts, setWorkerAlerts] = useState(INITIAL_ALERTS);
+  const [workerBookings, setWorkerBookings] = useState(INITIAL_WORKER_BOOKINGS);
+  const [workerWallet, setWorkerWallet] = useState(INITIAL_WALLET);
+
+  const handleUpdateWorkerProfile = (updates) => {
+    setWorkerProfile((prev) => ({ ...prev, ...updates }));
+  };
+
+  const handleApproveAlert = (alertItem) => {
+    setWorkerAlerts((prev) => prev.filter((a) => a.id !== alertItem.id));
+    const newBooking = {
+      id: `WB-${Date.now().toString().slice(-4)}`,
+      customerName: alertItem.customerName,
+      customerAvatar: alertItem.customerAvatar || 'CU',
+      customerColor: alertItem.customerColor || '#0284C7',
+      customerPhone: alertItem.customerPhone || '+91 98290 12345',
+      category: alertItem.category,
+      title: alertItem.title,
+      location: alertItem.location,
+      distance: alertItem.distance || '2.4 km',
+      date: alertItem.date,
+      timing: alertItem.timing || '9:00 AM – 5:00 PM',
+      amount: alertItem.offeredRate,
+      duration: alertItem.duration || '1 Day',
+      status: 'active',
+      step: 1, // Approved
+      escrowStatus: 'LOCKED_IN_ESCROW',
+    };
+    setWorkerBookings((prev) => [newBooking, ...prev]);
+  };
+
+  const handleRejectAlert = (alertId) => {
+    setWorkerAlerts((prev) => prev.filter((a) => a.id !== alertId));
+  };
+
+  const handleUpdateWorkerBookingStep = (bookingId, nextStep) => {
+    setWorkerBookings((prev) =>
+      prev.map((b) => (b.id === bookingId ? { ...b, step: nextStep } : b))
+    );
+  };
+
+  const handleCompleteWorkerBooking = (booking) => {
+    const numericAmount = parseInt(String(booking.amount).replace(/[^0-9]/g, ''), 10) || 950;
+    setWorkerBookings((prev) =>
+      prev.map((b) =>
+        b.id === booking.id
+          ? { ...b, status: 'completed', step: 4, payoutStatus: 'PAID_TO_WALLET' }
+          : b
+      )
+    );
+    setWorkerWallet((prev) => ({
+      ...prev,
+      availableBalance: prev.availableBalance + numericAmount,
+      totalLifetimeEarnings: prev.totalLifetimeEarnings + numericAmount,
+      transactions: [
+        {
+          id: `TXN-${Date.now().toString().slice(-4)}`,
+          title: `Job Payout: ${booking.title}`,
+          customer: booking.customerName,
+          type: 'CREDIT',
+          amount: numericAmount,
+          date: 'Today',
+          status: 'COMPLETED',
+          method: 'Escrow Release',
+        },
+        ...prev.transactions,
+      ],
+    }));
+  };
+
+  const handleWithdrawSuccess = (amount, newTxn) => {
+    setWorkerWallet((prev) => ({
+      ...prev,
+      transactions: [newTxn, ...prev.transactions],
+    }));
+  };
 
   // Dev Login form state
   const [showDevForm, setShowDevForm] = useState(false);
@@ -1708,32 +1799,42 @@ function MainApp() {
       ) : (
         <>
           {activeTab === 'HOME' && (
-            <HomeScreen
-              t={t}
-              role={role}
+            <WorkerHomeScreen
               insets={insets}
-              projects={projects}
-              onOpenPost={() => setShowPostModal(true)}
-              onSelectCategory={(cat) => setNewCategory(cat)}
+              workerProfile={workerProfile}
+              onUpdateProfile={handleUpdateWorkerProfile}
+              alertsCount={workerAlerts.length}
+              walletBalance={workerWallet.availableBalance}
+              onNavigateTab={(tab) => setActiveTab(tab)}
             />
           )}
 
-          {activeTab === 'WORK' && (
-            <WorkScreen
-              t={t}
-              role={role}
+          {activeTab === 'ALERTS' && (
+            <WorkerAlertsScreen
               insets={insets}
-              projects={projects}
-              onOpenPost={() => setShowPostModal(true)}
+              alerts={workerAlerts}
+              onApproveAlert={handleApproveAlert}
+              onRejectAlert={handleRejectAlert}
+              onNavigateTab={(tab) => setActiveTab(tab)}
             />
           )}
 
-          {activeTab === 'REVIEWS' && (
-            <ReviewsScreen
-              t={t}
+          {activeTab === 'BOOKINGS' && (
+            <WorkerBookingsScreen
               insets={insets}
-              reviews={reviews}
-              onOpenWriteReview={() => setShowReviewModal(true)}
+              bookings={workerBookings}
+              onUpdateBookingStep={handleUpdateWorkerBookingStep}
+              onCompleteBooking={handleCompleteWorkerBooking}
+              onNavigateTab={(tab) => setActiveTab(tab)}
+            />
+          )}
+
+          {activeTab === 'EARNINGS' && (
+            <WorkerEarningsScreen
+              insets={insets}
+              walletData={workerWallet}
+              workerProfile={workerProfile}
+              onWithdrawSuccess={handleWithdrawSuccess}
             />
           )}
 
@@ -1882,55 +1983,65 @@ function MainApp() {
                   strokeWidth={activeTab === 'HOME' ? 2.5 : 2}
                 />
               </View>
-              <Text style={[styles.navLabel, activeTab === 'HOME' && styles.navLabelActive]}>
-                {t.home}
+              <Text style={[styles.navLabel, activeTab === 'HOME' && styles.navLabelActive]} numberOfLines={1}>
+                Home
               </Text>
             </TouchableOpacity>
 
-            {/* Worker Tab 2: Work */}
+            {/* Worker Tab 2: Alerts */}
             <TouchableOpacity
               style={styles.navItem}
-              onPress={() => setActiveTab('WORK')}
+              onPress={() => setActiveTab('ALERTS')}
               activeOpacity={0.7}
             >
-              <View style={[styles.navIconBox, activeTab === 'WORK' && styles.navIconBoxActive]}>
-                <Briefcase
+              <View style={[styles.navIconBox, activeTab === 'ALERTS' && styles.navIconBoxActive]}>
+                <Bell
                   size={20}
-                  color={activeTab === 'WORK' ? '#4F46E5' : '#94A3B8'}
-                  strokeWidth={activeTab === 'WORK' ? 2.5 : 2}
+                  color={activeTab === 'ALERTS' ? '#4F46E5' : '#94A3B8'}
+                  strokeWidth={activeTab === 'ALERTS' ? 2.5 : 2}
                 />
+                {workerAlerts.length > 0 && (
+                  <View style={styles.navAlertDot} />
+                )}
               </View>
-              <Text style={[styles.navLabel, activeTab === 'WORK' && styles.navLabelActive]}>
-                {t.work}
+              <Text style={[styles.navLabel, activeTab === 'ALERTS' && styles.navLabelActive]} numberOfLines={1}>
+                Alerts
               </Text>
             </TouchableOpacity>
 
-            {/* Center Floating Action Button (Post Tender / Find Jobs) */}
-            <TouchableOpacity
-              style={styles.navCenterFab}
-              onPress={() => {
-                setShowPostModal(true);
-              }}
-              activeOpacity={0.85}
-            >
-              <Plus size={26} color="#FFFFFF" strokeWidth={2.8} />
-            </TouchableOpacity>
-
-            {/* Worker Tab 4: Reviews */}
+            {/* Worker Tab 3: Bookings */}
             <TouchableOpacity
               style={styles.navItem}
-              onPress={() => setActiveTab('REVIEWS')}
+              onPress={() => setActiveTab('BOOKINGS')}
               activeOpacity={0.7}
             >
-              <View style={[styles.navIconBox, activeTab === 'REVIEWS' && styles.navIconBoxActive]}>
-                <Star
+              <View style={[styles.navIconBox, activeTab === 'BOOKINGS' && styles.navIconBoxActive]}>
+                <Calendar
                   size={20}
-                  color={activeTab === 'REVIEWS' ? '#4F46E5' : '#94A3B8'}
-                  strokeWidth={activeTab === 'REVIEWS' ? 2.5 : 2}
+                  color={activeTab === 'BOOKINGS' ? '#4F46E5' : '#94A3B8'}
+                  strokeWidth={activeTab === 'BOOKINGS' ? 2.5 : 2}
                 />
               </View>
-              <Text style={[styles.navLabel, activeTab === 'REVIEWS' && styles.navLabelActive]}>
-                {t.reviews}
+              <Text style={[styles.navLabel, activeTab === 'BOOKINGS' && styles.navLabelActive]} numberOfLines={1}>
+                Bookings
+              </Text>
+            </TouchableOpacity>
+
+            {/* Worker Tab 4: Earnings */}
+            <TouchableOpacity
+              style={styles.navItem}
+              onPress={() => setActiveTab('EARNINGS')}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.navIconBox, activeTab === 'EARNINGS' && styles.navIconBoxActive]}>
+                <Wallet
+                  size={20}
+                  color={activeTab === 'EARNINGS' ? '#4F46E5' : '#94A3B8'}
+                  strokeWidth={activeTab === 'EARNINGS' ? 2.5 : 2}
+                />
+              </View>
+              <Text style={[styles.navLabel, activeTab === 'EARNINGS' && styles.navLabelActive]} numberOfLines={1}>
+                Earnings
               </Text>
             </TouchableOpacity>
 
@@ -1947,8 +2058,8 @@ function MainApp() {
                   strokeWidth={activeTab === 'PROFILE' ? 2.5 : 2}
                 />
               </View>
-              <Text style={[styles.navLabel, activeTab === 'PROFILE' && styles.navLabelActive]}>
-                {t.profile}
+              <Text style={[styles.navLabel, activeTab === 'PROFILE' && styles.navLabelActive]} numberOfLines={1}>
+                Profile
               </Text>
             </TouchableOpacity>
           </>
@@ -3266,6 +3377,15 @@ const styles = StyleSheet.create({
   },
   navIconBoxActive: {
     backgroundColor: '#EEF2FF',
+  },
+  navAlertDot: {
+    position: 'absolute',
+    top: 2,
+    right: 4,
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: '#DC2626',
   },
   navLabel: {
     fontFamily: 'Satoshi-Medium',
