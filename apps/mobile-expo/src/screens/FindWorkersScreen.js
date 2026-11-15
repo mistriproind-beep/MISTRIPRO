@@ -115,8 +115,19 @@ function WorkerCard({ worker, isSelected, onSelect, onOpenProfile, onProceedBook
   );
 }
 
-export default function FindWorkersScreen({ insets, onBookWorker, onNavigateTab }) {
-  const [selectedCategory, setSelectedCategory] = useState('All');
+export default function FindWorkersScreen({
+  insets,
+  onBookWorker,
+  onNavigateTab,
+  initialCategory = 'All',
+}) {
+  const [selectedCategory, setSelectedCategory] = useState(initialCategory || 'All');
+
+  useEffect(() => {
+    if (initialCategory) {
+      setSelectedCategory(initialCategory);
+    }
+  }, [initialCategory]);
   const [selectedWorkerId, setSelectedWorkerId] = useState(null);
   const [userLocation, setUserLocation] = useState(null); // { latitude, longitude, areaName }
   const [isLocLoading, setIsLocLoading] = useState(true);
@@ -508,7 +519,12 @@ export default function FindWorkersScreen({ insets, onBookWorker, onNavigateTab 
           contentContainerStyle={styles.chipsContent}
         >
           {allChips.map((chip) => {
-            const isSelected = selectedCategory === chip;
+            const isSelected =
+              selectedCategory === chip ||
+              (chip !== 'All' &&
+                selectedCategory !== 'All' &&
+                (chip.toLowerCase().includes(selectedCategory.toLowerCase()) ||
+                  selectedCategory.toLowerCase().includes(chip.toLowerCase())));
             return (
               <TouchableOpacity
                 key={chip}

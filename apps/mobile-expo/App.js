@@ -566,6 +566,7 @@ function MainApp() {
 
   // Customer Bookings State (Connected to Live DB + Mock Bookings)
   const [customerBookings, setCustomerBookings] = useState(MOCK_BOOKINGS);
+  const [findInitialCategory, setFindInitialCategory] = useState('All');
 
   const [isDev, setIsDev] = useState(false);
   const [showNotifModal, setShowNotifModal] = useState(false);
@@ -2031,7 +2032,10 @@ function MainApp() {
           {activeTab === 'HOME' && (
             <CustomerHomeScreen
               insets={insets}
-              onNavigateTab={(tab) => setActiveTab(tab)}
+              onNavigateTab={(tab, category) => {
+                if (category) setFindInitialCategory(category);
+                setActiveTab(tab);
+              }}
               onBookWorker={(details) => handleCustomerBookWorker(details)}
               onOpenNotifications={() => setShowNotifModal(true)}
               notificationsCount={notifications.length}
@@ -2041,6 +2045,7 @@ function MainApp() {
           {activeTab === 'FIND_WORKERS' && (
             <FindWorkersScreen
               insets={insets}
+              initialCategory={findInitialCategory}
               onNavigateTab={(tab) => setActiveTab(tab)}
               onBookWorker={(details) => handleCustomerBookWorker(details)}
             />

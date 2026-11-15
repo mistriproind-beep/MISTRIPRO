@@ -21,6 +21,8 @@ import {
   X,
   CheckCircle2,
   AlertCircle,
+  ArrowUpRight,
+  ChevronUp,
 } from 'lucide-react-native';
 import * as Location from 'expo-location';
 
@@ -60,6 +62,7 @@ export default function CustomerHomeScreen({
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [showRazorpayModal, setShowRazorpayModal] = useState(false);
   const [razorpayBookingData, setRazorpayBookingData] = useState(null);
+  const [showAllCategories, setShowAllCategories] = useState(false);
 
   /* GPS Location */
   useEffect(() => {
@@ -94,6 +97,53 @@ export default function CustomerHomeScreen({
     activeGroup === 'all'
       ? CATEGORIES
       : CATEGORIES.filter((c) => c.group === activeGroup);
+
+  // Concise 8 categories unless "See All" is clicked
+  const displayedCategories = showAllCategories
+    ? filteredCategories
+    : filteredCategories.slice(0, 8);
+
+  // Live Dropdown Suggestions for the Search Bar
+  const searchSuggestions = useMemo(() => {
+    if (!searchQuery.trim()) return { categories: [], workers: [], totalCount: 0 };
+    const q = searchQuery.toLowerCase().trim();
+
+    // 1. Matching categories (including trade synonyms & common misspellings)
+    const matchingCategories = CATEGORIES.filter((c) => {
+      const name = c.name.toLowerCase();
+      const short = shortName(c.name).toLowerCase();
+      const synonyms = {
+        plumber: ['puber', 'pumber', 'plumb', 'pipe', 'leak', 'tap', 'nal'],
+        mason: ['masn', 'maosn', 'raj', 'mistri', 'brick', 'cement'],
+        electrician: ['elect', 'bijli', 'wire', 'light', 'fan'],
+        carpenter: ['carpent', 'wood', 'lakdi', 'furniture'],
+        painter: ['paint', 'paintr', 'color', 'rang'],
+        welder: ['weld', 'loha', 'iron'],
+      };
+      let matchSyn = false;
+      for (const [key, list] of Object.entries(synonyms)) {
+        if (list.some((syn) => q.includes(syn) || syn.includes(q))) {
+          if (name.includes(key)) matchSyn = true;
+        }
+      }
+      return name.includes(q) || short.includes(q) || matchSyn;
+    }).slice(0, 4);
+
+    // 2. Matching online workers
+    const matchingWorkers = MOCK_WORKERS.filter((w) => {
+      if (w.available !== true) return false;
+      const wName = (w.name || '').toLowerCase();
+      const wSkill = (w.skill || '').toLowerCase();
+      const wCat = (w.category || '').toLowerCase();
+      return wName.includes(q) || wSkill.includes(q) || wCat.includes(q);
+    }).slice(0, 3);
+
+    return {
+      categories: matchingCategories,
+      workers: matchingWorkers,
+      totalCount: matchingCategories.length + matchingWorkers.length,
+    };
+  }, [searchQuery]);
 
   // Filter Workers: Online Only + Category Filter + Search Query Filter (Uber/Ola Real-Time Logic)
   const nearbyWorkers = useMemo(() => {
@@ -357,7 +407,99 @@ export default function CustomerHomeScreen({
               value={searchQuery}
               onChangeText={setSearchQuery}
             />
+            {searchQuery.trim().length > 0 && (
+              <TouchableOpacity
+                onPress={() => setSearchQuery('')}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <X size={16} color="#94A3B8" />
+              </TouchableOpacity>
+            )}
           </View>
+
+          {/* Instant Search Suggestions Dropdown (Direct 1-Tap to Find Tab) */}
+          {searchQuery.trim().length > 0 && (
+            <View style={styles.searchDropdownCard}>
+              <View style={styles.dropdownHeader}>
+                <Text style={styles.dropdownHeaderText}>Suggestions • Tap to Open on Map</Text>
+                <TouchableOpacity onPress={() => setSearchQuery('')}>
+                  <Text style={styles.dropdownCloseText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              {searchSuggestions.totalCount === 0 ? (
+                <View style={styles.emptySuggestionRow}>
+                  <Text style={styles.emptySuggestionText}>No online trade found for "{searchQuery}"</Text>
+                </View>
+              ) : (
+                <>
+                  {/* Categories suggestions */}
+                  {searchSuggestions.categories.map((cat) => (
+                    <TouchableOpacity
+                      key={cat.id}
+                      style={styles.suggestionRow}
+                      activeOpacity={0.7}
+                      onPress={() => {
+                        const targetCategory = cat.name;
+                        setSearchQuery('');
+                        if (onNavigateTab) {
+                          onNavigateTab('FIND_WORKERS', targetCategory);
+                        }
+                      }}
+                    >
+                      <View style={styles.suggestionIconWrap}>
+                        <Text style={{ fontSize: 16 }}>{cat.icon}</Text>
+                      </View>
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text style={styles.suggestionTitle} numberOfLines={1}>
+                          {cat.name}
+                        </Text>
+                        <Text style={styles.suggestionSub}>
+                          Tap to view {cat.name} on Live Map →
+                        </Text>
+                      </View>
+                      <View style={styles.suggestionActionBadge}>
+                        <Text style={styles.suggestionActionText}>Open Map</Text>
+                        <ArrowUpRight size={13} color="#4F46E5" />
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+
+                  {/* Worker suggestions */}
+                  {searchSuggestions.workers.map((w) => (
+                    <TouchableOpacity
+                      key={w.id}
+                      style={styles.suggestionRow}
+                      activeOpacity={0.7}
+                      onPress={() => {
+                        const targetCategory = w.category || w.skill;
+                        setSearchQuery('');
+                        if (onNavigateTab) {
+                          onNavigateTab('FIND_WORKERS', targetCategory);
+                        }
+                      }}
+                    >
+                      <View style={[styles.suggestionAvatar, { backgroundColor: w.color || '#4F46E5' }]}>
+                        <Text style={styles.suggestionAvatarText}>{w.avatar}</Text>
+                      </View>
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text style={styles.suggestionTitle} numberOfLines={1}>
+                          {w.name} • <Text style={{ color: '#15803D' }}>{w.rating}★</Text>
+                        </Text>
+                        <Text style={styles.suggestionSub} numberOfLines={1}>
+                          {w.skill} • ₹{w.rate}/day • {w.distance} km away
+                        </Text>
+                      </View>
+                      <View style={styles.suggestionActionBadge}>
+                        <Text style={styles.suggestionActionText}>Open Map</Text>
+                        <ArrowUpRight size={13} color="#4F46E5" />
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </>
+              )}
+            </View>
+          )}
         </View>
 
         {/* ─── 4. Category Filter Tabs ─── */}
@@ -382,9 +524,9 @@ export default function CustomerHomeScreen({
           })}
         </View>
 
-        {/* ─── 5. 25 Labour Categories Grid ─── */}
+        {/* ─── 5. Concise Labour Categories Grid (8 concise + See All toggle) ─── */}
         <FlatList
-          data={filteredCategories}
+          data={displayedCategories}
           keyExtractor={(item) => item.id}
           numColumns={4}
           renderItem={renderCategoryItem}
@@ -392,6 +534,20 @@ export default function CustomerHomeScreen({
           columnWrapperStyle={styles.categoryRow}
           contentContainerStyle={styles.categoryGrid}
         />
+
+        {filteredCategories.length > 8 && (
+          <TouchableOpacity
+            style={styles.seeAllCategoriesBtn}
+            onPress={() => setShowAllCategories((prev) => !prev)}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.seeAllCategoriesBtnText}>
+              {showAllCategories
+                ? 'Show Less (कम देखें) ▴'
+                : `See All Services (${filteredCategories.length}) ▾`}
+            </Text>
+          </TouchableOpacity>
+        )}
 
         {/* ─── 6. Nearby Workers (<15km) ─── */}
         <View style={styles.sectionHeader}>
@@ -768,6 +924,126 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 13.5,
     minHeight: 28,
+  },
+  seeAllCategoriesBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#EEF2FF',
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    marginBottom: 20,
+    marginTop: 4,
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+    alignSelf: 'center',
+  },
+  seeAllCategoriesBtnText: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 12.5,
+    color: '#4F46E5',
+  },
+  searchDropdownCard: {
+    marginTop: 10,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  dropdownHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#F8FAFC',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  dropdownHeaderText: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 11,
+    color: '#64748B',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  dropdownCloseText: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 12,
+    color: '#94A3B8',
+    paddingHorizontal: 4,
+  },
+  suggestionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F8FAFC',
+    gap: 10,
+  },
+  suggestionIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#EEF2FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  suggestionAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  suggestionAvatarText: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 13,
+    color: '#FFFFFF',
+  },
+  suggestionTitle: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 13,
+    color: '#0F172A',
+  },
+  suggestionSub: {
+    fontFamily: 'Satoshi-Regular',
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 1,
+  },
+  suggestionActionBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  suggestionActionText: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 10.5,
+    color: '#4F46E5',
+  },
+  emptySuggestionRow: {
+    padding: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptySuggestionText: {
+    fontFamily: 'Satoshi-Regular',
+    fontSize: 12,
+    color: '#94A3B8',
   },
   sectionHeader: {
     flexDirection: 'row',

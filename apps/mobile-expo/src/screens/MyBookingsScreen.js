@@ -434,13 +434,17 @@ export default function MyBookingsScreen({
         <View style={styles.modalBackdrop}>
           <View style={styles.modalSheet}>
             <View style={styles.modalHeader}>
-              <View>
-                <Text style={styles.modalTitle}>Live Job Progress Tracker</Text>
-                <Text style={styles.modalSub}>
+              <View style={{ flex: 1, marginRight: 12 }}>
+                <Text style={styles.modalTitle} numberOfLines={1}>Live Job Progress Tracker</Text>
+                <Text style={styles.modalSub} numberOfLines={1}>
                   {trackingBooking?.worker_name || trackingBooking?.workerName} • {trackingBooking?.category}
                 </Text>
               </View>
-              <TouchableOpacity onPress={() => setTrackingBooking(null)}>
+              <TouchableOpacity
+                style={styles.modalDoneBtn}
+                onPress={() => setTrackingBooking(null)}
+                activeOpacity={0.8}
+              >
                 <Text style={styles.modalCloseText}>Done</Text>
               </TouchableOpacity>
             </View>
@@ -511,11 +515,15 @@ export default function MyBookingsScreen({
         <View style={styles.modalBackdrop}>
           <View style={styles.modalSheet}>
             <View style={styles.modalHeader}>
-              <View>
-                <Text style={styles.modalTitle}>Rate Your Mistri Experience</Text>
-                <Text style={styles.modalSub}>{reviewBooking?.worker_name || 'Worker'} • {reviewBooking?.category}</Text>
+              <View style={{ flex: 1, marginRight: 12 }}>
+                <Text style={styles.modalTitle} numberOfLines={1}>Rate Your Mistri Experience</Text>
+                <Text style={styles.modalSub} numberOfLines={1}>{reviewBooking?.worker_name || 'Worker'} • {reviewBooking?.category}</Text>
               </View>
-              <TouchableOpacity onPress={() => setReviewBooking(null)}>
+              <TouchableOpacity
+                style={styles.modalDoneBtn}
+                onPress={() => setReviewBooking(null)}
+                activeOpacity={0.8}
+              >
                 <Text style={styles.modalCloseText}>Cancel</Text>
               </TouchableOpacity>
             </View>
@@ -1039,9 +1047,19 @@ const styles = StyleSheet.create({
     color: '#64748B',
     marginTop: 2,
   },
+  modalDoneBtn: {
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   modalCloseText: {
     fontFamily: 'Satoshi-Bold',
-    fontSize: 13,
+    fontSize: 12.5,
     color: '#4F46E5',
   },
   trackerBox: {
