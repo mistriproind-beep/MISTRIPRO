@@ -45,7 +45,7 @@ export const WORKER_TUTORIALS = [
   },
   {
     id: 'tut-3',
-    title: 'How Escrow Payments & Digital Payouts Work',
+    title: 'How Secured Payments & Digital Payouts Work',
     hindiTitle: 'एस्क्रो पेमेंट कैसे काम करता है और सीधे बैंक में पैसे निकालें',
     duration: '3:50 min',
     channel: 'Mistri Pro Finance',

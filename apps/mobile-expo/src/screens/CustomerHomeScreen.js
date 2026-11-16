@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   StatusBar,
   Modal,
+  Alert,
 } from 'react-native';
 import {
   Bell,
@@ -31,6 +32,7 @@ import RazorpayModal from '../components/RazorpayModal';
 
 /* ─── helpers ─── */
 const shortName = (full) => {
+  if (!full || typeof full !== 'string') return '';
   const cleaned = full.split('(')[0].split('/')[0].trim();
   if (cleaned.includes('Tile')) return 'Tile Worker';
   if (cleaned.includes('POP')) return 'POP Ceiling';
@@ -66,7 +68,7 @@ export default function CustomerHomeScreen({
   const [showAllCategories, setShowAllCategories] = useState(false);
 
   const userInitials = useMemo(() => {
-    const clean = (userName || 'User').trim();
+    const clean = (typeof userName === 'string' ? userName : 'User').trim();
     const parts = clean.split(' ').filter(Boolean);
     if (parts.length >= 2) {
       return (parts[0][0] + parts[1][0]).toUpperCase();
@@ -119,8 +121,9 @@ export default function CustomerHomeScreen({
     const q = searchQuery.toLowerCase().trim();
 
     // 1. Matching categories (including trade synonyms & common misspellings)
-    const matchingCategories = CATEGORIES.filter((c) => {
-      const name = c.name.toLowerCase();
+    const matchingCategories = (CATEGORIES || []).filter((c) => {
+      if (!c) return false;
+      const name = (c.name || '').toLowerCase();
       const short = shortName(c.name).toLowerCase();
       const synonyms = {
         plumber: ['puber', 'pumber', 'plumb', 'pipe', 'leak', 'tap', 'nal'],
@@ -139,15 +142,29 @@ export default function CustomerHomeScreen({
       return name.includes(q) || short.includes(q) || matchSyn;
     }).slice(0, 4);
 
-    // 2. Matching online workers
+    // 2. Matching workers (online first, but also finding offline workers)
     const liveList = Array.isArray(workers) ? workers : [];
-    const matchingWorkers = liveList.filter((w) => {
-      if (w.available !== true) return false;
-      const wName = (w.name || '').toLowerCase();
-      const wSkill = (w.skill || '').toLowerCase();
-      const wCat = (w.category || '').toLowerCase();
-      return wName.includes(q) || wSkill.includes(q) || wCat.includes(q);
-    }).slice(0, 3);
+    const matchingWorkers = liveList
+      .filter((w) => {
+        if (!w) return false;
+        const wName = (w.name || '').toLowerCase();
+        const wSkill = (w.skill || '').toLowerCase();
+        const wCat = (w.category || '').toLowerCase();
+        const wSkills = Array.isArray(w.skills) ? w.skills.join(' ').toLowerCase() : '';
+        return (
+          wName.includes(q) ||
+          wSkill.includes(q) ||
+          wCat.includes(q) ||
+          wSkills.includes(q)
+        );
+      })
+      .sort((a, b) => {
+        const aAvail = Boolean(a?.available);
+        const bAvail = Boolean(b?.available);
+        if (aAvail === bAvail) return 0;
+        return aAvail ? -1 : 1;
+      })
+      .slice(0, 3);
 
     return {
       categories: matchingCategories,
@@ -160,9 +177,10 @@ export default function CustomerHomeScreen({
   const nearbyWorkers = useMemo(() => {
     const liveList = Array.isArray(workers) ? workers : [];
     const filtered = liveList.filter((w) => {
+      if (!w) return false;
       // 1. Category selection filter (e.g., clicking Mason shows only Masons)
       if (selectedCategory) {
-        const catTarget = selectedCategory.toLowerCase();
+        const catTarget = String(selectedCategory).toLowerCase();
         const wCat = (w.category || '').toLowerCase();
         const wSkill = (w.skill || '').toLowerCase();
 
@@ -190,13 +208,15 @@ export default function CustomerHomeScreen({
         const wSkill = (w.skill || '').toLowerCase();
         const wCat = (w.category || '').toLowerCase();
         const wArea = (w.area || '').toLowerCase();
+        const wSkills = Array.isArray(w.skills) ? w.skills.join(' ').toLowerCase() : '';
 
         // Direct substring check
         let matches =
           wName.includes(rawQ) ||
           wSkill.includes(rawQ) ||
           wCat.includes(rawQ) ||
-          wArea.includes(rawQ);
+          wArea.includes(rawQ) ||
+          wSkills.includes(rawQ);
 
         // Smart trade tag & typo mapping (e.g. "puber", "pipe", "leak" -> plumber)
         if (!matches) {
@@ -230,8 +250,10 @@ export default function CustomerHomeScreen({
 
     // Sort: Online workers first, offline below
     return [...filtered].sort((a, b) => {
-      if (a.available === b.available) return 0;
-      return a.available ? -1 : 1;
+      const aAvail = Boolean(a?.available);
+      const bAvail = Boolean(b?.available);
+      if (aAvail === bAvail) return 0;
+      return aAvail ? -1 : 1;
     });
   }, [searchQuery, selectedCategory, workers]);
 
@@ -324,34 +346,34 @@ export default function CustomerHomeScreen({
         onPress={() => setSelectedWorker(item)}
       >
         {/* Avatar */}
-        <View style={[styles.workerAvatar, { backgroundColor: item.color }]}>
-          <Text style={styles.workerAvatarText}>{item.avatar}</Text>
+        <View style={[styles.workerAvatar, { backgroundColor: item?.color || '#4F46E5' }]}>
+          <Text style={styles.workerAvatarText}>{item?.avatar || 'W'}</Text>
         </View>
 
         {/* Info */}
         <View style={styles.workerInfo}>
           <View style={styles.workerNameRow}>
-            <Text style={styles.workerName} numberOfLines={1}>{item.name}</Text>
-            {item.verified && (
+            <Text style={styles.workerName} numberOfLines={1}>{item?.name || 'Worker'}</Text>
+            {item?.verified && (
               <View style={styles.verifiedBadge}>
                 <Text style={styles.verifiedText}>✓</Text>
               </View>
             )}
           </View>
-          <Text style={styles.workerSkill}>{item.skill}</Text>
+          <Text style={styles.workerSkill}>{item?.skill || 'Labour'}</Text>
           {/* Availability Status Badge */}
-          <View style={[styles.cardAvailBadge, item.available ? styles.cardAvailOnline : styles.cardAvailOffline]}>
-            <View style={[styles.cardAvailDot, item.available ? styles.cardDotOnline : styles.cardDotOffline]} />
-            <Text style={[styles.cardAvailText, item.available ? styles.cardTextOnline : styles.cardTextOffline]}>
-              {item.available ? 'Online' : 'Not Available Right Now'}
+          <View style={[styles.cardAvailBadge, item?.available ? styles.cardAvailOnline : styles.cardAvailOffline]}>
+            <View style={[styles.cardAvailDot, item?.available ? styles.cardDotOnline : styles.cardDotOffline]} />
+            <Text style={[styles.cardAvailText, item?.available ? styles.cardTextOnline : styles.cardTextOffline]}>
+              {item?.available ? 'Online' : 'Not Available Right Now'}
             </Text>
           </View>
           <View style={styles.workerMeta}>
             <Star size={13} color="#F59E0B" fill="#F59E0B" />
-            <Text style={styles.workerRating}>{item.rating}</Text>
-            <Text style={styles.workerReviews}>({item.reviews})</Text>
+            <Text style={styles.workerRating}>{item?.rating || '5.0'}</Text>
+            <Text style={styles.workerReviews}>({item?.reviews ?? 0})</Text>
             <View style={styles.metaDot} />
-            <Text style={styles.workerRate}>₹{item.rate}/{item.rateType}</Text>
+            <Text style={styles.workerRate}>₹{item?.rate || 800}/{item?.rateType || 'day'}</Text>
           </View>
         </View>
 
@@ -359,24 +381,24 @@ export default function CustomerHomeScreen({
         <View style={styles.workerRight}>
           <View style={styles.distanceBadge}>
             <MapPin size={11} color="#4F46E5" />
-            <Text style={styles.distanceText}>{item.distance} km</Text>
+            <Text style={styles.distanceText}>{item?.distance || '2.0'} km</Text>
           </View>
           <TouchableOpacity
-            style={[styles.hireBtn, !item.available && styles.hireBtnOffline]}
+            style={[styles.hireBtn, !item?.available && styles.hireBtnOffline]}
             activeOpacity={0.8}
             onPress={() => {
-              if (item.available) {
+              if (item?.available) {
                 setSelectedWorker(item);
               } else {
                 Alert.alert(
                   'Worker Offline 🔴',
-                  `${item.name} is not available right now. You can view their verified profile or check back later.`
+                  `${item?.name || 'This worker'} is not available right now. You can view their verified profile or check back later.`
                 );
               }
             }}
           >
-            <Text style={[styles.hireBtnText, !item.available && styles.hireBtnTextOffline]}>
-              {item.available ? 'Book' : 'Offline'}
+            <Text style={[styles.hireBtnText, !item?.available && styles.hireBtnTextOffline]}>
+              {item?.available ? 'Book' : 'Offline'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -499,9 +521,9 @@ export default function CustomerHomeScreen({
                   ))}
 
                   {/* Worker suggestions */}
-                  {searchSuggestions.workers.map((w) => (
+                  {searchSuggestions.workers.map((w, wIdx) => (
                     <TouchableOpacity
-                      key={w.id}
+                      key={w.id || `sw-${wIdx}`}
                       style={styles.suggestionRow}
                       activeOpacity={0.7}
                       onPress={() => {
@@ -513,14 +535,14 @@ export default function CustomerHomeScreen({
                       }}
                     >
                       <View style={[styles.suggestionAvatar, { backgroundColor: w.color || '#4F46E5' }]}>
-                        <Text style={styles.suggestionAvatarText}>{w.avatar}</Text>
+                        <Text style={styles.suggestionAvatarText}>{w.avatar || 'W'}</Text>
                       </View>
                       <View style={{ flex: 1, minWidth: 0 }}>
                         <Text style={styles.suggestionTitle} numberOfLines={1}>
-                          {w.name} • <Text style={{ color: '#15803D' }}>{w.rating}★</Text>
+                          {w.name || 'Worker'} • <Text style={{ color: w.available ? '#15803D' : '#64748B' }}>{w.available ? '● Online' : '○ Offline'}</Text>
                         </Text>
                         <Text style={styles.suggestionSub} numberOfLines={1}>
-                          {w.skill} • ₹{w.rate}/day • {w.distance} km away
+                          {w.skill || 'Labour'} • ₹{w.rate || 800}/day • {w.distance ? `${w.distance} km away` : 'Nearby'}
                         </Text>
                       </View>
                       <View style={styles.suggestionActionBadge}>
@@ -624,8 +646,8 @@ export default function CustomerHomeScreen({
             </TouchableOpacity>
           </View>
         ) : (
-          nearbyWorkers.slice(0, 8).map((worker) => (
-            <View key={worker.id}>{renderWorkerCard({ item: worker })}</View>
+          nearbyWorkers.slice(0, 8).map((worker, wIdx) => (
+            <View key={worker.id || `nw-${wIdx}`}>{renderWorkerCard({ item: worker })}</View>
           ))
         )}
 
@@ -740,7 +762,7 @@ export default function CustomerHomeScreen({
             <View style={styles.billBox}>
               <View style={styles.billRow}>
                 <Text style={styles.billItem}>Worker Fee (1 Day)</Text>
-                <Text style={styles.billVal}>₹{checkoutWorker?.rate || 950}</Text>
+                <Text style={styles.billVal}>₹{Number(checkoutWorker?.rate) || 950}</Text>
               </View>
               <View style={styles.billRow}>
                 <Text style={styles.billItem}>Mistri Pro Platform Fee</Text>
@@ -748,13 +770,13 @@ export default function CustomerHomeScreen({
               </View>
               <View style={styles.billRow}>
                 <Text style={styles.billItem}>Gateway & Service Processing (5%)</Text>
-                <Text style={styles.billVal}>₹{Math.round((checkoutWorker?.rate || 950) * 0.05)}</Text>
+                <Text style={styles.billVal}>₹{Math.round((Number(checkoutWorker?.rate) || 950) * 0.05)}</Text>
               </View>
               <View style={styles.billDivider} />
               <View style={styles.billRowGrand}>
                 <Text style={styles.billTotalLabel}>Total to Pay</Text>
                 <Text style={styles.billTotalVal}>
-                  ₹{(checkoutWorker?.rate || 950) + 99 + Math.round((checkoutWorker?.rate || 950) * 0.05)}
+                  ₹{(Number(checkoutWorker?.rate) || 950) + 99 + Math.round((Number(checkoutWorker?.rate) || 950) * 0.05)}
                 </Text>
               </View>
             </View>

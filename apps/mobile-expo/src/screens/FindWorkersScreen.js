@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
+  TextInput,
   ScrollView,
   TouchableOpacity,
   StyleSheet,
@@ -14,6 +15,7 @@ import {
 import {
   MapPin,
   Star,
+  Search,
   Phone,
   User,
   Navigation,
@@ -34,7 +36,8 @@ import RazorpayModal from '../components/RazorpayModal';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 function RatingStars({ rating }) {
-  const fullStars = Math.floor(rating);
+  const safeRating = Number(rating) || 5;
+  const fullStars = Math.floor(safeRating);
   const stars = [];
   for (let i = 0; i < 5; i++) {
     stars.push(
@@ -50,6 +53,7 @@ function RatingStars({ rating }) {
 }
 
 function WorkerCard({ worker, isSelected, onSelect, onOpenProfile, onProceedBooking }) {
+  if (!worker) return null;
   return (
     <TouchableOpacity
       style={[styles.workerCard, isSelected && styles.workerCardSelected]}
@@ -59,48 +63,48 @@ function WorkerCard({ worker, isSelected, onSelect, onOpenProfile, onProceedBook
       <View style={styles.workerCardRow}>
         {/* Avatar */}
         <View style={[styles.avatar, { backgroundColor: worker.color || '#4F46E5' }]}>
-          <Text style={styles.avatarText}>{worker.avatar}</Text>
+          <Text style={styles.avatarText}>{worker.avatar || 'W'}</Text>
         </View>
 
         {/* Info */}
         <View style={styles.workerInfo}>
           <View style={styles.workerNameRow}>
-            <Text style={styles.workerName} numberOfLines={1}>{worker.name}</Text>
+            <Text style={styles.workerName} numberOfLines={1}>{worker.name || 'Worker'}</Text>
             {worker.verified && (
               <View style={styles.verifiedBadge}>
                 <Text style={styles.verifiedText}>KYC ✓</Text>
               </View>
             )}
           </View>
-          <Text style={styles.workerSkill}>{worker.skill}</Text>
+          <Text style={styles.workerSkill}>{worker.skill || 'Labour'}</Text>
 
           {/* Availability Status Badge */}
           <View style={[styles.cardAvailBadge, worker.available ? styles.cardAvailOnline : styles.cardAvailOffline]}>
             <View style={[styles.cardAvailDot, worker.available ? styles.cardDotOnline : styles.cardDotOffline]} />
             <Text style={[styles.cardAvailText, worker.available ? styles.cardTextOnline : styles.cardTextOffline]}>
-              {worker.available ? 'Online & Available' : 'Not Available Right Now'}
+              {worker.available ? 'Online' : 'Not Available Right Now'}
             </Text>
           </View>
 
           <View style={styles.ratingRow}>
             <RatingStars rating={worker.rating} />
-            <Text style={styles.ratingText}>{worker.rating}</Text>
-            <Text style={styles.reviewsText}>({worker.reviews})</Text>
+            <Text style={styles.ratingText}>{worker.rating || '5.0'}</Text>
+            <Text style={styles.reviewsText}>({worker.reviews ?? 0})</Text>
           </View>
         </View>
 
         {/* Distance Badge */}
         <View style={styles.distanceBadge}>
           <Navigation size={10} color="#059669" />
-          <Text style={styles.distanceText}>{worker.distance} km</Text>
+          <Text style={styles.distanceText}>{worker.distance || '2.0'} km</Text>
         </View>
       </View>
 
       {/* Bottom row */}
       <View style={styles.workerCardBottom}>
         <View style={styles.rateContainer}>
-          <Text style={styles.rateAmount}>₹{worker.rate}</Text>
-          <Text style={styles.rateType}>/{worker.rateType}</Text>
+          <Text style={styles.rateAmount}>₹{worker.rate || 800}</Text>
+          <Text style={styles.rateType}>/{worker.rateType || 'day'}</Text>
         </View>
 
         <View style={styles.workerActions}>
@@ -124,7 +128,7 @@ function WorkerCard({ worker, isSelected, onSelect, onOpenProfile, onProceedBook
               onPress={() => {
                 Alert.alert(
                   'Worker Offline 🔴',
-                  `${worker.name} is not available right now. You can view their verified profile or check back later.`
+                  `${worker.name || 'This worker'} is not available right now. You can view their verified profile or check back later.`
                 );
               }}
             >
@@ -145,6 +149,7 @@ export default function FindWorkersScreen({
   workers = [],
 }) {
   const [selectedCategory, setSelectedCategory] = useState(initialCategory || 'All');
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     if (initialCategory) {
@@ -219,11 +224,12 @@ export default function FindWorkersScreen({
   // Base filtered list: Shows online & offline workers with status badge (Online sorted first)
   const baseWorkers = useMemo(() => {
     const liveList = Array.isArray(workers) ? workers : [];
-    let filtered = liveList;
+    let filtered = liveList.filter(Boolean);
 
-    if (selectedCategory !== 'All') {
-      const catTarget = selectedCategory.toLowerCase();
-      filtered = liveList.filter((w) => {
+    // 1. Category filter
+    if (selectedCategory && selectedCategory !== 'All') {
+      const catTarget = String(selectedCategory).toLowerCase();
+      filtered = filtered.filter((w) => {
         const wCat = (w.category || '').toLowerCase();
         const wSkill = (w.skill || '').toLowerCase();
 
@@ -241,18 +247,59 @@ export default function FindWorkersScreen({
       });
     }
 
+    // 2. Search query filter
+    if (searchQuery.trim()) {
+      const rawQ = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter((w) => {
+        const wName = (w.name || '').toLowerCase();
+        const wSkill = (w.skill || '').toLowerCase();
+        const wCat = (w.category || '').toLowerCase();
+        const wArea = (w.area || '').toLowerCase();
+        const wSkills = Array.isArray(w.skills) ? w.skills.join(' ').toLowerCase() : '';
+
+        if (
+          wName.includes(rawQ) ||
+          wSkill.includes(rawQ) ||
+          wCat.includes(rawQ) ||
+          wArea.includes(rawQ) ||
+          wSkills.includes(rawQ)
+        ) {
+          return true;
+        }
+
+        // Typo & synonym tolerance
+        const SYNONYMS = {
+          plumber: ['puber', 'pumber', 'plumb', 'pipe', 'leak', 'tap', 'nal'],
+          mason: ['masn', 'maosn', 'raj', 'mistri', 'brick', 'cement'],
+          electrician: ['elect', 'bijli', 'wire', 'light', 'fan'],
+          carpenter: ['carpent', 'wood', 'lakdi', 'furniture'],
+          painter: ['paint', 'paintr', 'color', 'rang'],
+          welder: ['weld', 'loha', 'iron'],
+        };
+        for (const [trade, keywords] of Object.entries(SYNONYMS)) {
+          if (keywords.some((kw) => rawQ.includes(kw) || kw.includes(rawQ))) {
+            if (wCat.includes(trade) || wSkill.includes(trade)) return true;
+          }
+        }
+        return false;
+      });
+    }
+
     // Sort: Online workers first, then offline workers
     return [...filtered].sort((a, b) => {
-      if (a.available === b.available) return 0;
-      return a.available ? -1 : 1;
+      const aAvail = Boolean(a?.available);
+      const bAvail = Boolean(b?.available);
+      if (aAvail === bAvail) return 0;
+      return aAvail ? -1 : 1;
     });
-  }, [selectedCategory, workers]);
+  }, [selectedCategory, searchQuery, workers]);
 
   // Dynamically place workers around the user's REAL live GPS location
   const liveWorkers = useMemo(() => {
     return baseWorkers.map((w, index) => {
-      // Scatter workers realistically within 1 to 7 km of the user's exact coordinates
-      const angle = (index * 2 * Math.PI) / baseWorkers.length;
+      if (!w) return null;
+      const count = baseWorkers.length || 1;
+      const angle = (index * 2 * Math.PI) / count;
       const radius = 0.012 + (index % 5) * 0.01; // ~1.2km to ~5.5km
       const lat = userLat + radius * Math.cos(angle);
       const lng = userLng + radius * Math.sin(angle);
@@ -263,7 +310,7 @@ export default function FindWorkersScreen({
         lng,
         distance,
       };
-    });
+    }).filter(Boolean);
   }, [baseWorkers, userLat, userLng]);
 
   const allChips = ['All', ...CATEGORIES.map((c) => c.name)];
@@ -273,18 +320,19 @@ export default function FindWorkersScreen({
     const workersData = JSON.stringify(
       liveWorkers.map((w) => ({
         id: w.id,
-        name: w.name,
-        skill: w.skill,
-        rate: w.rate,
-        rateType: w.rateType,
-        rating: w.rating,
-        reviews: w.reviews,
-        phone: w.phone,
-        avatar: w.avatar,
+        name: w.name || 'Verified Mistri',
+        skill: w.skill || 'Labour',
+        rate: Number(w.rate) || 800,
+        rateType: w.rateType || 'day',
+        rating: w.rating || 5.0,
+        reviews: w.reviews || 0,
+        phone: w.phone || '',
+        avatar: w.avatar || 'W',
         color: w.color || '#4F46E5',
-        distance: w.distance,
+        distance: w.distance || '2.0',
         lat: w.lat,
         lng: w.lng,
+        available: Boolean(w.available),
       }))
     );
 
@@ -441,22 +489,34 @@ export default function FindWorkersScreen({
     var workers = ${workersData};
     workers.forEach(function(w) {
       if (!w.lat || !w.lng) return;
+      var circleColor = w.available ? (w.color || '#4F46E5') : '#94A3B8';
+      var pillBg = w.available ? '#0F172A' : '#64748B';
+      var availTag = w.available ? '' : ' (Offline)';
       var icon = L.divIcon({
         className: '',
         html: '<div class="worker-marker-wrap">' +
-                '<div class="worker-circle" style="background-color:' + w.color + ';">' + w.avatar + '</div>' +
-                '<div class="worker-pill">' + w.skill.split(' ')[0] + '</div>' +
+                '<div class="worker-circle" style="background-color:' + circleColor + ';">' + (w.avatar || 'W') + '</div>' +
+                '<div class="worker-pill" style="background-color:' + pillBg + ';">' + (w.skill ? w.skill.split(' ')[0] : 'Mistri') + availTag + '</div>' +
               '</div>',
         iconSize: [36, 44],
         iconAnchor: [18, 22]
       });
 
+      var statusBadge = w.available
+        ? '<div style="display:inline-block;padding:2px 6px;border-radius:4px;background:#F0FDF4;color:#15803D;font-weight:700;font-size:10px;margin-bottom:4px;">● Online</div>'
+        : '<div style="display:inline-block;padding:2px 6px;border-radius:4px;background:#F8FAFC;color:#64748B;font-weight:700;font-size:10px;border:1px solid #CBD5E1;margin-bottom:4px;">● Not Available Right Now</div>';
+
+      var actionBtn = w.available
+        ? '<button class="popup-btn" onclick="sendMsg(\\'' + (w.phone || '') + '\\')">📞 Call Mistri</button>'
+        : '<button class="popup-btn" style="background:#94A3B8;" onclick="alertOffline(\\'' + (w.name || 'Worker').replace(/\'/g, \"\\\\'\") + '\\')">Worker Offline</button>';
+
       var popupHtml = '<div class="popup-box">' +
-        '<div class="popup-name">' + w.name + '</div>' +
-        '<div class="popup-skill">' + w.skill + '</div>' +
-        '<div>⭐ ' + w.rating + ' (' + w.reviews + ' reviews)</div>' +
-        '<div class="popup-rate">₹' + w.rate + '/' + w.rateType + ' • ' + w.distance + ' km away</div>' +
-        '<button class="popup-btn" onclick="sendMsg(\\'' + w.phone + '\\')">📞 Call Mistri</button>' +
+        '<div class="popup-name">' + (w.name || 'Verified Mistri') + '</div>' +
+        '<div class="popup-skill">' + (w.skill || 'Labour') + '</div>' +
+        statusBadge +
+        '<div>⭐ ' + (w.rating || 5.0) + ' (' + (w.reviews || 0) + ' reviews)</div>' +
+        '<div class="popup-rate">₹' + (w.rate || 800) + '/' + (w.rateType || 'day') + ' • ' + (w.distance || '2.0') + ' km away</div>' +
+        actionBtn +
       '</div>';
 
       L.marker([w.lat, w.lng], { icon: icon })
@@ -474,6 +534,12 @@ export default function FindWorkersScreen({
         window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'CALL', phone: phone }));
       }
     }
+
+    function alertOffline(name) {
+      if (window.ReactNativeWebView) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'OFFLINE_ALERT', name: name }));
+      }
+    }
   </script>
 </body>
 </html>
@@ -482,11 +548,17 @@ export default function FindWorkersScreen({
 
   const handleWebViewMessage = (event) => {
     try {
+      if (!event?.nativeEvent?.data) return;
       const data = JSON.parse(event.nativeEvent.data);
       if (data.type === 'CALL' && data.phone) {
         Linking.openURL(`tel:${data.phone}`);
       } else if (data.type === 'SELECT_WORKER' && data.id) {
         setSelectedWorkerId(data.id);
+      } else if (data.type === 'OFFLINE_ALERT') {
+        Alert.alert(
+          'Worker Offline 🔴',
+          `${data.name || 'This worker'} is not available right now. You can view their verified profile or check back later.`
+        );
       }
     } catch (e) {
       console.log('WebView message error:', e);
@@ -541,6 +613,28 @@ export default function FindWorkersScreen({
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: (insets?.bottom || 34) + 110 }}
       >
+        {/* Search Bar */}
+        <View style={styles.searchBarWrap}>
+          <View style={styles.searchBar}>
+            <Search size={16} color="#94A3B8" style={{ marginRight: 8 }} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search by worker name, skill, category..."
+              placeholderTextColor="#94A3B8"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            {searchQuery.trim().length > 0 && (
+              <TouchableOpacity
+                onPress={() => setSearchQuery('')}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <X size={15} color="#94A3B8" />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+
         {/* Category Chips */}
         <ScrollView
           horizontal
@@ -550,11 +644,13 @@ export default function FindWorkersScreen({
         >
           {allChips.map((chip) => {
             const isSelected =
-              selectedCategory === chip ||
-              (chip !== 'All' &&
-                selectedCategory !== 'All' &&
-                (chip.toLowerCase().includes(selectedCategory.toLowerCase()) ||
-                  selectedCategory.toLowerCase().includes(chip.toLowerCase())));
+              Boolean(selectedCategory) &&
+              (selectedCategory === chip ||
+                (chip !== 'All' &&
+                  selectedCategory !== 'All' &&
+                  typeof selectedCategory === 'string' &&
+                  (chip.toLowerCase().includes(selectedCategory.toLowerCase()) ||
+                    selectedCategory.toLowerCase().includes(chip.toLowerCase()))));
             return (
               <TouchableOpacity
                 key={chip}
@@ -602,7 +698,7 @@ export default function FindWorkersScreen({
             <View style={styles.mapLivePill}>
               <View style={styles.greenLiveDot} />
               <Text style={styles.mapLiveText}>
-                Live Radar • {liveWorkers.length} Active Mistris
+                Live Radar • {liveWorkers.filter((w) => w.available).length} Online ({liveWorkers.length} Total)
               </Text>
             </View>
           </View>
@@ -614,29 +710,51 @@ export default function FindWorkersScreen({
             <View>
               <Text style={styles.listTitle}>Nearby Workers on Map</Text>
               <Text style={styles.listCount}>
-                Showing {liveWorkers.length} available mistris around {areaLabel.split(',')[0]}
+                Showing {liveWorkers.length} mistris around {(areaLabel || '').split(',')[0]}
               </Text>
             </View>
-            {selectedCategory !== 'All' && (
+            {(selectedCategory !== 'All' || searchQuery.trim().length > 0) && (
               <TouchableOpacity
                 style={styles.resetFilterBtn}
-                onPress={() => setSelectedCategory('All')}
+                onPress={() => {
+                  setSelectedCategory('All');
+                  setSearchQuery('');
+                }}
               >
-                <Text style={styles.resetFilterText}>Clear</Text>
+                <Text style={styles.resetFilterText}>Clear Filter</Text>
               </TouchableOpacity>
             )}
           </View>
 
-          {liveWorkers.map((worker) => (
-            <WorkerCard
-              key={worker.id}
-              worker={worker}
-              isSelected={selectedWorkerId === worker.id}
-              onSelect={(w) => setSelectedWorkerId(w.id)}
-              onOpenProfile={(w) => setSelectedProfileWorker(w)}
-              onProceedBooking={(w) => setCheckoutWorker(w)}
-            />
-          ))}
+          {liveWorkers.length === 0 ? (
+            <View style={styles.emptyCard}>
+              <Text style={{ fontSize: 32, marginBottom: 8 }}>👷‍♂️</Text>
+              <Text style={styles.emptyTitle}>No Workers Found</Text>
+              <Text style={styles.emptySub}>
+                No workers match your filter or search query. Try clearing filters to view all nearby mistris.
+              </Text>
+              <TouchableOpacity
+                style={styles.clearBtn}
+                onPress={() => {
+                  setSelectedCategory('All');
+                  setSearchQuery('');
+                }}
+              >
+                <Text style={styles.clearBtnText}>Show All Mistris</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            liveWorkers.map((worker) => (
+              <WorkerCard
+                key={worker.id}
+                worker={worker}
+                isSelected={selectedWorkerId === worker.id}
+                onSelect={(w) => setSelectedWorkerId(w.id)}
+                onOpenProfile={(w) => setSelectedProfileWorker(w)}
+                onProceedBooking={(w) => setCheckoutWorker(w)}
+              />
+            ))
+          )}
         </View>
       </ScrollView>
 
@@ -752,7 +870,7 @@ export default function FindWorkersScreen({
             <View style={styles.billBox}>
               <View style={styles.billRow}>
                 <Text style={styles.billItem}>Worker Fee (1 Day)</Text>
-                <Text style={styles.billVal}>₹{checkoutWorker?.rate || 950}</Text>
+                <Text style={styles.billVal}>₹{Number(checkoutWorker?.rate) || 950}</Text>
               </View>
               <View style={styles.billRow}>
                 <Text style={styles.billItem}>Mistri Pro Platform Fee</Text>
@@ -760,13 +878,13 @@ export default function FindWorkersScreen({
               </View>
               <View style={styles.billRow}>
                 <Text style={styles.billItem}>Gateway & Service Processing (5%)</Text>
-                <Text style={styles.billVal}>₹{Math.round((checkoutWorker?.rate || 950) * 0.05)}</Text>
+                <Text style={styles.billVal}>₹{Math.round((Number(checkoutWorker?.rate) || 950) * 0.05)}</Text>
               </View>
               <View style={styles.billDivider} />
               <View style={styles.billRowGrand}>
                 <Text style={styles.billTotalLabel}>Total to Pay</Text>
                 <Text style={styles.billTotalVal}>
-                  ₹{(checkoutWorker?.rate || 950) + 99 + Math.round((checkoutWorker?.rate || 950) * 0.05)}
+                  ₹{(Number(checkoutWorker?.rate) || 950) + 99 + Math.round((Number(checkoutWorker?.rate) || 950) * 0.05)}
                 </Text>
               </View>
             </View>
@@ -790,18 +908,19 @@ export default function FindWorkersScreen({
 
                 const bookingDetails = {
                   workerId: worker.id,
-                  workerName: worker.name,
-                  workerAvatar: worker.avatar,
-                  workerColor: worker.color,
-                  workerPhone: worker.phone,
-                  workerSkill: worker.skill,
-                  category: worker.category || worker.skill,
-                  title: `${worker.skill} Service`,
+                  workerName: worker.name || 'Verified Mistri',
+                  workerAvatar: worker.avatar || 'W',
+                  workerColor: worker.color || '#4F46E5',
+                  workerPhone: worker.phone || '',
+                  workerSkill: worker.skill || 'Labour Service',
+                  category: worker.category || worker.skill || 'Labour Service',
+                  title: `${worker.skill || 'Labour'} Service`,
                   siteLocation: areaLabel,
                   scheduledDate: 'Today, Immediate',
                   duration: '1 Day',
                   workerFee,
                   platformFee,
+                  txnFee,
                   transactionFee: txnFee,
                   totalAmount,
                 };
@@ -911,8 +1030,71 @@ const styles = StyleSheet.create({
   scroll: {
     flex: 1,
   },
+  searchBarWrap: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 2,
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    height: 44,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  searchInput: {
+    flex: 1,
+    fontFamily: 'Satoshi-Regular',
+    fontSize: 13.5,
+    color: '#0F172A',
+    padding: 0,
+  },
+  emptyCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  emptyTitle: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 15,
+    color: '#0F172A',
+    marginBottom: 6,
+    textAlign: 'center',
+  },
+  emptySub: {
+    fontFamily: 'Satoshi-Regular',
+    fontSize: 12.5,
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 16,
+  },
+  clearBtn: {
+    backgroundColor: '#4F46E5',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+  },
+  clearBtnText: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 12.5,
+    color: '#FFFFFF',
+  },
   chipsScroll: {
-    marginTop: 12,
+    marginTop: 10,
     marginBottom: 10,
   },
   chipsContent: {

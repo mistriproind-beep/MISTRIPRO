@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,8 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  Dimensions,
+  Linking,
 } from 'react-native';
 import {
   ShieldCheck,
@@ -35,6 +37,16 @@ export default function RazorpayModal({
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [successPaymentId, setSuccessPaymentId] = useState('');
 
+  const quickPayTimer = useRef(null);
+  const successTimer = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (quickPayTimer.current) clearTimeout(quickPayTimer.current);
+      if (successTimer.current) clearTimeout(successTimer.current);
+    };
+  }, []);
+
   if (!bookingData) return null;
 
   const {
@@ -48,6 +60,13 @@ export default function RazorpayModal({
     customerPhone = '',
   } = bookingData;
 
+  const safeAmountPaise = Math.round(Number(String(totalAmount).replace(/[^0-9.]/g, '') || 0) * 100);
+  const safeWorkerSkill = String(workerSkill || 'Labour Service').replace(/["\\]/g, '');
+  const safeWorkerName = String(workerName || 'Mistri').replace(/["\\]/g, '');
+  const safeCustomerName = String(customerName || 'Customer').replace(/["\\]/g, '');
+  const safeCustomerPhone = String(customerPhone || '').replace(/[^0-9+]/g, '');
+  const formattedTotal = Number(totalAmount || 0).toLocaleString('en-IN');
+
   // Complete Payment helper
   const handlePaymentCompleted = (paymentId, method = 'Razorpay Test') => {
     setIsProcessing(false);
@@ -56,7 +75,7 @@ export default function RazorpayModal({
     setPaymentSuccess(true);
     DeviceFeedback.triggerSuccessHaptics();
 
-    setTimeout(() => {
+    successTimer.current = setTimeout(() => {
       setPaymentSuccess(false);
       if (onPaymentSuccess) {
         onPaymentSuccess({
@@ -74,10 +93,27 @@ export default function RazorpayModal({
   const handleQuickPay = () => {
     setIsProcessing(true);
     DeviceFeedback.triggerAlertHaptics();
-    setTimeout(() => {
+    quickPayTimer.current = setTimeout(() => {
       const generatedId = `pay_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 7)}`;
       handlePaymentCompleted(generatedId, 'Razorpay Instant Test');
     }, 1000);
+  };
+
+  const handleShouldStartLoadWithRequest = (request) => {
+    const { url } = request;
+    if (
+      url.startsWith('upi:') ||
+      url.startsWith('intent:') ||
+      url.startsWith('phonepe:') ||
+      url.startsWith('paytmmp:') ||
+      url.startsWith('gpay:')
+    ) {
+      Linking.openURL(url).catch((err) =>
+        console.log('Cannot open UPI URL scheme:', err)
+      );
+      return false;
+    }
+    return true;
   };
 
   // 2. Razorpay Live Web Checkout HTML
@@ -88,7 +124,7 @@ export default function RazorpayModal({
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Razorpay Checkout</title>
-  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+  <script src="https://checkout.razorpay.com/v1/checkout.js" onload="onRazorpayLoaded()" onerror="onRazorpayError()"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -99,12 +135,12 @@ export default function RazorpayModal({
       align-items: center;
       justify-content: center;
       min-height: 100vh;
-      padding: 20px;
+      padding: 16px;
     }
     .card {
       background: #ffffff;
       border-radius: 20px;
-      padding: 28px 24px;
+      padding: 24px 20px;
       width: 100%;
       max-width: 380px;
       box-shadow: 0 10px 25px rgba(0,0,0,0.08);
@@ -118,36 +154,36 @@ export default function RazorpayModal({
       font-weight: 700;
       padding: 6px 12px;
       border-radius: 20px;
-      margin-bottom: 14px;
+      margin-bottom: 12px;
       text-transform: uppercase;
       letter-spacing: 0.5px;
     }
     .title {
-      font-size: 20px;
+      font-size: 18px;
       font-weight: 800;
       color: #0F172A;
-      margin-bottom: 6px;
+      margin-bottom: 4px;
     }
     .sub {
-      font-size: 13px;
+      font-size: 12.5px;
       color: #64748B;
-      margin-bottom: 22px;
+      margin-bottom: 18px;
     }
     .amount-box {
       background: #F1F5F9;
       border-radius: 14px;
-      padding: 16px;
-      margin-bottom: 22px;
+      padding: 14px;
+      margin-bottom: 18px;
     }
     .amount-label {
-      font-size: 12px;
+      font-size: 11px;
       color: #64748B;
       margin-bottom: 4px;
       text-transform: uppercase;
       letter-spacing: 0.5px;
     }
     .amount-val {
-      font-size: 30px;
+      font-size: 28px;
       font-weight: 900;
       color: #4F46E5;
     }
@@ -157,8 +193,8 @@ export default function RazorpayModal({
       border: none;
       border-radius: 14px;
       width: 100%;
-      padding: 16px;
-      font-size: 16px;
+      padding: 15px;
+      font-size: 15px;
       font-weight: 700;
       cursor: pointer;
       display: flex;
@@ -174,7 +210,7 @@ export default function RazorpayModal({
       background: transparent;
       color: #94A3B8;
       border: none;
-      margin-top: 14px;
+      margin-top: 12px;
       font-size: 13px;
       font-weight: 600;
       cursor: pointer;
@@ -184,7 +220,7 @@ export default function RazorpayModal({
       align-items: center;
       justify-content: center;
       gap: 6px;
-      margin-top: 20px;
+      margin-top: 16px;
       font-size: 11px;
       color: #15803D;
       font-weight: 600;
@@ -195,11 +231,11 @@ export default function RazorpayModal({
   <div class="card">
     <div class="badge">Official Razorpay Gateway</div>
     <h2 class="title">Secure Checkout</h2>
-    <p class="sub">${(workerSkill || 'Mistri Booking').replace(/"/g, '')} • ${workerName.replace(/"/g, '')}</p>
+    <p class="sub">${safeWorkerSkill} • ${safeWorkerName}</p>
 
     <div class="amount-box">
       <div class="amount-label">Total Amount to Pay</div>
-      <div class="amount-val">₹${totalAmount}</div>
+      <div class="amount-val">₹${formattedTotal}</div>
     </div>
 
     <button class="btn-pay" id="payBtn" onclick="launchRazorpay()">
@@ -216,21 +252,57 @@ export default function RazorpayModal({
   </div>
 
   <script>
+    var rzpInstance = null;
+    var scriptLoaded = false;
+
+    function onRazorpayLoaded() {
+      scriptLoaded = true;
+      setTimeout(launchRazorpay, 100);
+    }
+
+    function onRazorpayError() {
+      window.ReactNativeWebView.postMessage(JSON.stringify({
+        type: 'ERROR',
+        message: 'Failed to load Razorpay checkout script from checkout.razorpay.com'
+      }));
+    }
+
     function launchRazorpay() {
+      if (typeof Razorpay === 'undefined') {
+        var btn = document.getElementById('payBtn');
+        if (btn) btn.innerHTML = 'Connecting to Gateway... ⏳';
+        var attempts = 0;
+        var timer = setInterval(function() {
+          attempts++;
+          if (typeof Razorpay !== 'undefined') {
+            clearInterval(timer);
+            if (btn) btn.innerHTML = 'Open Razorpay Modal 🚀';
+            launchRazorpay();
+          } else if (attempts > 25) {
+            clearInterval(timer);
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'ERROR',
+              message: 'Razorpay SDK load timed out'
+            }));
+          }
+        }, 200);
+        return;
+      }
+
       var options = {
         key: "${RAZORPAY_CONFIG.KEY_ID}",
-        amount: ${totalAmount * 100},
-        currency: "INR",
-        name: "Mistri Pro",
-        description: "${(workerSkill || 'Labour Service').replace(/"/g, '')} Advance Booking",
+        amount: ${safeAmountPaise},
+        currency: "${RAZORPAY_CONFIG.CURRENCY || 'INR'}",
+        name: "${RAZORPAY_CONFIG.MERCHANT_NAME || 'Mistri Pro'}",
+        description: "${safeWorkerSkill} Advance Booking",
         image: "https://i.imgur.com/3g7nmJC.png",
         prefill: {
-          name: "${(customerName || 'Customer').replace(/"/g, '')}",
-          contact: "${(customerPhone || '').replace(/[^0-9+]/g, '')}",
+          name: "${safeCustomerName}",
+          contact: "${safeCustomerPhone}",
           email: "customer@mistripro.com"
         },
         theme: {
-          color: "#4F46E5"
+          color: "${RAZORPAY_CONFIG.THEME_COLOR || '#4F46E5'}"
         },
         handler: function (response) {
           window.ReactNativeWebView.postMessage(JSON.stringify({
@@ -248,14 +320,14 @@ export default function RazorpayModal({
       };
 
       try {
-        var rzp = new Razorpay(options);
-        rzp.on('payment.failed', function (resp) {
+        rzpInstance = new Razorpay(options);
+        rzpInstance.on('payment.failed', function (resp) {
           window.ReactNativeWebView.postMessage(JSON.stringify({
             type: 'PAYMENT_FAILED',
             error: (resp.error && resp.error.description) || 'Payment failed'
           }));
         });
-        rzp.open();
+        rzpInstance.open();
       } catch (err) {
         window.ReactNativeWebView.postMessage(JSON.stringify({
           type: 'ERROR',
@@ -270,8 +342,9 @@ export default function RazorpayModal({
       }));
     }
 
-    // Auto-launch checkout after brief render
-    setTimeout(launchRazorpay, 350);
+    if (typeof Razorpay !== 'undefined') {
+      setTimeout(launchRazorpay, 100);
+    }
   </script>
 </body>
 </html>
@@ -288,8 +361,14 @@ export default function RazorpayModal({
       } else if (data.type === 'CANCEL' || data.type === 'MODAL_DISMISSED') {
         setShowLiveWebView(false);
       } else if (data.type === 'ERROR') {
-        // Fallback to instant payment if Razorpay CDN blocked
-        handleQuickPay();
+        Alert.alert(
+          'Razorpay Gateway Unavailable',
+          'Could not reach Razorpay online servers. Would you like to use 1-Tap Test Mode instead?',
+          [
+            { text: 'Cancel', style: 'cancel', onPress: () => setShowLiveWebView(false) },
+            { text: 'Use 1-Tap Test', onPress: handleQuickPay },
+          ]
+        );
       }
     } catch (e) {
       console.log('WebView message error:', e);
@@ -316,6 +395,10 @@ export default function RazorpayModal({
                 if (showLiveWebView) {
                   setShowLiveWebView(false);
                 } else {
+                  if (quickPayTimer.current) clearTimeout(quickPayTimer.current);
+                  if (successTimer.current) clearTimeout(successTimer.current);
+                  setIsProcessing(false);
+                  setPaymentSuccess(false);
                   onClose();
                 }
               }}
@@ -341,7 +424,7 @@ export default function RazorpayModal({
               </View>
               <Text style={styles.successTitle}>Payment Verified via Razorpay!</Text>
               <Text style={styles.successSub}>
-                ₹{totalAmount} paid successfully. Mistri assigned.
+                ₹{formattedTotal} paid successfully. Mistri assigned.
               </Text>
               <Text style={styles.successTxn}>Txn ID: {successPaymentId}</Text>
             </View>
@@ -350,10 +433,12 @@ export default function RazorpayModal({
             <View style={styles.webViewWrap}>
               <WebView
                 originWhitelist={['*']}
-                source={{ html: razorpayHtml }}
+                source={{ html: razorpayHtml, baseUrl: 'https://checkout.razorpay.com' }}
                 onMessage={handleWebViewMessage}
+                onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
                 javaScriptEnabled={true}
                 domStorageEnabled={true}
+                mixedContentMode="always"
                 startInLoadingState={true}
                 renderLoading={() => (
                   <View style={styles.loadingOverlay}>
@@ -374,7 +459,7 @@ export default function RazorpayModal({
               <View style={styles.orderCard}>
                 <View style={styles.orderTop}>
                   <Text style={styles.merchantLabel}>Total Payable Amount</Text>
-                  <Text style={styles.amountDisplay}>₹{totalAmount}</Text>
+                  <Text style={styles.amountDisplay}>₹{formattedTotal}</Text>
                 </View>
                 <Text style={styles.workerSummaryText}>
                   Booking: {workerName} • {workerSkill}
@@ -382,16 +467,20 @@ export default function RazorpayModal({
 
                 <View style={styles.breakdown}>
                   <View style={styles.breakdownRow}>
-                    <Text style={styles.breakdownLabel}>Mistri Wage (1 Day)</Text>
-                    <Text style={styles.breakdownVal}>₹{workerFee}</Text>
+                    <Text style={styles.breakdownLabel}>
+                      {bookingData.wageLabel || 'Mistri Wage (1 Day)'}
+                    </Text>
+                    <Text style={styles.breakdownVal}>₹{Number(workerFee || 0).toLocaleString('en-IN')}</Text>
                   </View>
                   <View style={styles.breakdownRow}>
                     <Text style={styles.breakdownLabel}>Platform Service Fee</Text>
-                    <Text style={styles.breakdownVal}>₹{platformFee}</Text>
+                    <Text style={styles.breakdownVal}>₹{Number(platformFee || 0).toLocaleString('en-IN')}</Text>
                   </View>
                   <View style={styles.breakdownRow}>
-                    <Text style={styles.breakdownLabel}>Gateway & Processing (5%)</Text>
-                    <Text style={styles.breakdownVal}>₹{txnFee}</Text>
+                    <Text style={styles.breakdownLabel}>
+                      {bookingData.txnFeeLabel || 'Gateway & Processing (5%)'}
+                    </Text>
+                    <Text style={styles.breakdownVal}>₹{Number(txnFee || 0).toLocaleString('en-IN')}</Text>
                   </View>
                 </View>
               </View>
@@ -412,7 +501,7 @@ export default function RazorpayModal({
                 disabled={isProcessing}
               >
                 <Text style={styles.primaryPayBtnText}>
-                  Pay with Razorpay Gateway • ₹{totalAmount}
+                  Pay with Razorpay Gateway • ₹{formattedTotal}
                 </Text>
                 <ArrowRight size={18} color="#FFFFFF" />
               </TouchableOpacity>
@@ -636,7 +725,7 @@ const styles = StyleSheet.create({
     color: '#4F46E5',
   },
   webViewWrap: {
-    height: 480,
+    height: Math.min(Dimensions.get('window').height * 0.76, 580),
     width: '100%',
     backgroundColor: '#F8FAFC',
   },

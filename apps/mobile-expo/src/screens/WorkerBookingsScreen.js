@@ -40,63 +40,106 @@ export default function WorkerBookingsScreen({
   onNavigateTab,
 }) {
   const [tab, setTab] = useState('ACTIVE'); // 'ACTIVE' | 'HISTORY'
-  const [localBookings, setLocalBookings] = useState(bookings || []);
+  const [localBookings, setLocalBookings] = useState(Array.isArray(bookings) ? bookings : []);
 
   React.useEffect(() => {
-    setLocalBookings(bookings || []);
+    setLocalBookings(Array.isArray(bookings) ? bookings : []);
   }, [bookings]);
 
-  const activeBookings = localBookings.filter((b) => b.status === 'active');
-  const historyBookings = localBookings.filter((b) => b.status === 'completed');
+  const safeBookings = Array.isArray(localBookings) ? localBookings : [];
+
+  const activeBookings = safeBookings.filter((b) => {
+    if (!b) return false;
+    const s = (b.status || '').toLowerCase();
+    const step = Number(b.step || b.progress_step || 1);
+    if (s === 'completed' || step === 4) return false;
+    if (s === 'cancelled' || s === 'rejected' || s === 'refunded') return false;
+    return s === 'active' || s === 'confirmed' || s === 'in_progress' || s === 'waiting_confirmation' || step < 4;
+  });
+
+  const historyBookings = safeBookings.filter((b) => {
+    if (!b) return false;
+    const s = (b.status || '').toLowerCase();
+    const step = Number(b.step || b.progress_step || 1);
+    return s === 'completed' || step === 4;
+  });
 
   // Phone Call
   const handleCall = (phoneNumber, customerName) => {
-    if (!phoneNumber) return;
-    const cleaned = phoneNumber.replace(/[^0-9+]/g, '');
+    const name = customerName || 'Customer';
+    if (!phoneNumber || !String(phoneNumber).trim()) {
+      Alert.alert('Call Customer', `Contact number for ${name} is not available.`);
+      return;
+    }
+    const cleaned = String(phoneNumber).replace(/[^0-9+]/g, '');
+    if (!cleaned || cleaned.replace(/[^0-9]/g, '').length < 5) {
+      Alert.alert('Call Customer', `Valid contact number for ${name} is not available.`);
+      return;
+    }
     Linking.openURL(`tel:${cleaned}`).catch(() => {
-      Alert.alert('Call Customer', `Calling ${customerName} at ${phoneNumber}`);
+      Alert.alert('Call Customer', `Calling ${name} at ${phoneNumber}`);
     });
   };
 
   // WhatsApp
   const handleWhatsApp = (phoneNumber, customerName, title) => {
-    if (!phoneNumber) return;
-    const cleaned = phoneNumber.replace(/[^0-9]/g, '');
+    const name = customerName || 'Sir';
+    const jobTitle = title || 'Work';
+    if (!phoneNumber || !String(phoneNumber).trim()) {
+      Alert.alert('WhatsApp', `Customer contact number is not available for WhatsApp.`);
+      return;
+    }
+    const cleaned = String(phoneNumber).replace(/[^0-9]/g, '');
+    if (!cleaned || cleaned.length < 5) {
+      Alert.alert('WhatsApp', `Valid WhatsApp number is not available.`);
+      return;
+    }
     const text = encodeURIComponent(
-      `Namaste ${customerName || 'Sir'}! I am your verified Mistri from Mistri Pro regarding your booking "${title}".`
+      `Namaste ${name}! I am your verified Mistri from Mistri Pro regarding your booking "${jobTitle}".`
     );
     Linking.openURL(`whatsapp://send?phone=${cleaned}&text=${text}`).catch(() => {
-      Alert.alert('WhatsApp', `Opening WhatsApp chat with ${customerName} (${phoneNumber}).`);
+      Alert.alert('WhatsApp', `Opening WhatsApp chat with ${name} (${phoneNumber}).`);
     });
   };
 
   // Google Maps navigation
   const handleOpenMap = (locationAddress) => {
-    const query = encodeURIComponent(locationAddress || 'Sawai Madhopur, Rajasthan');
+    const location = locationAddress || 'Sawai Madhopur, Rajasthan';
+    const query = encodeURIComponent(location);
     const url = Platform.select({
       ios: `maps:0,0?q=${query}`,
       android: `geo:0,0?q=${query}`,
       default: `https://www.google.com/maps/search/?api=1&query=${query}`,
     });
     Linking.openURL(url).catch(() => {
-      Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${query}`);
+      Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${query}`).catch(() => {
+        Alert.alert('Navigation', 'Unable to open maps application.');
+      });
     });
   };
 
   // Advance step progress
   const handleAdvanceStep = (booking) => {
-    const currentStep = booking.step || 1;
+    if (!booking) return;
+    const currentStep = Number(booking.step || booking.progress_step || 1);
+    const custName = booking.customerName || booking.customer_name || 'Customer';
+    const loc = booking.location || booking.site_location || 'Work Location';
+    const jobTitle = booking.title || 'Work';
+    const rawAmt = booking.amount || '₹950';
+    const amt = String(rawAmt).startsWith('₹') ? rawAmt : `₹${rawAmt}`;
+
     if (currentStep === 1) {
       // Step 1 -> Step 2
       Alert.alert(
         'Mark Site Visited? 📍',
-        `Confirm that you have arrived at ${booking.customerName}'s work location (${booking.location})?`,
+        `Confirm that you have arrived at ${custName}'s work location (${loc})?`,
         [
           { text: 'Cancel', style: 'cancel' },
           {
             text: 'Yes, Reached Site',
             onPress: () => {
               updateBookingStep(booking.id, 2);
+              DeviceFeedback?.triggerSuccessHaptics?.();
               Alert.alert('Status Updated', 'Site Visit recorded! Customer has been notified.');
             },
           },
@@ -106,13 +149,14 @@ export default function WorkerBookingsScreen({
       // Step 2 -> Step 3
       Alert.alert(
         'Start Work? 🔨',
-        `Start working on "${booking.title}"?`,
+        `Start working on "${jobTitle}"?`,
         [
           { text: 'Cancel', style: 'cancel' },
           {
             text: 'Start Work',
             onPress: () => {
               updateBookingStep(booking.id, 3);
+              DeviceFeedback?.triggerSuccessHaptics?.();
               Alert.alert('Work in Progress', 'Timer & work tracker active.');
             },
           },
@@ -122,7 +166,7 @@ export default function WorkerBookingsScreen({
       // Step 3 -> Step 4 (Work Done / Completed)
       Alert.alert(
         'Mark Work Done? 🎉',
-        `Have you completed all tasks for "${booking.title}"?\n\nThis will send a completion notification to ${booking.customerName} and transfer ${booking.amount} into your Wallet balance.`,
+        `Have you completed all tasks for "${jobTitle}"?\n\nThis will send a completion notification to ${custName} and transfer ${amt} into your Wallet balance.`,
         [
           { text: 'Cancel', style: 'cancel' },
           {
@@ -132,9 +176,10 @@ export default function WorkerBookingsScreen({
               if (onCompleteBooking) {
                 onCompleteBooking(booking);
               }
+              DeviceFeedback?.triggerSuccessHaptics?.();
               Alert.alert(
                 'Job Completed! 💰',
-                `Congratulations! ${booking.amount} has been released as payment into your Wallet.\n\nMoved to Previous Bookings History.`,
+                `Congratulations! ${amt} has been released as payment into your Wallet.\n\nMoved to Booking History.`,
                 [
                   {
                     text: 'View Wallet',
@@ -153,13 +198,14 @@ export default function WorkerBookingsScreen({
   const updateBookingStep = (bookingId, nextStep) => {
     setLocalBookings((prev) =>
       prev.map((b) => {
-        if (b.id === bookingId) {
+        if (b && b.id === bookingId) {
           const isDone = nextStep === 4;
           return {
             ...b,
             step: nextStep,
-            status: isDone ? 'completed' : b.status,
-            payoutStatus: isDone ? 'PAID_TO_WALLET' : b.payoutStatus,
+            progress_step: nextStep,
+            status: isDone ? 'completed' : (nextStep === 3 ? 'in_progress' : b.status || 'confirmed'),
+            payoutStatus: isDone ? 'PAID_TO_WALLET' : (b.payoutStatus || 'SECURED'),
           };
         }
         return b;
@@ -225,24 +271,38 @@ export default function WorkerBookingsScreen({
               </TouchableOpacity>
             </View>
           ) : (
-            activeBookings.map((booking) => {
-              const currentStep = booking.step || 1;
+            activeBookings.map((booking, index) => {
+              if (!booking) return null;
+              const currentStep = Number(booking.step || booking.progress_step || 1);
+              const stepIndex = Math.min(Math.max(currentStep, 1), 4) - 1;
+              const currentStepObj = STEPS[stepIndex] || STEPS[0];
               const progressPct = ((currentStep - 1) / 3) * 100;
 
+              const customerName = booking.customerName || booking.customer_name || 'Customer';
+              const customerAvatar = booking.customerAvatar || (typeof customerName === 'string' && customerName.trim().length >= 2 ? customerName.trim().slice(0, 2).toUpperCase() : 'CU');
+              const customerColor = booking.customerColor || '#0284C7';
+              const category = booking.category || booking.skill || 'General Mistri';
+              const title = booking.title || `${category} Service`;
+              const location = booking.location || booking.site_location || 'Sawai Madhopur, Rajasthan';
+              const rawAmt = booking.amount || '₹950';
+              const amount = String(rawAmt).startsWith('₹') ? rawAmt : `₹${rawAmt}`;
+              const customerPhone = booking.customerPhone || booking.customer_phone || '';
+              const bookingKey = booking.id || `active-${index}`;
+
               return (
-                <View key={booking.id} style={styles.bookingCard}>
+                <View key={bookingKey} style={styles.bookingCard}>
                   {/* Card Header: Customer Info */}
                   <View style={styles.cardHeader}>
                     <View style={styles.customerRow}>
-                      <View style={[styles.avatar, { backgroundColor: booking.customerColor || '#0284C7' }]}>
-                        <Text style={styles.avatarText}>{booking.customerAvatar || 'CU'}</Text>
+                      <View style={[styles.avatar, { backgroundColor: customerColor }]}>
+                        <Text style={styles.avatarText}>{customerAvatar}</Text>
                       </View>
                       <View style={styles.customerMeta}>
                         <Text style={styles.customerName} numberOfLines={1}>
-                          {booking.customerName}
+                          {customerName}
                         </Text>
                         <View style={styles.categorySubRow}>
-                          <Text style={styles.categoryText}>{booking.category}</Text>
+                          <Text style={styles.categoryText}>{category}</Text>
                           <View style={styles.subDot} />
                           <View style={styles.verifiedBadge}>
                             <ShieldCheck size={10} color="#15803D" />
@@ -253,20 +313,20 @@ export default function WorkerBookingsScreen({
                     </View>
 
                     <View style={styles.payoutBadge}>
-                      <Text style={styles.payoutAmount}>{booking.amount}</Text>
+                      <Text style={styles.payoutAmount}>{amount}</Text>
                       <Text style={styles.payoutSub}>Payment Secured</Text>
                     </View>
                   </View>
 
                   {/* Job Title & Timing */}
-                  <Text style={styles.jobTitle}>{booking.title}</Text>
+                  <Text style={styles.jobTitle}>{title}</Text>
 
                   {/* Customer Location & Contact Details */}
                   <View style={styles.locationContactCard}>
                     {/* Location with Google Map direct navigation */}
                     <TouchableOpacity
                       style={styles.locRow}
-                      onPress={() => handleOpenMap(booking.location)}
+                      onPress={() => handleOpenMap(location)}
                       activeOpacity={0.7}
                     >
                       <MapPin size={16} color="#DC2626" style={{ marginTop: 2 }} />
@@ -278,7 +338,7 @@ export default function WorkerBookingsScreen({
                             <ExternalLink size={11} color="#2563EB" />
                           </View>
                         </View>
-                        <Text style={styles.locAddress}>{booking.location}</Text>
+                        <Text style={styles.locAddress}>{location}</Text>
                         <Text style={styles.locDistance}>Distance: {booking.distance || '2.4 km'} from your location</Text>
                       </View>
                     </TouchableOpacity>
@@ -289,14 +349,14 @@ export default function WorkerBookingsScreen({
                     <View style={styles.contactRow}>
                       <View style={styles.phoneCol}>
                         <Text style={styles.contactLabel}>Customer Contact Number:</Text>
-                        <Text style={styles.phoneText}>{booking.customerPhone}</Text>
+                        <Text style={styles.phoneText}>{customerPhone || 'Not available'}</Text>
                       </View>
 
                       <View style={styles.contactActions}>
                         {/* 1-Tap Phone Call */}
                         <TouchableOpacity
                           style={styles.callBtn}
-                          onPress={() => handleCall(booking.customerPhone, booking.customerName)}
+                          onPress={() => handleCall(customerPhone, customerName)}
                           activeOpacity={0.8}
                         >
                           <Phone size={14} color="#FFFFFF" />
@@ -306,7 +366,7 @@ export default function WorkerBookingsScreen({
                         {/* 1-Tap WhatsApp */}
                         <TouchableOpacity
                           style={styles.whatsappBtn}
-                          onPress={() => handleWhatsApp(booking.customerPhone, booking.customerName, booking.title)}
+                          onPress={() => handleWhatsApp(customerPhone, customerName, title)}
                           activeOpacity={0.8}
                         >
                           <MessageSquare size={14} color="#FFFFFF" />
@@ -321,7 +381,7 @@ export default function WorkerBookingsScreen({
                     <View style={styles.progressHeaderRow}>
                       <Text style={styles.progressSectionTitle}>Work Progress Tracker</Text>
                       <Text style={styles.progressStepCount}>
-                        Step {currentStep} of 4 • {STEPS[currentStep - 1].hindi}
+                        Step {currentStep} of 4 • {currentStepObj.hindi}
                       </Text>
                     </View>
 
@@ -417,54 +477,71 @@ export default function WorkerBookingsScreen({
               </Text>
             </View>
           ) : (
-            historyBookings.map((item) => (
-              <View key={item.id} style={styles.historyCard}>
-                <View style={styles.historyTopRow}>
-                  <View style={styles.customerRow}>
-                    <View style={[styles.avatar, { backgroundColor: item.customerColor || '#10B981' }]}>
-                      <Text style={styles.avatarText}>{item.customerAvatar || 'CU'}</Text>
+            historyBookings.map((item, index) => {
+              if (!item) return null;
+              const itemKey = item.id || `history-${index}`;
+              const customerName = item.customerName || item.customer_name || 'Customer';
+              const customerAvatar = item.customerAvatar || (typeof customerName === 'string' && customerName.trim().length >= 2 ? customerName.trim().slice(0, 2).toUpperCase() : 'CU');
+              const customerColor = item.customerColor || '#10B981';
+              const location = item.location || item.site_location || 'Sawai Madhopur, Rajasthan';
+              const title = item.title || 'Completed Service';
+              const rawAmt = item.amount || '₹950';
+              const amount = String(rawAmt).startsWith('₹') ? rawAmt : `₹${rawAmt}`;
+              const customerPhone = item.customerPhone || item.customer_phone || '';
+
+              return (
+                <View key={itemKey} style={styles.historyCard}>
+                  <View style={styles.historyTopRow}>
+                    <View style={styles.customerRow}>
+                      <View style={[styles.avatar, { backgroundColor: customerColor }]}>
+                        <Text style={styles.avatarText}>{customerAvatar}</Text>
+                      </View>
+                      <View style={styles.customerMeta}>
+                        <Text style={styles.customerName}>{customerName}</Text>
+                        <Text style={styles.locText} numberOfLines={1}>{location}</Text>
+                      </View>
                     </View>
-                    <View style={styles.customerMeta}>
-                      <Text style={styles.customerName}>{item.customerName}</Text>
-                      <Text style={styles.locText} numberOfLines={1}>{item.location}</Text>
+
+                    <View style={styles.completedBadge}>
+                      <CheckCircle2 size={11} color="#15803D" />
+                      <Text style={styles.completedBadgeText}>COMPLETED</Text>
                     </View>
                   </View>
 
-                  <View style={styles.completedBadge}>
-                    <CheckCircle2 size={11} color="#15803D" />
-                    <Text style={styles.completedBadgeText}>COMPLETED</Text>
+                  <Text style={styles.historyJobTitle}>{title}</Text>
+
+                  {/* Rating & Review */}
+                  {item.rating ? (
+                    <View style={styles.reviewBox}>
+                      <View style={styles.ratingStarsRow}>
+                        <Star size={13} color="#F59E0B" fill="#F59E0B" />
+                        <Text style={styles.ratingNum}>{item.rating} / 5.0</Text>
+                      </View>
+                      {item.reviewText ? (
+                        <Text style={styles.reviewComment}>"{item.reviewText}"</Text>
+                      ) : null}
+                    </View>
+                  ) : null}
+
+                  {/* Payout Footer */}
+                  <View style={styles.historyFooter}>
+                    <TouchableOpacity
+                      style={styles.phoneSnippet}
+                      onPress={() => customerPhone && handleCall(customerPhone, customerName)}
+                      activeOpacity={customerPhone ? 0.7 : 1}
+                    >
+                      <Phone size={11} color="#64748B" />
+                      <Text style={styles.phoneSnippetText}>{customerPhone || 'Contact Customer'}</Text>
+                    </TouchableOpacity>
+
+                    <View style={styles.paidPill}>
+                      <Text style={styles.paidLabel}>Earnings Credited:</Text>
+                      <Text style={styles.paidAmount}>{amount}</Text>
+                    </View>
                   </View>
                 </View>
-
-                <Text style={styles.historyJobTitle}>{item.title}</Text>
-
-                {/* Rating & Review */}
-                {item.rating ? (
-                  <View style={styles.reviewBox}>
-                    <View style={styles.ratingStarsRow}>
-                      <Star size={13} color="#F59E0B" fill="#F59E0B" />
-                      <Text style={styles.ratingNum}>{item.rating} / 5.0</Text>
-                    </View>
-                    {item.reviewText ? (
-                      <Text style={styles.reviewComment}>"{item.reviewText}"</Text>
-                    ) : null}
-                  </View>
-                ) : null}
-
-                {/* Payout Footer */}
-                <View style={styles.historyFooter}>
-                  <View style={styles.phoneSnippet}>
-                    <Phone size={11} color="#64748B" />
-                    <Text style={styles.phoneSnippetText}>{item.customerPhone}</Text>
-                  </View>
-
-                  <View style={styles.paidPill}>
-                    <Text style={styles.paidLabel}>Earnings Credited:</Text>
-                    <Text style={styles.paidAmount}>{item.amount}</Text>
-                  </View>
-                </View>
-              </View>
-            ))
+              );
+            })
           )
         )}
       </ScrollView>

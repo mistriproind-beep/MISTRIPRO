@@ -31,6 +31,7 @@ import {
   UserCheck,
 } from 'lucide-react-native';
 import { InvoiceService } from '../services/invoiceService';
+import { DeviceFeedback } from '../services/deviceFeedback';
 
 const TRACK_STEPS = [
   { step: 1, title: 'Approved', hindi: 'स्वीकृत' },
@@ -46,6 +47,8 @@ export default function MyBookingsScreen({
   onAutoAssignAnother,
   onRefundBooking,
   onSubmitReview,
+  onOpenNotifications,
+  notificationsCount,
 }) {
   const [activeTab, setActiveTab] = useState('active'); // 'active' | 'completed' | 'cancelled'
   
@@ -57,8 +60,11 @@ export default function MyBookingsScreen({
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewText, setReviewText] = useState('');
 
+  const safeBookings = Array.isArray(bookings) ? bookings : [];
+
   // Filter bookings based on active tab
-  const filteredBookings = bookings.filter((b) => {
+  const filteredBookings = safeBookings.filter((b) => {
+    if (!b) return false;
     const s = (b.status || '').toLowerCase();
     if (activeTab === 'active') {
       return s === 'active' || s === 'waiting_confirmation' || s === 'confirmed' || s === 'in_progress';
@@ -73,12 +79,14 @@ export default function MyBookingsScreen({
   });
 
   const getStatusCounts = () => {
-    const active = bookings.filter((b) => {
+    const active = safeBookings.filter((b) => {
+      if (!b) return false;
       const s = (b.status || '').toLowerCase();
       return s === 'active' || s === 'waiting_confirmation' || s === 'confirmed' || s === 'in_progress';
     }).length;
-    const completed = bookings.filter((b) => (b.status || '').toLowerCase() === 'completed').length;
-    const cancelled = bookings.filter((b) => {
+    const completed = safeBookings.filter((b) => (b?.status || '').toLowerCase() === 'completed').length;
+    const cancelled = safeBookings.filter((b) => {
+      if (!b) return false;
       const s = (b.status || '').toLowerCase();
       return s === 'cancelled' || s === 'rejected' || s === 'refunded';
     }).length;
@@ -89,6 +97,10 @@ export default function MyBookingsScreen({
 
   // Call worker (only when booking is confirmed)
   const handleCall = (booking) => {
+    if (!booking) {
+      Alert.alert('Call Mistri', 'Booking information is not available.');
+      return;
+    }
     const s = (booking.status || '').toLowerCase();
     if (s === 'waiting_confirmation') {
       Alert.alert(
@@ -97,15 +109,20 @@ export default function MyBookingsScreen({
       );
       return;
     }
-    const phone = booking.worker_phone || booking.workerPhone;
-    if (phone) {
-      const cleaned = phone.replace(/[^0-9+]/g, '');
-      Linking.openURL(`tel:${cleaned}`).catch(() => {
-        Alert.alert('Call Mistri', `Calling ${booking.worker_name || booking.workerName} at ${phone}`);
-      });
-    } else {
-      Alert.alert('Calling Mistri', 'Connecting you via Mistri Pro secure dialer...');
+    const rawPhone = booking.worker_phone || booking.workerPhone;
+    const workerName = booking.worker_name || booking.workerName || 'Mistri';
+    if (!rawPhone || !String(rawPhone).trim()) {
+      Alert.alert('Calling Mistri', `Connecting you to ${workerName} via Mistri Pro secure dialer...`);
+      return;
     }
+    const cleaned = String(rawPhone).replace(/[^0-9+]/g, '');
+    if (!cleaned || cleaned.replace(/[^0-9]/g, '').length < 5) {
+      Alert.alert('Calling Mistri', `Connecting you to ${workerName} via Mistri Pro secure dialer...`);
+      return;
+    }
+    Linking.openURL(`tel:${cleaned}`).catch(() => {
+      Alert.alert('Call Mistri', `Calling ${workerName} at ${rawPhone}`);
+    });
   };
 
   // Submit Rating & Review
@@ -114,6 +131,7 @@ export default function MyBookingsScreen({
     if (onSubmitReview) {
       onSubmitReview(reviewBooking.id, reviewRating, reviewText);
     }
+    DeviceFeedback?.triggerSuccessHaptics?.();
     Alert.alert('Thank You! ⭐', 'Your verified rating and review have been saved.');
     setReviewBooking(null);
     setReviewText('');
@@ -122,7 +140,16 @@ export default function MyBookingsScreen({
 
   // Download PDF Invoice
   const handleDownloadInvoice = (booking) => {
-    InvoiceService.downloadInvoicePdf(booking);
+    if (!booking) {
+      Alert.alert('Download Invoice', 'Booking details are missing.');
+      return;
+    }
+    try {
+      InvoiceService.downloadInvoicePdf(booking);
+    } catch (err) {
+      console.log('Invoice download error:', err);
+      Alert.alert('Invoice', 'Unable to generate invoice. Please try again.');
+    }
   };
 
   return (
@@ -199,7 +226,8 @@ export default function MyBookingsScreen({
             )}
           </View>
         ) : (
-          filteredBookings.map((booking) => {
+          filteredBookings.map((booking, index) => {
+            if (!booking) return null;
             const rawStatus = (booking.status || 'active').toLowerCase();
             const isWaiting = rawStatus === 'waiting_confirmation';
             const isConfirmed = rawStatus === 'confirmed' || rawStatus === 'active';
@@ -208,17 +236,19 @@ export default function MyBookingsScreen({
             const isRefunded = rawStatus === 'refunded';
 
             const workerName = booking.worker_name || booking.workerName || 'Assigned Mistri';
-            const workerAvatar = booking.workerAvatar || workerName.slice(0, 2).toUpperCase();
+            const workerAvatar = booking.workerAvatar || (typeof workerName === 'string' && workerName.trim().length >= 2 ? workerName.trim().slice(0, 2).toUpperCase() : 'MP');
             const workerColor = booking.workerColor || '#4F46E5';
             const category = booking.worker_skill || booking.category || 'General Labour';
             const title = booking.title || `${category} Service`;
             const location = booking.site_location || booking.location || 'Sawai Madhopur, Rajasthan';
             const date = booking.scheduled_date || booking.date || 'Today, Immediate';
-            const amount = booking.total_amount ? `₹${booking.total_amount}` : (booking.amount || '₹1,098');
-            const currentStep = booking.progress_step || booking.step || 1;
+            const rawAmt = booking.total_amount || booking.amount || '₹1,098';
+            const amount = String(rawAmt).startsWith('₹') ? rawAmt : `₹${rawAmt}`;
+            const currentStep = Number(booking.progress_step || booking.step || 1);
+            const bookingKey = booking.id || booking.booking_code || `booking-${index}`;
 
             return (
-              <View key={booking.id || booking.booking_code} style={styles.bookingCard}>
+              <View key={bookingKey} style={styles.bookingCard}>
                 {/* Card Top */}
                 <View style={styles.cardHeader}>
                   <View style={styles.workerRow}>
@@ -432,20 +462,34 @@ export default function MyBookingsScreen({
       </ScrollView>
 
       {/* ─── LIVE WORK PROGRESS TRACKER MODAL ─── */}
-      <Modal visible={!!trackingBooking} transparent animationType="fade">
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalSheet}>
+      <Modal
+        visible={!!trackingBooking}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setTrackingBooking(null)}
+      >
+        <TouchableOpacity
+          style={styles.modalBackdrop}
+          activeOpacity={1}
+          onPress={() => setTrackingBooking(null)}
+        >
+          <TouchableOpacity
+            style={styles.modalSheet}
+            activeOpacity={1}
+            onPress={(e) => e?.stopPropagation?.()}
+          >
             <View style={styles.modalHeader}>
               <View style={{ flex: 1, marginRight: 12 }}>
                 <Text style={styles.modalTitle} numberOfLines={1}>Live Job Progress Tracker</Text>
                 <Text style={styles.modalSub} numberOfLines={1}>
-                  {trackingBooking?.worker_name || trackingBooking?.workerName} • {trackingBooking?.category}
+                  {(trackingBooking?.worker_name || trackingBooking?.workerName || 'Mistri')} • {(trackingBooking?.category || trackingBooking?.worker_skill || 'Service')}
                 </Text>
               </View>
               <TouchableOpacity
                 style={styles.modalDoneBtn}
                 onPress={() => setTrackingBooking(null)}
                 activeOpacity={0.8}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
               >
                 <Text style={styles.modalCloseText}>Done</Text>
               </TouchableOpacity>
@@ -454,7 +498,7 @@ export default function MyBookingsScreen({
             {/* Stepper Display */}
             <View style={styles.trackerBox}>
               {TRACK_STEPS.map((s, idx) => {
-                const current = trackingBooking?.progress_step || trackingBooking?.step || 1;
+                const current = Number(trackingBooking?.progress_step || trackingBooking?.step || 1);
                 const isPassed = current >= s.step;
                 const isCurrent = current === s.step;
 
@@ -501,30 +545,46 @@ export default function MyBookingsScreen({
               onPress={() => {
                 const b = trackingBooking;
                 setTrackingBooking(null);
-                handleCall(b);
+                if (b) {
+                  handleCall(b);
+                }
               }}
               activeOpacity={0.85}
             >
               <Phone size={16} color="#FFFFFF" />
-              <Text style={styles.modalCallBtnText}>Call {trackingBooking?.worker_name || 'Mistri'}</Text>
+              <Text style={styles.modalCallBtnText}>Call {trackingBooking?.worker_name || trackingBooking?.workerName || 'Mistri'}</Text>
             </TouchableOpacity>
-          </View>
-        </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
       </Modal>
 
       {/* ─── RATE & REVIEW MODAL ─── */}
-      <Modal visible={!!reviewBooking} transparent animationType="slide">
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalSheet}>
+      <Modal
+        visible={!!reviewBooking}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setReviewBooking(null)}
+      >
+        <TouchableOpacity
+          style={styles.modalBackdrop}
+          activeOpacity={1}
+          onPress={() => setReviewBooking(null)}
+        >
+          <TouchableOpacity
+            style={styles.modalSheet}
+            activeOpacity={1}
+            onPress={(e) => e?.stopPropagation?.()}
+          >
             <View style={styles.modalHeader}>
               <View style={{ flex: 1, marginRight: 12 }}>
                 <Text style={styles.modalTitle} numberOfLines={1}>Rate Your Mistri Experience</Text>
-                <Text style={styles.modalSub} numberOfLines={1}>{reviewBooking?.worker_name || 'Worker'} • {reviewBooking?.category}</Text>
+                <Text style={styles.modalSub} numberOfLines={1}>{(reviewBooking?.worker_name || reviewBooking?.workerName || 'Worker')} • {(reviewBooking?.category || reviewBooking?.worker_skill || 'Service')}</Text>
               </View>
               <TouchableOpacity
                 style={styles.modalDoneBtn}
                 onPress={() => setReviewBooking(null)}
                 activeOpacity={0.8}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
               >
                 <Text style={styles.modalCloseText}>Cancel</Text>
               </TouchableOpacity>
@@ -558,8 +618,8 @@ export default function MyBookingsScreen({
             <TouchableOpacity style={styles.submitReviewBtn} onPress={handleSendReview} activeOpacity={0.85}>
               <Text style={styles.submitReviewBtnText}>Submit Verified Review</Text>
             </TouchableOpacity>
-          </View>
-        </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
       </Modal>
     </View>
   );

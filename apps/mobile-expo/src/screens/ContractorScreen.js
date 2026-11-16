@@ -39,7 +39,14 @@ const CREW_ROLES = [
   { id: 'plumber', name: 'Plumber', icon: '🔧', baseRate: 950, unit: 'day' },
 ];
 
-export default function ContractorScreen({ insets, onNavigateTab, onDeployContractorBooking, workers = [] }) {
+export default function ContractorScreen({
+  insets,
+  onNavigateTab,
+  onDeployContractorBooking,
+  workers = [],
+  userName = 'Customer',
+  userContact = '',
+}) {
   // Crew selection: { [roleId]: count }
   const [crewCounts, setCrewCounts] = useState({
     mason: 2,
@@ -169,32 +176,40 @@ export default function ContractorScreen({ insets, onNavigateTab, onDeployContra
               color: w.color,
             }));
 
+            const durationText =
+              durationType === 'hourly'
+                ? `${hoursCount} Hours`
+                : durationType === 'half'
+                ? 'Half Day (4 hrs)'
+                : durationType === 'full'
+                ? 'Full Day (8 hrs)'
+                : `${daysCount} Days`;
+
             const contractorPayload = {
               totalWorkers,
               crewBreakdown: crewCounts,
               assignedWorkers: assigned,
               siteLocation,
-              duration:
-                durationType === 'hourly'
-                  ? `${hoursCount} Hours`
-                  : durationType === 'half'
-                  ? 'Half Day (4 hrs)'
-                  : durationType === 'full'
-                  ? 'Full Day (8 hrs)'
-                  : `${daysCount} Days`,
+              duration: durationText,
               subtotal,
-              platformFee: 99,
-              transactionFee: Math.round(subtotal * 0.05),
-              totalAmount: subtotal + 99 + Math.round(subtotal * 0.05),
+              platformFee,
+              gst,
+              transactionFee: gst,
+              totalAmount: grandTotal,
+              paymentMethod: payMethod === 'card' ? 'Razorpay Cards / NetBanking' : 'Razorpay UPI / QR',
             };
 
             const bookingData = {
               workerName: `${totalWorkers} Worker Crew`,
               workerSkill: 'Contractor Crew Deployment',
               workerFee: subtotal,
-              platformFee: 99,
-              txnFee: Math.round(subtotal * 0.05),
-              totalAmount: subtotal + 99 + Math.round(subtotal * 0.05),
+              platformFee,
+              txnFee: gst,
+              totalAmount: grandTotal,
+              customerName: userName || 'Customer',
+              customerPhone: userContact || '',
+              wageLabel: `Crew Wage (${totalWorkers} workers, ${durationText})`,
+              txnFeeLabel: 'GST (18% on fee)',
               contractorPayload,
             };
 

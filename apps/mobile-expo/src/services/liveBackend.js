@@ -1,4 +1,7 @@
 import { supabase } from './supabase';
+import { StorageService } from './storage';
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export const LiveBackend = {
   // 1. Fetch Real Live Workers from Supabase (Zero Mock / Zero Fake Data)
@@ -51,51 +54,193 @@ export const LiveBackend = {
     }
   },
 
-  // 1b. Update Worker Live Online / Offline Availability in Supabase
-  updateWorkerAvailability: async (userIdOrPhone, isAvailable) => {
+  // Helper: Safely resolve worker Supabase UUID from id, phone, auth user, or storage session
+  _resolveWorkerTargetId: async (userIdOrPhone) => {
     try {
-      if (!userIdOrPhone) return { success: false };
-      const isUuid = String(userIdOrPhone).includes('-');
-      let targetUserId = isUuid ? userIdOrPhone : null;
+      if (userIdOrPhone && UUID_REGEX.test(String(userIdOrPhone).trim())) {
+        return String(userIdOrPhone).trim();
+      }
 
-      if (!targetUserId) {
-        const cleanDigits = String(userIdOrPhone).replace(/[^0-9]/g, '').slice(-10);
-        const { data: profs } = await supabase.from('profiles').select('id, phone, alt_phone').limit(50);
+      // 1. Phone number lookup (must be at least 10 valid digits)
+      const cleanDigits = String(userIdOrPhone || '').replace(/[^0-9]/g, '').slice(-10);
+      if (cleanDigits.length === 10) {
+        const { data: prof } = await supabase
+          .from('profiles')
+          .select('id')
+          .or(`phone.ilike.%${cleanDigits}%,alt_phone.ilike.%${cleanDigits}%`)
+          .limit(1)
+          .maybeSingle();
+
+        if (prof?.id && UUID_REGEX.test(prof.id)) {
+          return prof.id;
+        }
+
+        // Fallback scan with strict check to avoid empty phone matching
+        const { data: profs } = await supabase
+          .from('profiles')
+          .select('id, phone, alt_phone')
+          .limit(100);
+
         const match = (profs || []).find((p) => {
           const pD = (p.phone || '').replace(/[^0-9]/g, '').slice(-10);
           const aD = (p.alt_phone || '').replace(/[^0-9]/g, '').slice(-10);
-          return pD === cleanDigits || aD === cleanDigits || p.id === userIdOrPhone;
+          return (pD.length === 10 && pD === cleanDigits) || (aD.length === 10 && aD === cleanDigits);
         });
-        if (match) targetUserId = match.id;
-      }
-
-      if (targetUserId) {
-        const { data: existingWp } = await supabase
-          .from('worker_profiles')
-          .select('id')
-          .eq('user_id', targetUserId)
-          .limit(1);
-
-        if (existingWp && existingWp.length > 0) {
-          await supabase
-            .from('worker_profiles')
-            .update({ is_available: isAvailable })
-            .eq('user_id', targetUserId);
-        } else {
-          await supabase.from('worker_profiles').insert([
-            {
-              user_id: targetUserId,
-              is_available: isAvailable,
-              daily_rate: 800,
-              skills: ['Master Mason'],
-            },
-          ]);
+        if (match?.id && UUID_REGEX.test(match.id)) {
+          return match.id;
         }
-        return { success: true };
       }
-      return { success: false };
+
+      // 2. Fallback to active Supabase Auth session user
+      try {
+        const { data: authData } = await supabase.auth.getUser();
+        if (authData?.user?.id && UUID_REGEX.test(authData.user.id)) {
+          return authData.user.id;
+        }
+      } catch (e) {}
+
+      // 3. Fallback to locally stored session
+      try {
+        const session = await StorageService.getSession();
+        if (session?.id && UUID_REGEX.test(session.id)) {
+          return session.id;
+        }
+        if (session?.mobile || session?.phone) {
+          const sDigits = String(session.mobile || session.phone).replace(/[^0-9]/g, '').slice(-10);
+          if (sDigits.length === 10) {
+            const { data: sProf } = await supabase
+              .from('profiles')
+              .select('id')
+              .or(`phone.ilike.%${sDigits}%,alt_phone.ilike.%${sDigits}%`)
+              .limit(1)
+              .maybeSingle();
+            if (sProf?.id && UUID_REGEX.test(sProf.id)) {
+              return sProf.id;
+            }
+          }
+        }
+      } catch (e) {}
+
+      return null;
+    } catch (e) {
+      console.log('LiveBackend._resolveWorkerTargetId error:', e?.message);
+      return null;
+    }
+  },
+
+  // 1b. Update Worker Live Online / Offline Availability in Supabase
+  updateWorkerAvailability: async (userIdOrPhone, isAvailable) => {
+    try {
+      const boolVal = Boolean(isAvailable);
+      const targetUserId = await LiveBackend._resolveWorkerTargetId(userIdOrPhone);
+
+      if (!targetUserId) {
+        console.log('LiveBackend.updateWorkerAvailability: target worker ID could not be resolved safely');
+        return { success: false, error: 'Target worker profile ID could not be resolved' };
+      }
+
+      const { data: existingWp, error: selectErr } = await supabase
+        .from('worker_profiles')
+        .select('id, user_id')
+        .or(`user_id.eq.${targetUserId},id.eq.${targetUserId}`)
+        .limit(1);
+
+      if (selectErr) {
+        console.log('LiveBackend.updateWorkerAvailability select error:', selectErr.message);
+      }
+
+      if (existingWp && existingWp.length > 0) {
+        const { error: updErr } = await supabase
+          .from('worker_profiles')
+          .update({ is_available: boolVal })
+          .eq('id', existingWp[0].id);
+
+        if (updErr) {
+          console.log('LiveBackend.updateWorkerAvailability update error:', updErr.message);
+          return { success: false, error: updErr.message };
+        }
+        return { success: true, is_available: boolVal };
+      } else {
+        const { data: pCheck } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('id', targetUserId)
+          .maybeSingle();
+
+        if (!pCheck) {
+          console.log('LiveBackend.updateWorkerAvailability: profile not found in database');
+          return { success: false, error: 'Profile not found in database' };
+        }
+
+        const { error: insErr } = await supabase.from('worker_profiles').insert([
+          {
+            user_id: targetUserId,
+            is_available: boolVal,
+            daily_rate: 800,
+            skills: ['Master Mason'],
+          },
+        ]);
+
+        if (insErr) {
+          console.log('LiveBackend.updateWorkerAvailability insert error:', insErr.message);
+          return { success: false, error: insErr.message };
+        }
+        return { success: true, is_available: boolVal };
+      }
     } catch (err) {
       console.log('LiveBackend.updateWorkerAvailability error:', err.message);
+      return { success: false, error: err.message };
+    }
+  },
+
+  // 1c. Fetch Worker Live Availability from Supabase
+  getWorkerAvailability: async (userIdOrPhone) => {
+    try {
+      const targetUserId = await LiveBackend._resolveWorkerTargetId(userIdOrPhone);
+      if (!targetUserId) return null;
+
+      const { data, error } = await supabase
+        .from('worker_profiles')
+        .select('is_available')
+        .or(`user_id.eq.${targetUserId},id.eq.${targetUserId}`)
+        .limit(1)
+        .maybeSingle();
+
+      if (error || !data) return null;
+      return Boolean(data.is_available);
+    } catch (err) {
+      console.log('LiveBackend.getWorkerAvailability error:', err.message);
+      return null;
+    }
+  },
+
+  // 1d. Update Worker Daily Working Rate in Supabase
+  updateWorkerDailyRate: async (userIdOrPhone, dailyRate) => {
+    try {
+      const rate = parseInt(dailyRate, 10);
+      if (isNaN(rate) || rate <= 0) return { success: false, error: 'Invalid daily rate' };
+
+      const targetUserId = await LiveBackend._resolveWorkerTargetId(userIdOrPhone);
+      if (!targetUserId) return { success: false, error: 'Target worker profile ID could not be resolved' };
+
+      const { data: existingWp } = await supabase
+        .from('worker_profiles')
+        .select('id')
+        .or(`user_id.eq.${targetUserId},id.eq.${targetUserId}`)
+        .limit(1);
+
+      if (existingWp && existingWp.length > 0) {
+        const { error: updErr } = await supabase
+          .from('worker_profiles')
+          .update({ daily_rate: rate })
+          .eq('id', existingWp[0].id);
+
+        if (updErr) return { success: false, error: updErr.message };
+        return { success: true };
+      }
+      return { success: false, error: 'Worker profile not found in database' };
+    } catch (err) {
+      console.log('LiveBackend.updateWorkerDailyRate error:', err.message);
       return { success: false, error: err.message };
     }
   },

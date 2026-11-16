@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -21,8 +21,6 @@ import {
   Bell,
   Briefcase,
   Wallet,
-  Star,
-  Sparkles,
   ExternalLink,
   X,
   Radio,
@@ -32,69 +30,177 @@ import { WORKER_TUTORIALS } from '../data/workerData';
 import { supabase } from '../services/supabase';
 import { LiveBackend } from '../services/liveBackend';
 import { DeviceFeedback } from '../services/deviceFeedback';
+import { StorageService } from '../services/storage';
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const resolveWorkerTarget = (profile) => {
+  if (!profile) return null;
+  if (profile.user_id && UUID_REGEX.test(String(profile.user_id).trim())) {
+    return String(profile.user_id).trim();
+  }
+  if (profile.id && UUID_REGEX.test(String(profile.id).trim())) {
+    return String(profile.id).trim();
+  }
+  const rawPhone = profile.phone || profile.mobile;
+  if (rawPhone && String(rawPhone).replace(/[^0-9]/g, '').length >= 10) {
+    return String(rawPhone).trim();
+  }
+  if (profile.id && profile.id !== 'w-me') {
+    return profile.id;
+  }
+  return null;
+};
 
 export default function WorkerHomeScreen({
   insets,
   workerProfile,
   onUpdateProfile,
-  alertsCount = 3,
-  walletBalance = 4850,
+  alertsCount = 0,
+  walletBalance = 0,
   onNavigateTab,
+  onOpenNotifications,
+  notificationsCount,
 }) {
-  const [isAvailable, setIsAvailable] = useState(
-    workerProfile?.isAvailable !== undefined ? workerProfile.isAvailable : true
-  );
+  const [isAvailable, setIsAvailable] = useState(() => {
+    if (workerProfile?.isAvailable !== undefined) return Boolean(workerProfile.isAvailable);
+    if (workerProfile?.is_available !== undefined) return Boolean(workerProfile.is_available);
+    return true;
+  });
+  const [isSyncingAvailability, setIsSyncingAvailability] = useState(false);
   const [showPriceModal, setShowPriceModal] = useState(false);
-  const [editPrice, setEditPrice] = useState(String(workerProfile?.price || 950));
+  const [editPrice, setEditPrice] = useState(String(workerProfile?.price || workerProfile?.daily_rate || 950));
   const [editRateType, setEditRateType] = useState(workerProfile?.priceType || 'day');
-  const [activeVideo, setActiveVideo] = useState(null);
+
+  // Keep state in sync if parent prop workerProfile changes
+  useEffect(() => {
+    const nextAvail = workerProfile?.isAvailable ?? workerProfile?.is_available;
+    if (nextAvail !== undefined) {
+      setIsAvailable(Boolean(nextAvail));
+    }
+  }, [workerProfile?.isAvailable, workerProfile?.is_available]);
+
+  // Sync real-time database availability on mount/profile load
+  useEffect(() => {
+    let isMounted = true;
+    const fetchLiveAvailability = async () => {
+      try {
+        const target = resolveWorkerTarget(workerProfile);
+        const liveAvail = await LiveBackend.getWorkerAvailability(target);
+        if (liveAvail !== null && isMounted) {
+          setIsAvailable(liveAvail);
+          if (onUpdateProfile) {
+            onUpdateProfile({ isAvailable: liveAvail, is_available: liveAvail });
+          }
+        }
+      } catch (err) {
+        console.log('WorkerHomeScreen live availability fetch error:', err);
+      }
+    };
+    fetchLiveAvailability();
+    return () => {
+      isMounted = false;
+    };
+  }, [workerProfile?.id, workerProfile?.user_id, workerProfile?.phone]);
 
   // Toggle Availability
   const handleToggleAvailability = async (val) => {
+    if (isSyncingAvailability) return;
+    setIsSyncingAvailability(true);
+    const previousVal = isAvailable;
     setIsAvailable(val);
     if (onUpdateProfile) {
-      onUpdateProfile({ isAvailable: val });
+      onUpdateProfile({ isAvailable: val, is_available: val });
     }
-    const workerTarget = workerProfile?.id || workerProfile?.user_id || workerProfile?.phone || '';
-    if (workerTarget) {
-      await LiveBackend.updateWorkerAvailability(workerTarget, val);
-    }
-    DeviceFeedback.triggerAlertHaptics();
-    if (val) {
-      Alert.alert(
-        'Online & Available! 🟢',
-        'Your profile is now marked ONLINE on customer live maps and directory. Nearby clients can book you now.'
-      );
-    } else {
-      Alert.alert(
-        'Offline / Busy 🔴',
-        'Your profile will show as "Not Available Right Now" to customers until you turn this back on.'
-      );
+
+    try {
+      let target = resolveWorkerTarget(workerProfile);
+      if (!target) {
+        try {
+          const sess = await StorageService.getSession();
+          if (sess?.id && UUID_REGEX.test(sess.id)) {
+            target = sess.id;
+          } else if (sess?.mobile || sess?.phone) {
+            target = sess.mobile || sess.phone;
+          }
+        } catch (e) {}
+      }
+
+      const res = await LiveBackend.updateWorkerAvailability(target, val);
+      DeviceFeedback.triggerAlertHaptics?.();
+
+      if (res && res.success === false && res.error) {
+        console.warn('Worker availability sync notice:', res.error);
+      }
+
+      if (val) {
+        Alert.alert(
+          'Online & Available! 🟢',
+          'Your profile is now marked ONLINE on customer live maps and directory. Nearby clients can book you now.'
+        );
+      } else {
+        Alert.alert(
+          'Offline / Busy 🔴',
+          'Your profile will show as "Not Available Right Now" to customers until you turn this back on.'
+        );
+      }
+    } catch (err) {
+      console.log('Worker availability toggle error:', err);
+      setIsAvailable(previousVal);
+      if (onUpdateProfile) {
+        onUpdateProfile({ isAvailable: previousVal, is_available: previousVal });
+      }
+      Alert.alert('Status Update Failed', 'Unable to update availability status. Please try again.');
+    } finally {
+      setIsSyncingAvailability(false);
     }
   };
 
   // Save new price
-  const handleSavePrice = () => {
+  const handleSavePrice = async () => {
     const num = parseInt(editPrice, 10);
     if (isNaN(num) || num <= 0) {
       Alert.alert('Invalid Price', 'Please enter a valid rate in Rupees (₹).');
       return;
     }
     if (onUpdateProfile) {
-      onUpdateProfile({ price: num, priceType: editRateType });
+      onUpdateProfile({ price: num, daily_rate: num, priceType: editRateType });
     }
     setShowPriceModal(false);
+
+    try {
+      const target = resolveWorkerTarget(workerProfile);
+      await LiveBackend.updateWorkerDailyRate(target, num);
+    } catch (e) {
+      console.log('WorkerHomeScreen: updateWorkerDailyRate error:', e);
+    }
+
     Alert.alert('Price Updated ✓', `Your daily rate is now ₹${num}/${editRateType}. Saved successfully!`);
   };
 
   // Open YouTube tutorial
   const handleOpenVideo = (video) => {
-    if (video.url) {
+    if (video?.url) {
       Linking.openURL(video.url).catch(() => {
-        Alert.alert('Video Tutorial', `Opening "${video.title}" on YouTube.`);
+        Alert.alert('Video Tutorial', `Opening "${video.title || 'Tutorial'}" on YouTube.`);
       });
     }
   };
+
+  const avatarText =
+    workerProfile?.avatar ||
+    (workerProfile?.name
+      ? workerProfile.name
+          .trim()
+          .split(' ')
+          .map((w) => w[0])
+          .join('')
+          .slice(0, 2)
+          .toUpperCase()
+      : 'RS');
+
+  const unreadAlertCount =
+    notificationsCount !== undefined ? notificationsCount : alertsCount;
 
   return (
     <View style={[styles.container, { paddingTop: insets?.top || 10 }]}>
@@ -106,7 +212,7 @@ export default function WorkerHomeScreen({
         <View style={styles.headerRow}>
           <View style={styles.headerLeft}>
             <View style={[styles.avatarBox, { backgroundColor: workerProfile?.color || '#4F46E5' }]}>
-              <Text style={styles.avatarText}>{workerProfile?.avatar || 'RS'}</Text>
+              <Text style={styles.avatarText}>{avatarText}</Text>
             </View>
             <View style={styles.headerTextCol}>
               <View style={styles.nameRow}>
@@ -127,13 +233,19 @@ export default function WorkerHomeScreen({
 
           <TouchableOpacity
             style={styles.bellBtn}
-            onPress={() => onNavigateTab && onNavigateTab('ALERTS')}
+            onPress={() => {
+              if (onOpenNotifications) {
+                onOpenNotifications();
+              } else if (onNavigateTab) {
+                onNavigateTab('ALERTS');
+              }
+            }}
             activeOpacity={0.8}
           >
             <Bell size={20} color="#0F172A" />
-            {alertsCount > 0 && (
+            {unreadAlertCount > 0 && (
               <View style={styles.bellBadge}>
-                <Text style={styles.bellBadgeText}>{alertsCount}</Text>
+                <Text style={styles.bellBadgeText}>{unreadAlertCount}</Text>
               </View>
             )}
           </TouchableOpacity>
@@ -159,6 +271,7 @@ export default function WorkerHomeScreen({
             <Switch
               value={isAvailable}
               onValueChange={handleToggleAvailability}
+              disabled={isSyncingAvailability}
               trackColor={{ false: '#CBD5E1', true: '#86EFAC' }}
               thumbColor={isAvailable ? '#16A34A' : '#F1F5F9'}
               style={{ transform: [{ scaleX: 1.1 }, { scaleY: 1.1 }] }}
@@ -192,7 +305,7 @@ export default function WorkerHomeScreen({
               <Text style={styles.priceLabel}>Your Working Rate</Text>
               <View style={styles.priceValueRow}>
                 <Text style={styles.priceSymbol}>₹</Text>
-                <Text style={styles.priceAmount}>{workerProfile?.price || 950}</Text>
+                <Text style={styles.priceAmount}>{workerProfile?.price || workerProfile?.daily_rate || 950}</Text>
                 <Text style={styles.priceUnit}>/{workerProfile?.priceType || 'day'}</Text>
               </View>
               <Text style={styles.priceHint}>Shown to customers when booking</Text>
@@ -202,7 +315,7 @@ export default function WorkerHomeScreen({
             <TouchableOpacity
               style={styles.editPriceBtn}
               onPress={() => {
-                setEditPrice(String(workerProfile?.price || 950));
+                setEditPrice(String(workerProfile?.price || workerProfile?.daily_rate || 950));
                 setEditRateType(workerProfile?.priceType || 'day');
                 setShowPriceModal(true);
               }}
@@ -250,7 +363,7 @@ export default function WorkerHomeScreen({
             <View style={[styles.statIconWrap, { backgroundColor: '#DCFCE7' }]}>
               <Wallet size={16} color="#15803D" />
             </View>
-            <Text style={styles.statCount}>₹{walletBalance.toLocaleString()}</Text>
+            <Text style={styles.statCount}>₹{Number(walletBalance || 0).toLocaleString('en-IN')}</Text>
             <Text style={styles.statTitle}>Wallet Cash</Text>
             <Text style={styles.statSub}>Withdraw now →</Text>
           </TouchableOpacity>
@@ -269,7 +382,7 @@ export default function WorkerHomeScreen({
             </View>
           </View>
 
-          {WORKER_TUTORIALS.map((video) => (
+          {(WORKER_TUTORIALS || []).map((video) => (
             <TouchableOpacity
               key={video.id}
               style={styles.videoCard}
@@ -313,7 +426,12 @@ export default function WorkerHomeScreen({
       </ScrollView>
 
       {/* ── Edit Price Modal ── */}
-      <Modal visible={showPriceModal} transparent animationType="fade">
+      <Modal
+        visible={showPriceModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowPriceModal(false)}
+      >
         <View style={styles.modalBackdrop}>
           <View style={styles.modalSheet}>
             <View style={styles.modalHeader}>

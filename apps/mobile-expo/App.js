@@ -19,6 +19,7 @@ import { SafeAreaView, SafeAreaProvider, useSafeAreaInsets } from 'react-native-
 import { useFonts } from 'expo-font';
 import LottieView from 'lottie-react-native';
 import * as ImagePicker from 'expo-image-picker';
+import * as Location from 'expo-location';
 import { supabase } from './src/services/supabase';
 import {
   signInWithGoogle,
@@ -486,7 +487,7 @@ const INITIAL_REVIEWS = [
     role: 'Architect',
     rating: 5,
     date: '4 days ago',
-    text: 'Found 4 certified plumbers within 20 mins. The digital contract and escrow guarantee gave me total peace of mind.',
+    text: 'Found 4 certified plumbers within 20 mins. The digital contract and secured payment guarantee gave me total peace of mind.',
     verifiedWork: 'Sanitary Line Repair',
   },
   {
@@ -513,12 +514,13 @@ export default function App() {
 
 function MainApp() {
   const insets = useSafeAreaInsets();
-  // Instant Image Picker (Zero Lag & Direct Gallery Opening)
+
+  // Instant Image Picker (Gallery Selection with graceful permissions)
   const pickImage = async (setImageUri) => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
-        allowsEditing: false, // Disabling crop/editing screen removes the 2-3s freeze lag on iOS/Android
+        allowsEditing: false, // Disabling crop removes the 2-3s freeze lag on iOS/Android
         quality: 0.7,
       });
       if (!result.canceled && result.assets && result.assets.length > 0) {
@@ -544,6 +546,45 @@ function MainApp() {
         console.log('Image picker error:', e);
       }
     }
+  };
+
+  // Camera Capture with graceful permission handling
+  const takePhoto = async (setImageUri) => {
+    try {
+      const perm = await ImagePicker.requestCameraPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert('Camera Permission Needed', 'Please allow camera access from Settings to capture photos.');
+        return;
+      }
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: false,
+        quality: 0.7,
+      });
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setImageUri(result.assets[0].uri);
+      }
+    } catch (err) {
+      console.log('Camera capture error:', err?.message);
+      Alert.alert('Camera Error', 'Could not open camera. Please check camera permissions in Settings.');
+    }
+  };
+
+  // Unified Photo Selector (Camera or Gallery)
+  const selectPhotoSource = (setImageUri) => {
+    Alert.alert('Select Photo Source', 'Choose how you would like to upload your photo:', [
+      {
+        text: 'Take Photo with Camera',
+        onPress: () => takePhoto(setImageUri),
+      },
+      {
+        text: 'Choose from Gallery',
+        onPress: () => pickImage(setImageUri),
+      },
+      {
+        text: 'Cancel',
+        style: 'cancel',
+      },
+    ]);
   };
 
   const [fontsLoaded] = useFonts({
@@ -645,7 +686,7 @@ function MainApp() {
     {
       id: 'n1',
       title: 'Welcome to Mistri Pro',
-      message: 'Explore verified mistris near you or book directly with 100% Escrow Protection.',
+      message: 'Explore verified mistris near you or book directly with 100% Payment Protection.',
       time: 'Just now',
       type: 'info',
     },
@@ -792,7 +833,7 @@ function MainApp() {
       setNotifications((prev) => [
         {
           id: `NOTIF-${Date.now()}`,
-          title: 'Booking Sent & Escrow Locked',
+          title: 'Booking Sent & Payment Secured',
           message: `Booking request sent to ${bookingDetails.workerName}. Payment ₹${bookingDetails.totalAmount} secured via Razorpay Test.`,
           time: 'Just now',
           type: 'booking',
@@ -1036,20 +1077,100 @@ function MainApp() {
   // Unified App Permissions Request (Location, Storage/Photos, Camera)
   const requestAppPermissions = async () => {
     try {
-      // 1. Request GPS Location Permission
-      const { status: locStatus } = await Location.requestForegroundPermissionsAsync();
-      console.log('Location permission status:', locStatus);
+      // 1. Request GPS Location Permission safely
+      try {
+        const locPerm = await Location.requestForegroundPermissionsAsync();
+        console.log('Location permission status:', locPerm?.status);
+      } catch (locErr) {
+        console.log('Location permission request skipped:', locErr?.message);
+      }
 
-      // 2. Request Media Library (Photos & Storage) Permission
-      const { status: mediaStatus } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      console.log('Media library permission status:', mediaStatus);
+      // 2. Request Media Library (Photos & Storage) Permission safely
+      try {
+        const mediaPerm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        console.log('Media library permission status:', mediaPerm?.status);
+      } catch (mediaErr) {
+        console.log('Media library permission request skipped:', mediaErr?.message);
+      }
 
-      // 3. Request Camera Permission
-      const { status: camStatus } = await ImagePicker.requestCameraPermissionsAsync();
-      console.log('Camera permission status:', camStatus);
+      // 3. Request Camera Permission safely
+      try {
+        const camPerm = await ImagePicker.requestCameraPermissionsAsync();
+        console.log('Camera permission status:', camPerm?.status);
+      } catch (camErr) {
+        console.log('Camera permission request skipped:', camErr?.message);
+      }
     } catch (e) {
       console.log('Permission request error:', e?.message);
     }
+  };
+
+  // Dedicated Complete Sign Out (Wipes React states, persistent storage, Supabase auth)
+  const handleSignOut = async () => {
+    Alert.alert(t.logout || 'Log Out', 'Are you sure you want to sign out?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Sign Out',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await supabase.auth.signOut().catch(() => {});
+          } catch (e) {}
+
+          await StorageService.clearSession();
+          await StorageService.setBookings([]);
+
+          // Reset all user and session states
+          setRole('CUSTOMER');
+          setActiveTab('HOME');
+          setEmailInput('');
+          setPasswordInput('');
+          setPhoneInput('');
+          setOtpCode('');
+          setIsOtpSent(false);
+          setShowOtpModal(false);
+
+          setCustName('');
+          setCustMobile('');
+          setCustAddress('');
+          setCustPhotoUri(null);
+
+          setWorkerName('');
+          setWorkerMobile('');
+          setWorkerAltMobile('');
+          setWorkerAddress('');
+          setWorkerSkills([]);
+          setWorkerPhotoUri(null);
+          setAadhaarFrontUri(null);
+          setAadhaarBackUri(null);
+
+          setWorkerProfile(INITIAL_WORKER_PROFILE);
+          setWorkerWallet({
+            availableBalance: 0,
+            escrowLockedBalance: 0,
+            totalLifetimeEarnings: 0,
+            transactions: [],
+          });
+
+          setCustomerBookings([]);
+          setWorkerBookings([]);
+          setWorkerAlerts([]);
+
+          setNotifications([
+            {
+              id: 'n1',
+              title: 'Welcome to Mistri Pro',
+              message: 'Explore verified mistris near you or book directly with 100% Escrow Protection.',
+              time: 'Just now',
+              type: 'info',
+            },
+          ]);
+
+          DeviceFeedback.triggerAlertHaptics();
+          setCurrentScreen('SIGN_IN');
+        },
+      },
+    ]);
   };
 
   // Auto transition from Splash Screen with StorageService
@@ -1063,7 +1184,7 @@ function MainApp() {
         // 2. Fetch Real Live Workers from Supabase immediately (Zero Mock Data)
         LiveBackend.fetchRealWorkers().then((w) => {
           if (w && isMounted) setRealWorkers(w);
-        });
+        }).catch(() => {});
 
         // 3. Ensure language is set (default 'en' permanently, never prompt repeatedly)
         const savedLang = await StorageService.getLanguage();
@@ -1087,6 +1208,14 @@ function MainApp() {
               setWorkerName(userDisplayName);
               setWorkerMobile(savedSession.mobile || savedSession.phone || '');
               if (savedSession.address) setWorkerAddress(savedSession.address);
+              setWorkerProfile((prev) => ({
+                ...prev,
+                id: savedSession.id || prev.id,
+                user_id: savedSession.id || prev.user_id,
+                name: userDisplayName || prev.name,
+                phone: savedSession.mobile || savedSession.phone || prev.phone,
+                location: savedSession.address || prev.location,
+              }));
               const workerCheckPhone = savedSession.mobile || savedSession.phone;
               if (workerCheckPhone) {
                 const approval = await LiveBackend.checkWorkerApprovalStatus(workerCheckPhone);
@@ -1138,6 +1267,7 @@ function MainApp() {
 
         // 6. Live Supabase sync for real customer bookings in background
         const userPhone = savedSession?.mobile || savedSession?.phone;
+        const sessionRole = savedSession?.role || 'CUSTOMER';
         if (userPhone) {
           LiveBackend.fetchCustomerBookings(userPhone).then((live) => {
             if (live && live.length > 0 && isMounted) {
@@ -1156,7 +1286,7 @@ function MainApp() {
         }
 
         // 7. Live Supabase sync for real worker bookings in background
-        if (savedRole === 'WORKER' && userPhone) {
+        if (sessionRole === 'WORKER' && userPhone) {
           LiveBackend.fetchWorkerBookings(userPhone).then((wLive) => {
             if (wLive && wLive.length > 0 && isMounted) {
               setWorkerBookings(wLive);
@@ -1165,7 +1295,19 @@ function MainApp() {
         }
       } catch (err) {
         console.log('Splash check error:', err);
-        if (isMounted) setCurrentScreen('MAIN');
+        if (isMounted) {
+          try {
+            const fallbackSession = await StorageService.getSession();
+            if (fallbackSession && (fallbackSession.email || fallbackSession.mobile || fallbackSession.phone || fallbackSession.name)) {
+              setRole(fallbackSession.role || 'CUSTOMER');
+              setCurrentScreen('MAIN');
+            } else {
+              setCurrentScreen('SIGN_IN');
+            }
+          } catch {
+            setCurrentScreen('SIGN_IN');
+          }
+        }
       }
     };
 
@@ -1213,6 +1355,18 @@ function MainApp() {
           } else {
             setWorkerName(p.full_name || 'Worker');
             if (p.phone) setWorkerMobile(p.phone);
+            setWorkerProfile((prev) => ({
+              ...prev,
+              id: p.id || prev.id,
+              user_id: p.id || prev.user_id,
+              name: p.full_name || prev.name,
+              phone: p.phone || prev.phone,
+              location: p.address || prev.location,
+              isAvailable:
+                p.worker_profiles && p.worker_profiles[0]?.is_available !== undefined
+                  ? p.worker_profiles[0].is_available
+                  : prev.isAvailable,
+            }));
             if (p.kyc_status === 'APPROVED' || p.kyc_status === 'VERIFIED') {
               setCurrentScreen('MAIN');
             } else {
@@ -1223,6 +1377,9 @@ function MainApp() {
         }
 
         const googleEmail = res.user?.email || '';
+        if (googleEmail) {
+          setEmailInput(googleEmail);
+        }
         const localAcct = googleEmail ? await StorageService.getAccountProfile(googleEmail) : null;
         if (localAcct?.role) {
           const savedRole = localAcct.role;
@@ -1244,12 +1401,19 @@ function MainApp() {
         } else {
           // New Google User: Ask Customer or Worker!
           const derivedName = res.user?.user_metadata?.full_name || formatNameFromEmail(googleEmail);
+          setRole(null);
           setCustName(derivedName);
           setCustMobile('');
           setCustAddress('');
+          setCustPhotoUri(null);
           setWorkerName(derivedName);
           setWorkerMobile('');
+          setWorkerAltMobile('');
           setWorkerAddress('');
+          setWorkerSkills([]);
+          setWorkerPhotoUri(null);
+          setAadhaarFrontUri(null);
+          setAadhaarBackUri(null);
           setCustomerBookings([]);
           setWorkerBookings([]);
           setWorkerAlerts([]);
@@ -1370,6 +1534,18 @@ function MainApp() {
           } else {
             setWorkerName(p.full_name || 'Worker');
             if (p.phone) setWorkerMobile(p.phone);
+            setWorkerProfile((prev) => ({
+              ...prev,
+              id: p.id || prev.id,
+              user_id: p.id || prev.user_id,
+              name: p.full_name || prev.name,
+              phone: p.phone || prev.phone,
+              location: p.address || prev.location,
+              isAvailable:
+                p.worker_profiles && p.worker_profiles[0]?.is_available !== undefined
+                  ? p.worker_profiles[0].is_available
+                  : prev.isAvailable,
+            }));
             if (p.kyc_status === 'APPROVED' || p.kyc_status === 'VERIFIED') {
               setCurrentScreen('MAIN');
             } else {
@@ -1402,10 +1578,19 @@ function MainApp() {
           }
         } else {
           // New phone user: Prompt role selection!
+          setRole(null);
           setCustName(`User ${phoneInput.slice(-4)}`);
           setCustMobile(phoneInput);
+          setCustAddress('');
+          setCustPhotoUri(null);
           setWorkerName(`Mistri ${phoneInput.slice(-4)}`);
           setWorkerMobile(phoneInput);
+          setWorkerAltMobile('');
+          setWorkerAddress('');
+          setWorkerSkills([]);
+          setWorkerPhotoUri(null);
+          setAadhaarFrontUri(null);
+          setAadhaarBackUri(null);
           setCustomerBookings([]);
           setWorkerBookings([]);
           setWorkerAlerts([]);
@@ -1440,6 +1625,18 @@ function MainApp() {
           } else {
             setWorkerName(p.full_name || 'Worker');
             if (p.phone) setWorkerMobile(p.phone);
+            setWorkerProfile((prev) => ({
+              ...prev,
+              id: p.id || prev.id,
+              user_id: p.id || prev.user_id,
+              name: p.full_name || prev.name,
+              phone: p.phone || prev.phone,
+              location: p.address || prev.location,
+              isAvailable:
+                p.worker_profiles && p.worker_profiles[0]?.is_available !== undefined
+                  ? p.worker_profiles[0].is_available
+                  : prev.isAvailable,
+            }));
             if (p.kyc_status === 'APPROVED' || p.kyc_status === 'VERIFIED') {
               setCurrentScreen('MAIN');
             } else {
@@ -1571,12 +1768,19 @@ function MainApp() {
         } else {
           // NEW USER / NEW EMAIL: Reset all user states and ask them Customer or Worker!
           const newUserName = formatNameFromEmail(cleanEmail);
+          setRole(null);
           setCustName(newUserName);
           setCustMobile('');
           setCustAddress('');
+          setCustPhotoUri(null);
           setWorkerName(newUserName);
           setWorkerMobile('');
+          setWorkerAltMobile('');
           setWorkerAddress('');
+          setWorkerSkills([]);
+          setWorkerPhotoUri(null);
+          setAadhaarFrontUri(null);
+          setAadhaarBackUri(null);
           setCustomerBookings([]);
           setWorkerBookings([]);
           setWorkerAlerts([]);
@@ -2267,7 +2471,7 @@ function MainApp() {
               <Text style={styles.roleCardTitle}>{t.customerRole}</Text>
               <Text style={styles.roleCardDesc}>{t.customerDesc}</Text>
               <View style={styles.roleTag}>
-                <Text style={styles.roleTagText}>Post Work • Hire Workers • Escrow Safety</Text>
+                <Text style={styles.roleTagText}>Post Work • Hire Workers • Secured Payments</Text>
               </View>
             </TouchableOpacity>
 
@@ -2340,7 +2544,7 @@ function MainApp() {
           <View style={styles.photoUploadCenter}>
             <TouchableOpacity
               style={styles.photoPickerCircle}
-              onPress={() => pickImage(setCustPhotoUri)}
+              onPress={() => selectPhotoSource(setCustPhotoUri)}
               activeOpacity={0.8}
             >
               {custPhotoUri ? (
@@ -2357,7 +2561,7 @@ function MainApp() {
                 </View>
               )}
             </TouchableOpacity>
-            <Text style={styles.photoHelpText}>Tap to choose photo from your gallery</Text>
+            <Text style={styles.photoHelpText}>Tap to capture photo with camera or choose from gallery</Text>
           </View>
 
           {/* Form Fields */}
@@ -2547,7 +2751,7 @@ function MainApp() {
           <View style={styles.photoUploadCenter}>
             <TouchableOpacity
               style={styles.photoPickerCircle}
-              onPress={() => pickImage(setWorkerPhotoUri)}
+              onPress={() => selectPhotoSource(setWorkerPhotoUri)}
               activeOpacity={0.8}
             >
               {workerPhotoUri ? (
@@ -2564,7 +2768,7 @@ function MainApp() {
                 </View>
               )}
             </TouchableOpacity>
-            <Text style={styles.photoHelpText}>Tap to choose mistri passport photo from gallery</Text>
+            <Text style={styles.photoHelpText}>Tap to capture passport photo with camera or choose from gallery</Text>
           </View>
 
           {/* Form Fields */}
@@ -2651,7 +2855,7 @@ function MainApp() {
               <View style={styles.aadhaarCardsRow}>
                 <TouchableOpacity
                   style={[styles.aadhaarCardBox, aadhaarFrontUri && styles.aadhaarCardBoxActive]}
-                  onPress={() => pickImage(setAadhaarFrontUri)}
+                  onPress={() => selectPhotoSource(setAadhaarFrontUri)}
                   activeOpacity={0.8}
                 >
                   {aadhaarFrontUri ? (
@@ -2668,13 +2872,13 @@ function MainApp() {
                     Aadhaar Front {aadhaarFrontUri ? '✓' : ''}
                   </Text>
                   <Text style={styles.aadhaarBoxSub}>
-                    {aadhaarFrontUri ? 'Photo uploaded' : 'Tap to upload'}
+                    {aadhaarFrontUri ? 'Photo uploaded' : 'Tap to capture / upload'}
                   </Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   style={[styles.aadhaarCardBox, aadhaarBackUri && styles.aadhaarCardBoxActive]}
-                  onPress={() => pickImage(setAadhaarBackUri)}
+                  onPress={() => selectPhotoSource(setAadhaarBackUri)}
                   activeOpacity={0.8}
                 >
                   {aadhaarBackUri ? (
@@ -2691,7 +2895,7 @@ function MainApp() {
                     Aadhaar Back {aadhaarBackUri ? '✓' : ''}
                   </Text>
                   <Text style={styles.aadhaarBoxSub}>
-                    {aadhaarBackUri ? 'Photo uploaded' : 'Tap to upload'}
+                    {aadhaarBackUri ? 'Photo uploaded' : 'Tap to capture / upload'}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -2849,6 +3053,16 @@ function MainApp() {
               <Text style={styles.previewHomeBtnText}>Check Approval Status 🔄</Text>
             )}
           </TouchableOpacity>
+
+          {/* Sign Out / Switch Account Button */}
+          <TouchableOpacity
+            style={styles.reviewLogoutBtn}
+            onPress={handleSignOut}
+            activeOpacity={0.8}
+          >
+            <LogOut size={16} color="#DC2626" />
+            <Text style={styles.reviewLogoutBtnText}>Sign Out / Switch Account</Text>
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -2905,6 +3119,8 @@ function MainApp() {
               insets={insets}
               onNavigateTab={(tab) => setActiveTab(tab)}
               workers={realWorkers}
+              userName={custName}
+              userContact={custMobile}
               onDeployContractorBooking={async (payload) => {
                 try {
                   const bookingId = `CB-${Date.now().toString().slice(-4)}`;
@@ -2966,7 +3182,7 @@ function MainApp() {
 
                   DeviceFeedback.triggerSuccessHaptics();
                   Alert.alert(
-                    'Booking Placed & Escrow Locked! 💳',
+                    'Booking Placed & Payment Secured! 💳',
                     `Payment of ₹${payload.totalAmount} secured via Razorpay. Alert sent to nearby workers. Track worker acceptance in My Bookings.`
                   );
                   setActiveTab('BOOKINGS');
@@ -2989,31 +3205,7 @@ function MainApp() {
               onSaveProfile={handleSaveProfile}
               onSwitchLang={() => setCurrentScreen('LANGUAGE')}
               onOpenInvoices={() => setShowInvoicesModal(true)}
-              onLogout={async () => {
-                Alert.alert(t.logout, 'Are you sure you want to sign out?', [
-                  { text: 'Cancel', style: 'cancel' },
-                  {
-                    text: 'Sign Out',
-                    style: 'destructive',
-                    onPress: async () => {
-                      await StorageService.clearSession();
-                      setEmailInput('');
-                      setPasswordInput('');
-                      setPhoneInput('');
-                      setCustName('');
-                      setCustMobile('');
-                      setCustAddress('');
-                      setWorkerName('');
-                      setWorkerMobile('');
-                      setWorkerAddress('');
-                      setCustomerBookings([]);
-                      setWorkerBookings([]);
-                      setWorkerAlerts([]);
-                      setCurrentScreen('SIGN_IN');
-                    },
-                  },
-                ]);
-              }}
+              onLogout={handleSignOut}
             />
           )}
         </>
@@ -3073,31 +3265,7 @@ function MainApp() {
               onSaveProfile={handleSaveProfile}
               onSwitchLang={() => setCurrentScreen('LANGUAGE')}
               onOpenInvoices={() => setShowInvoicesModal(true)}
-              onLogout={async () => {
-                Alert.alert(t.logout, 'Are you sure you want to sign out?', [
-                  { text: 'Cancel', style: 'cancel' },
-                  {
-                    text: 'Sign Out',
-                    style: 'destructive',
-                    onPress: async () => {
-                      await StorageService.clearSession();
-                      setEmailInput('');
-                      setPasswordInput('');
-                      setPhoneInput('');
-                      setCustName('');
-                      setCustMobile('');
-                      setCustAddress('');
-                      setWorkerName('');
-                      setWorkerMobile('');
-                      setWorkerAddress('');
-                      setCustomerBookings([]);
-                      setWorkerBookings([]);
-                      setWorkerAlerts([]);
-                      setCurrentScreen('SIGN_IN');
-                    },
-                  },
-                ]);
-              }}
+              onLogout={handleSignOut}
             />
           )}
         </>
@@ -3431,7 +3599,7 @@ function MainApp() {
                 <View style={styles.escrowNoticeCard}>
                   <ShieldCheck size={20} color="#16A34A" />
                   <Text style={styles.escrowNoticeText}>
-                    100% Escrow Protected: Payments are only released to mistris after you confirm milestone completion.
+                    100% Secured Payment: Payments are only released to mistris after you confirm milestone completion.
                   </Text>
                 </View>
 
@@ -3626,7 +3794,7 @@ function MainApp() {
 // =================================================================
 // SUB-SCREEN A: HOME SCREEN (FIONIX STYLE + ULTRA HIGH FINISH)
 // =================================================================
-function HomeScreen({ t, role, insets, projects, onOpenPost, onSelectCategory }) {
+function HomeScreen({ t, role, insets, projects, onOpenPost, onSelectCategory, custName }) {
   return (
     <SafeAreaView style={styles.homeSafeArea}>
       <ScrollView
@@ -3872,7 +4040,7 @@ function WorkScreen({ t, role, insets, projects, onOpenPost }) {
           </Text>
           <Text style={styles.workScreenSub}>
             {role === 'CUSTOMER'
-              ? 'Track applications and release escrow milestones'
+              ? 'Track applications and release payment milestones'
               : 'Direct construction tenders in Jaipur region'}
           </Text>
         </View>
@@ -6527,5 +6695,24 @@ const styles = StyleSheet.create({
     fontFamily: 'Satoshi-Bold',
     fontSize: 14,
     color: '#FFFFFF',
+  },
+  reviewLogoutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 14,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECDD3',
+    width: '100%',
+  },
+  reviewLogoutBtnText: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 13,
+    color: '#DC2626',
   },
 });

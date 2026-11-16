@@ -194,7 +194,7 @@ export const InvoiceService = {
       <tr>
         <td>
           <strong>Mistri Pro Platform Booking Fee</strong><br>
-          <span style="font-size: 11px; color: #64748b;">Includes 100% Escrow Protection & Onsite Guarantee</span>
+          <span style="font-size: 11px; color: #64748b;">Includes 100% Secured Payment & Onsite Guarantee</span>
         </td>
         <td>1 Order</td>
         <td class="text-right">₹99</td>
@@ -202,7 +202,7 @@ export const InvoiceService = {
       </tr>
       <tr>
         <td>
-          <strong>Digital Escrow & Gateway Fee (5%)</strong><br>
+          <strong>Digital Security & Gateway Fee (5%)</strong><br>
           <span style="font-size: 11px; color: #64748b;">UPI/Banking processing & secure disbursement</span>
         </td>
         <td>5%</td>
@@ -218,7 +218,7 @@ export const InvoiceService = {
       <span>₹${workerFee.toLocaleString()}</span>
     </div>
     <div class="total-row">
-      <span>Platform & Escrow Fees:</span>
+      <span>Platform & Security Fees:</span>
       <span>₹${(platformFee + txnFee).toLocaleString()}</span>
     </div>
     <div class="total-row grand">
@@ -226,7 +226,7 @@ export const InvoiceService = {
       <span>₹${totalAmount.toLocaleString()}</span>
     </div>
     <p style="margin-top: 6px; font-size: 11px; color: #16a34a; font-weight: 600;">
-      ✓ Payment Status: PAID VIA ESCROW
+      ✓ Payment Status: SECURED & VERIFIED VIA RAZORPAY
     </p>
   </div>
 
