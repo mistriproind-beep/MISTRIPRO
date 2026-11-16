@@ -67,17 +67,10 @@ export const LiveBackend = {
 
       let matched = null;
       if (isEmail) {
-        const prefix = cleanId.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
         matched = data.find((p) => {
-          const pEmail = (p.email || '').toLowerCase();
-          const pAlt = (p.alt_phone || '').toLowerCase();
-          const pName = (p.full_name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-          return (
-            pEmail === cleanId ||
-            pAlt === cleanId ||
-            (pAlt.includes('@') && pAlt === cleanId) ||
-            (prefix && pName && (pName.includes(prefix) || prefix.includes(pName)))
-          );
+          const pEmail = (p.email || '').toLowerCase().trim();
+          const pAlt = (p.alt_phone || '').toLowerCase().trim();
+          return pEmail === cleanId || pAlt === cleanId;
         });
       } else {
         const searchDigits = cleanId.replace(/[^0-9]/g, '').slice(-10);

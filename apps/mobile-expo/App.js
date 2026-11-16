@@ -1055,62 +1055,48 @@ function MainApp() {
 
         // 4. Session Check & Auto-provisioning
         let savedSession = await StorageService.getSession();
-        let savedRole = await StorageService.getRole();
-        const savedCreds = await StorageService.getCredentials();
-        if (savedCreds && isMounted) {
-          if (savedCreds.email) setEmailInput(savedCreds.email);
-          if (savedCreds.password) setPasswordInput(savedCreds.password);
-        }
 
-        const savedAccount = savedCreds?.email ? await StorageService.getAccountProfile(savedCreds.email) : null;
-        let userDisplayName = 'User';
-        if (savedAccount?.name && savedAccount.name !== 'Ramesh Sharma') {
-          userDisplayName = savedAccount.name;
-        } else if (savedSession?.name && savedSession.name !== 'Ramesh Sharma') {
-          userDisplayName = savedSession.name;
-        } else if (savedCreds?.email) {
-          userDisplayName = formatNameFromEmail(savedCreds.email);
-        }
+        if (savedSession && (savedSession.email || savedSession.mobile || savedSession.phone || savedSession.name)) {
+          const effectiveRole = savedSession.role || 'CUSTOMER';
+          const userDisplayName = savedSession.name || 'User';
+          setRole(effectiveRole);
 
-        const effectiveRole = savedAccount?.role || savedRole || savedSession?.role || 'CUSTOMER';
-
-        // Auto-provision clean session so user is never trapped and never sees hardcoded Ramesh
-        if (!savedSession || savedSession.name === 'Ramesh Sharma') {
-          savedSession = {
-            id: savedAccount?.id || savedSession?.id || 'usr-' + Date.now(),
-            name: userDisplayName,
-            mobile: savedAccount?.phone || (savedSession?.mobile !== '+91 98290 12345' ? savedSession?.mobile : '') || '',
-            phone: savedAccount?.phone || (savedSession?.phone !== '+91 98290 12345' ? savedSession?.phone : '') || '',
-            address: savedAccount?.address || savedSession?.address || 'Sawai Madhopur, Rajasthan',
-            role: effectiveRole,
-          };
-          await StorageService.setSession(savedSession);
-          await StorageService.setRole(effectiveRole);
-        }
-
-        if (isMounted) {
-          setCustName(userDisplayName);
-          setCustMobile(savedSession.mobile || savedSession.phone || '');
-          if (savedSession.address) setCustAddress(savedSession.address);
-
-          if (effectiveRole === 'WORKER') {
-            setRole('WORKER');
-            setWorkerName(userDisplayName);
-            setWorkerMobile(savedSession.mobile || savedSession.phone || '');
-            const workerCheckPhone = savedSession.mobile || savedSession.phone;
-            if (workerCheckPhone) {
-              const approval = await LiveBackend.checkWorkerApprovalStatus(workerCheckPhone);
-              if (approval?.status === 'APPROVED' || approval?.approved) {
-                setCurrentScreen('MAIN');
+          if (isMounted) {
+            if (effectiveRole === 'WORKER') {
+              setWorkerName(userDisplayName);
+              setWorkerMobile(savedSession.mobile || savedSession.phone || '');
+              if (savedSession.address) setWorkerAddress(savedSession.address);
+              const workerCheckPhone = savedSession.mobile || savedSession.phone;
+              if (workerCheckPhone) {
+                const approval = await LiveBackend.checkWorkerApprovalStatus(workerCheckPhone);
+                if (approval?.status === 'APPROVED' || approval?.approved) {
+                  setCurrentScreen('MAIN');
+                } else {
+                  setCurrentScreen('WORKER_UNDER_REVIEW');
+                }
               } else {
-                setCurrentScreen('WORKER_UNDER_REVIEW');
+                setCurrentScreen('MAIN');
               }
             } else {
+              setCustName(userDisplayName);
+              setCustMobile(savedSession.mobile || savedSession.phone || '');
+              if (savedSession.address) setCustAddress(savedSession.address);
               setCurrentScreen('MAIN');
             }
-          } else {
-            setRole('CUSTOMER');
-            setCurrentScreen('MAIN');
+          }
+        } else {
+          // NO ACTIVE LOGGED IN SESSION: Clean slate for new user/login
+          if (isMounted) {
+            setEmailInput('');
+            setPasswordInput('');
+            setPhoneInput('');
+            setCustName('');
+            setCustMobile('');
+            setCustAddress('');
+            setWorkerName('');
+            setWorkerMobile('');
+            setWorkerAddress('');
+            setCurrentScreen('SIGN_IN');
           }
         }
 
@@ -1217,28 +1203,36 @@ function MainApp() {
 
         const googleEmail = res.user?.email || '';
         const localAcct = googleEmail ? await StorageService.getAccountProfile(googleEmail) : null;
-        const savedRole = (await StorageService.getRole()) || localAcct?.role || 'CUSTOMER';
-        const derivedName = res.user?.user_metadata?.full_name || localAcct?.name || (googleEmail ? formatNameFromEmail(googleEmail) : 'Google User');
-        setRole(savedRole);
-        await StorageService.setRole(savedRole);
-        await StorageService.setSession({
-          name: derivedName,
-          email: googleEmail,
-          role: savedRole,
-        });
-        if (googleEmail) {
-          await StorageService.saveAccountProfile(googleEmail, {
-            role: savedRole,
+        if (localAcct?.role) {
+          const savedRole = localAcct.role;
+          const derivedName = localAcct.name || res.user?.user_metadata?.full_name || formatNameFromEmail(googleEmail);
+          setRole(savedRole);
+          await StorageService.setRole(savedRole);
+          await StorageService.setSession({
             name: derivedName,
             email: googleEmail,
+            role: savedRole,
           });
-        }
-        if (savedRole === 'CUSTOMER') {
-          setCustName(derivedName);
-          setCurrentScreen('MAIN');
+          if (savedRole === 'CUSTOMER') {
+            setCustName(derivedName);
+            setCurrentScreen('MAIN');
+          } else {
+            setWorkerName(derivedName);
+            setCurrentScreen('WORKER_UNDER_REVIEW');
+          }
         } else {
+          // New Google User: Ask Customer or Worker!
+          const derivedName = res.user?.user_metadata?.full_name || formatNameFromEmail(googleEmail);
+          setCustName(derivedName);
+          setCustMobile('');
+          setCustAddress('');
           setWorkerName(derivedName);
-          setCurrentScreen('WORKER_UNDER_REVIEW');
+          setWorkerMobile('');
+          setWorkerAddress('');
+          setCustomerBookings([]);
+          setWorkerBookings([]);
+          setWorkerAlerts([]);
+          setCurrentScreen('ROLE_SELECT');
         }
       } else if (res.error && res.error.includes('OAuth secret')) {
         // Explaining OAuth Client Secret requirement from Google Cloud Console
@@ -1364,33 +1358,37 @@ function MainApp() {
           return;
         }
 
-        // Automatically use existing role or saved account registry, never loop on ROLE_SELECT
+        // Check if this phone number already has a registered role:
         const localAcct = await StorageService.getAccountProfile(phoneInput);
-        const deviceSavedRole = await StorageService.getRole();
-        const effectiveRole = localAcct?.role || deviceSavedRole || 'CUSTOMER';
-        const effectiveName = localAcct?.name || `User ${phoneInput.slice(-4)}`;
-
-        setRole(effectiveRole);
-        await StorageService.setRole(effectiveRole);
-        await StorageService.setSession({
-          mobile: phoneInput,
-          name: effectiveName,
-          role: effectiveRole,
-        });
-        await StorageService.saveAccountProfile(phoneInput, {
-          role: effectiveRole,
-          name: effectiveName,
-          phone: phoneInput,
-        });
-
-        if (effectiveRole === 'CUSTOMER') {
-          setCustName(effectiveName);
-          setCustMobile(phoneInput);
-          setCurrentScreen('MAIN');
+        if (localAcct?.role) {
+          const effectiveRole = localAcct.role;
+          const effectiveName = localAcct.name || `User ${phoneInput.slice(-4)}`;
+          setRole(effectiveRole);
+          await StorageService.setRole(effectiveRole);
+          await StorageService.setSession({
+            mobile: phoneInput,
+            name: effectiveName,
+            role: effectiveRole,
+          });
+          if (effectiveRole === 'CUSTOMER') {
+            setCustName(effectiveName);
+            setCustMobile(phoneInput);
+            setCurrentScreen('MAIN');
+          } else {
+            setWorkerName(effectiveName);
+            setWorkerMobile(phoneInput);
+            setCurrentScreen('WORKER_UNDER_REVIEW');
+          }
         } else {
-          setWorkerName(effectiveName);
+          // New phone user: Prompt role selection!
+          setCustName(`User ${phoneInput.slice(-4)}`);
+          setCustMobile(phoneInput);
+          setWorkerName(`Mistri ${phoneInput.slice(-4)}`);
           setWorkerMobile(phoneInput);
-          setCurrentScreen('WORKER_UNDER_REVIEW');
+          setCustomerBookings([]);
+          setWorkerBookings([]);
+          setWorkerAlerts([]);
+          setCurrentScreen('ROLE_SELECT');
         }
       } else {
         Alert.alert('Invalid OTP', res.error || 'The verification code entered is incorrect.');
@@ -1502,60 +1500,66 @@ function MainApp() {
         await StorageService.setCredentials({ email: cleanEmail, password: passwordInput });
         await StorageService.setHasChosenLanguage(true);
 
-        // 1. Check local persistent account registry and saved role
+        // 1. Check local persistent account registry and Supabase for THIS specific email
         const localAcct = await StorageService.getAccountProfile(cleanEmail);
-        const deviceSavedRole = await StorageService.getRole();
-
-        // 2. Query Supabase
         const existing = await LiveBackend.getProfileByEmailOrPhone(cleanEmail);
         const p = existing.found ? existing.profile : null;
 
-        const effectiveRole = p?.role || localAcct?.role || deviceSavedRole || 'CUSTOMER';
-        const effectiveName = (p?.full_name && p.full_name !== 'Ramesh Sharma')
-          ? p.full_name
-          : ((localAcct?.name && localAcct.name !== 'Ramesh Sharma')
-            ? localAcct.name
-            : formatNameFromEmail(cleanEmail));
-        const effectivePhone = p?.phone || localAcct?.phone || '';
-        const effectiveAddress = p?.address || localAcct?.address || '';
-        const effectiveKyc = p?.kyc_status || localAcct?.kyc_status || 'VERIFIED';
+        const existingRole = p?.role || localAcct?.role;
 
-        // Persist session & role permanently
-        setRole(effectiveRole);
-        await StorageService.setRole(effectiveRole);
-        await StorageService.setSession({
-          id: p?.id || localAcct?.id || 'usr-' + Date.now(),
-          name: effectiveName,
-          mobile: effectivePhone,
-          phone: effectivePhone,
-          email: cleanEmail,
-          role: effectiveRole,
-          address: effectiveAddress,
-          kyc_status: effectiveKyc,
-        });
+        if (existingRole) {
+          // Returning user who already chose their role & profile:
+          const effectiveRole = existingRole;
+          const effectiveName = (p?.full_name && p.full_name !== 'Ramesh Sharma')
+            ? p.full_name
+            : ((localAcct?.name && localAcct.name !== 'Ramesh Sharma')
+              ? localAcct.name
+              : formatNameFromEmail(cleanEmail));
+          const effectivePhone = p?.phone || localAcct?.phone || '';
+          const effectiveAddress = p?.address || localAcct?.address || '';
+          const effectiveKyc = p?.kyc_status || localAcct?.kyc_status || 'VERIFIED';
 
-        await StorageService.saveAccountProfile(cleanEmail, {
-          role: effectiveRole,
-          name: effectiveName,
-          phone: effectivePhone,
-          email: cleanEmail,
-          kyc_status: effectiveKyc,
-          address: effectiveAddress,
-        });
+          setRole(effectiveRole);
+          await StorageService.setRole(effectiveRole);
+          await StorageService.setSession({
+            id: p?.id || localAcct?.id || 'usr-' + Date.now(),
+            name: effectiveName,
+            mobile: effectivePhone,
+            phone: effectivePhone,
+            email: cleanEmail,
+            role: effectiveRole,
+            address: effectiveAddress,
+            kyc_status: effectiveKyc,
+          });
 
-        if (effectiveRole === 'CUSTOMER') {
-          setCustName(effectiveName);
-          if (effectivePhone) setCustMobile(effectivePhone);
-          if (effectiveAddress) setCustAddress(effectiveAddress);
-          setCurrentScreen('MAIN');
-        } else {
-          setWorkerName(effectiveName);
-          if (effectivePhone) setWorkerMobile(effectivePhone);
-          if (effectiveKyc === 'APPROVED' || effectiveKyc === 'VERIFIED') {
+          if (effectiveRole === 'CUSTOMER') {
+            setCustName(effectiveName);
+            setCustMobile(effectivePhone);
+            setCustAddress(effectiveAddress);
             setCurrentScreen('MAIN');
           } else {
-            setCurrentScreen('WORKER_UNDER_REVIEW');
+            setWorkerName(effectiveName);
+            setWorkerMobile(effectivePhone);
+            setWorkerAddress(effectiveAddress);
+            if (effectiveKyc === 'APPROVED' || effectiveKyc === 'VERIFIED') {
+              setCurrentScreen('MAIN');
+            } else {
+              setCurrentScreen('WORKER_UNDER_REVIEW');
+            }
           }
+        } else {
+          // NEW USER / NEW EMAIL: Reset all user states and ask them Customer or Worker!
+          const newUserName = formatNameFromEmail(cleanEmail);
+          setCustName(newUserName);
+          setCustMobile('');
+          setCustAddress('');
+          setWorkerName(newUserName);
+          setWorkerMobile('');
+          setWorkerAddress('');
+          setCustomerBookings([]);
+          setWorkerBookings([]);
+          setWorkerAlerts([]);
+          setCurrentScreen('ROLE_SELECT');
         }
         return;
       } else {
@@ -2972,6 +2976,18 @@ function MainApp() {
                     style: 'destructive',
                     onPress: async () => {
                       await StorageService.clearSession();
+                      setEmailInput('');
+                      setPasswordInput('');
+                      setPhoneInput('');
+                      setCustName('');
+                      setCustMobile('');
+                      setCustAddress('');
+                      setWorkerName('');
+                      setWorkerMobile('');
+                      setWorkerAddress('');
+                      setCustomerBookings([]);
+                      setWorkerBookings([]);
+                      setWorkerAlerts([]);
                       setCurrentScreen('SIGN_IN');
                     },
                   },
@@ -3044,6 +3060,18 @@ function MainApp() {
                     style: 'destructive',
                     onPress: async () => {
                       await StorageService.clearSession();
+                      setEmailInput('');
+                      setPasswordInput('');
+                      setPhoneInput('');
+                      setCustName('');
+                      setCustMobile('');
+                      setCustAddress('');
+                      setWorkerName('');
+                      setWorkerMobile('');
+                      setWorkerAddress('');
+                      setCustomerBookings([]);
+                      setWorkerBookings([]);
+                      setWorkerAlerts([]);
                       setCurrentScreen('SIGN_IN');
                     },
                   },
