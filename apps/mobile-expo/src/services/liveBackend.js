@@ -39,7 +39,7 @@ export const LiveBackend = {
             .toUpperCase(),
           color: '#4F46E5',
           phone: p.phone || '',
-          available: wp.is_available !== false,
+          available: wp.is_available === true,
           lat: 26.9124,
           lng: 75.7873,
           distance: 2.1,
@@ -48,6 +48,55 @@ export const LiveBackend = {
     } catch (err) {
       console.log('LiveBackend.fetchRealWorkers error:', err.message);
       return [];
+    }
+  },
+
+  // 1b. Update Worker Live Online / Offline Availability in Supabase
+  updateWorkerAvailability: async (userIdOrPhone, isAvailable) => {
+    try {
+      if (!userIdOrPhone) return { success: false };
+      const isUuid = String(userIdOrPhone).includes('-');
+      let targetUserId = isUuid ? userIdOrPhone : null;
+
+      if (!targetUserId) {
+        const cleanDigits = String(userIdOrPhone).replace(/[^0-9]/g, '').slice(-10);
+        const { data: profs } = await supabase.from('profiles').select('id, phone, alt_phone').limit(50);
+        const match = (profs || []).find((p) => {
+          const pD = (p.phone || '').replace(/[^0-9]/g, '').slice(-10);
+          const aD = (p.alt_phone || '').replace(/[^0-9]/g, '').slice(-10);
+          return pD === cleanDigits || aD === cleanDigits || p.id === userIdOrPhone;
+        });
+        if (match) targetUserId = match.id;
+      }
+
+      if (targetUserId) {
+        const { data: existingWp } = await supabase
+          .from('worker_profiles')
+          .select('id')
+          .eq('user_id', targetUserId)
+          .limit(1);
+
+        if (existingWp && existingWp.length > 0) {
+          await supabase
+            .from('worker_profiles')
+            .update({ is_available: isAvailable })
+            .eq('user_id', targetUserId);
+        } else {
+          await supabase.from('worker_profiles').insert([
+            {
+              user_id: targetUserId,
+              is_available: isAvailable,
+              daily_rate: 800,
+              skills: ['Master Mason'],
+            },
+          ]);
+        }
+        return { success: true };
+      }
+      return { success: false };
+    } catch (err) {
+      console.log('LiveBackend.updateWorkerAvailability error:', err.message);
+      return { success: false, error: err.message };
     }
   },
 

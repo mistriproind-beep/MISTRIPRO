@@ -619,6 +619,27 @@ function MainApp() {
   // Customer Bookings State (Connected to Live DB + Phone Storage)
   const [customerBookings, setCustomerBookings] = useState([]);
   const [findInitialCategory, setFindInitialCategory] = useState('All');
+
+  // Live Worker Radar Polling (Syncs online/offline availability in real-time)
+  useEffect(() => {
+    let isCancelled = false;
+    const syncWorkers = async () => {
+      try {
+        const live = await LiveBackend.fetchRealWorkers();
+        if (live && Array.isArray(live) && !isCancelled) {
+          setRealWorkers(live);
+        }
+      } catch (e) {}
+    };
+
+    syncWorkers();
+    const interval = setInterval(syncWorkers, 8000);
+    return () => {
+      isCancelled = true;
+      clearInterval(interval);
+    };
+  }, []);
+
   const [showNotifModal, setShowNotifModal] = useState(false);
   const [notifications, setNotifications] = useState([
     {

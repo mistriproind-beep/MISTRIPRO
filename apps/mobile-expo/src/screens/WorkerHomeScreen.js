@@ -30,6 +30,8 @@ import {
 } from 'lucide-react-native';
 import { WORKER_TUTORIALS } from '../data/workerData';
 import { supabase } from '../services/supabase';
+import { LiveBackend } from '../services/liveBackend';
+import { DeviceFeedback } from '../services/deviceFeedback';
 
 export default function WorkerHomeScreen({
   insets,
@@ -53,23 +55,20 @@ export default function WorkerHomeScreen({
     if (onUpdateProfile) {
       onUpdateProfile({ isAvailable: val });
     }
-    try {
-      await supabase
-        .from('worker_profiles')
-        .update({ is_available: val, updated_at: new Date().toISOString() })
-        .eq('phone', workerProfile?.phone || '+91 94140 88990');
-    } catch (e) {
-      console.log('Worker availability sync error:', e);
+    const workerTarget = workerProfile?.id || workerProfile?.user_id || workerProfile?.phone || '';
+    if (workerTarget) {
+      await LiveBackend.updateWorkerAvailability(workerTarget, val);
     }
+    DeviceFeedback.triggerAlertHaptics();
     if (val) {
       Alert.alert(
         'Online & Available! 🟢',
-        'Your profile is now VISIBLE to all customers within a 15 km radius. You will receive live hire alerts.'
+        'Your profile is now marked ONLINE on customer live maps and directory. Nearby clients can book you now.'
       );
     } else {
       Alert.alert(
         'Offline / Busy 🔴',
-        'Your profile is now HIDDEN from customer searches. You will not receive new hire requests until you turn this back on.'
+        'Your profile will show as "Not Available Right Now" to customers until you turn this back on.'
       );
     }
   };

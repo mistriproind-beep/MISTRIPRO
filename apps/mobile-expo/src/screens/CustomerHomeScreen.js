@@ -156,14 +156,11 @@ export default function CustomerHomeScreen({
     };
   }, [searchQuery, workers]);
 
-  // Filter Workers: Online Only + Category Filter + Search Query Filter (Uber/Ola Real-Time Logic)
+  // Filter Workers: Online & Offline workers with status badge, online sorted first
   const nearbyWorkers = useMemo(() => {
     const liveList = Array.isArray(workers) ? workers : [];
-    return liveList.filter((w) => {
-      // 1. Online / Available only (Offline workers are strictly hidden from customers)
-      if (w.available !== true) return false;
-
-      // 2. Category selection filter (e.g., clicking Mason shows only Masons)
+    const filtered = liveList.filter((w) => {
+      // 1. Category selection filter (e.g., clicking Mason shows only Masons)
       if (selectedCategory) {
         const catTarget = selectedCategory.toLowerCase();
         const wCat = (w.category || '').toLowerCase();
@@ -186,7 +183,7 @@ export default function CustomerHomeScreen({
         if (!isMatch) return false;
       }
 
-      // 3. Search query filter (Tag-aware + Typo-tolerant: e.g. "puber" -> Plumber)
+      // 2. Search query filter (Tag-aware + Typo-tolerant: e.g. "puber" -> Plumber)
       if (searchQuery.trim()) {
         const rawQ = searchQuery.toLowerCase().trim();
         const wName = (w.name || '').toLowerCase();
@@ -229,6 +226,12 @@ export default function CustomerHomeScreen({
       }
 
       return true;
+    });
+
+    // Sort: Online workers first, offline below
+    return [...filtered].sort((a, b) => {
+      if (a.available === b.available) return 0;
+      return a.available ? -1 : 1;
     });
   }, [searchQuery, selectedCategory, workers]);
 
@@ -336,6 +339,13 @@ export default function CustomerHomeScreen({
             )}
           </View>
           <Text style={styles.workerSkill}>{item.skill}</Text>
+          {/* Availability Status Badge */}
+          <View style={[styles.cardAvailBadge, item.available ? styles.cardAvailOnline : styles.cardAvailOffline]}>
+            <View style={[styles.cardAvailDot, item.available ? styles.cardDotOnline : styles.cardDotOffline]} />
+            <Text style={[styles.cardAvailText, item.available ? styles.cardTextOnline : styles.cardTextOffline]}>
+              {item.available ? 'Online' : 'Not Available Right Now'}
+            </Text>
+          </View>
           <View style={styles.workerMeta}>
             <Star size={13} color="#F59E0B" fill="#F59E0B" />
             <Text style={styles.workerRating}>{item.rating}</Text>
@@ -352,11 +362,22 @@ export default function CustomerHomeScreen({
             <Text style={styles.distanceText}>{item.distance} km</Text>
           </View>
           <TouchableOpacity
-            style={styles.hireBtn}
+            style={[styles.hireBtn, !item.available && styles.hireBtnOffline]}
             activeOpacity={0.8}
-            onPress={() => setSelectedWorker(item)}
+            onPress={() => {
+              if (item.available) {
+                setSelectedWorker(item);
+              } else {
+                Alert.alert(
+                  'Worker Offline 🔴',
+                  `${item.name} is not available right now. You can view their verified profile or check back later.`
+                );
+              }
+            }}
           >
-            <Text style={styles.hireBtnText}>Book</Text>
+            <Text style={[styles.hireBtnText, !item.available && styles.hireBtnTextOffline]}>
+              {item.available ? 'Book' : 'Offline'}
+            </Text>
           </TouchableOpacity>
         </View>
       </TouchableOpacity>
@@ -661,19 +682,42 @@ export default function CustomerHomeScreen({
               </Text>
             </View>
 
+            {!selectedWorker?.available && (
+              <View style={styles.modalOfflineNotice}>
+                <Text style={styles.modalOfflineNoticeText}>
+                  ⚠️ This mistri is currently OFFLINE / Not Available Right Now. Immediate bookings are paused until they go online.
+                </Text>
+              </View>
+            )}
+
             <View style={styles.modalFooterRow}>
               <View>
                 <Text style={styles.modalRateLabel}>Daily Wage</Text>
                 <Text style={styles.modalRateVal}>₹{selectedWorker?.rate} <Text style={{ fontSize: 13, color: '#64748B' }}>/day</Text></Text>
               </View>
 
-              <TouchableOpacity
-                style={styles.modalBookBtn}
-                onPress={() => handleProceedToBooking(selectedWorker)}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.modalBookBtnText}>Proceed to Book</Text>
-              </TouchableOpacity>
+              {selectedWorker?.available ? (
+                <TouchableOpacity
+                  style={styles.modalBookBtn}
+                  onPress={() => handleProceedToBooking(selectedWorker)}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.modalBookBtnText}>Proceed to Book</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={[styles.modalBookBtn, { backgroundColor: '#94A3B8' }]}
+                  onPress={() => {
+                    Alert.alert(
+                      'Worker Currently Offline',
+                      `${selectedWorker?.name} is currently not available for instant booking.`
+                    );
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.modalBookBtnText}>Currently Offline</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         </View>
@@ -1240,6 +1284,68 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontFamily: 'Satoshi-Bold',
     fontSize: 12,
+  },
+  hireBtnOffline: {
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  hireBtnTextOffline: {
+    color: '#94A3B8',
+  },
+  cardAvailBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+    marginTop: 3,
+    marginBottom: 4,
+  },
+  cardAvailOnline: {
+    backgroundColor: '#F0FDF4',
+  },
+  cardAvailOffline: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  cardAvailDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  cardDotOnline: {
+    backgroundColor: '#16A34A',
+  },
+  cardDotOffline: {
+    backgroundColor: '#94A3B8',
+  },
+  cardAvailText: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 10,
+  },
+  cardTextOnline: {
+    color: '#15803D',
+  },
+  cardTextOffline: {
+    color: '#64748B',
+  },
+  modalOfflineNotice: {
+    backgroundColor: '#FEF3C7',
+    padding: 10,
+    borderRadius: 10,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  modalOfflineNoticeText: {
+    fontFamily: 'Satoshi-Medium',
+    fontSize: 11.5,
+    color: '#92400E',
+    lineHeight: 16,
   },
 
   /* Modals */

@@ -73,6 +73,15 @@ function WorkerCard({ worker, isSelected, onSelect, onOpenProfile, onProceedBook
             )}
           </View>
           <Text style={styles.workerSkill}>{worker.skill}</Text>
+
+          {/* Availability Status Badge */}
+          <View style={[styles.cardAvailBadge, worker.available ? styles.cardAvailOnline : styles.cardAvailOffline]}>
+            <View style={[styles.cardAvailDot, worker.available ? styles.cardDotOnline : styles.cardDotOffline]} />
+            <Text style={[styles.cardAvailText, worker.available ? styles.cardTextOnline : styles.cardTextOffline]}>
+              {worker.available ? 'Online & Available' : 'Not Available Right Now'}
+            </Text>
+          </View>
+
           <View style={styles.ratingRow}>
             <RatingStars rating={worker.rating} />
             <Text style={styles.ratingText}>{worker.rating}</Text>
@@ -102,12 +111,26 @@ function WorkerCard({ worker, isSelected, onSelect, onOpenProfile, onProceedBook
             <User size={13} color="#4F46E5" />
             <Text style={styles.viewProfileText}>Profile</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.bookActionBtn}
-            onPress={() => onProceedBooking && onProceedBooking(worker)}
-          >
-            <Text style={styles.bookActionText}>Book</Text>
-          </TouchableOpacity>
+          {worker.available ? (
+            <TouchableOpacity
+              style={styles.bookActionBtn}
+              onPress={() => onProceedBooking && onProceedBooking(worker)}
+            >
+              <Text style={styles.bookActionText}>Book</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={[styles.bookActionBtn, styles.bookActionBtnOffline]}
+              onPress={() => {
+                Alert.alert(
+                  'Worker Offline 🔴',
+                  `${worker.name} is not available right now. You can view their verified profile or check back later.`
+                );
+              }}
+            >
+              <Text style={styles.bookActionTextOffline}>Offline</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     </TouchableOpacity>
@@ -193,29 +216,35 @@ export default function FindWorkersScreen({
   const userLng = userLocation?.longitude || 76.3533;
   const areaLabel = userLocation?.areaName || 'Detecting GPS...';
 
-  // Base filtered list: Only online workers matching selected trade (Strict Uber/Ola online filter)
+  // Base filtered list: Shows online & offline workers with status badge (Online sorted first)
   const baseWorkers = useMemo(() => {
     const liveList = Array.isArray(workers) ? workers : [];
-    if (selectedCategory === 'All') {
-      return liveList.filter((w) => w.available === true);
+    let filtered = liveList;
+
+    if (selectedCategory !== 'All') {
+      const catTarget = selectedCategory.toLowerCase();
+      filtered = liveList.filter((w) => {
+        const wCat = (w.category || '').toLowerCase();
+        const wSkill = (w.skill || '').toLowerCase();
+
+        if (wCat === catTarget || wCat.includes(catTarget) || catTarget.includes(wCat)) {
+          return true;
+        }
+
+        const cleanTokens = catTarget
+          .replace(/[^a-z0-9]/g, ' ')
+          .split(/\s+/)
+          .filter((t) => t.length >= 3 && !['and', 'for', 'the', 'other'].includes(t));
+
+        const workerCombined = `${wCat} ${wSkill}`.toLowerCase();
+        return cleanTokens.some((tok) => workerCombined.includes(tok));
+      });
     }
-    const catTarget = selectedCategory.toLowerCase();
-    return liveList.filter((w) => {
-      if (w.available !== true) return false;
-      const wCat = (w.category || '').toLowerCase();
-      const wSkill = (w.skill || '').toLowerCase();
 
-      if (wCat === catTarget || wCat.includes(catTarget) || catTarget.includes(wCat)) {
-        return true;
-      }
-
-      const cleanTokens = catTarget
-        .replace(/[^a-z0-9]/g, ' ')
-        .split(/\s+/)
-        .filter((t) => t.length >= 3 && !['and', 'for', 'the', 'other'].includes(t));
-
-      const workerCombined = `${wCat} ${wSkill}`.toLowerCase();
-      return cleanTokens.some((tok) => workerCombined.includes(tok));
+    // Sort: Online workers first, then offline workers
+    return [...filtered].sort((a, b) => {
+      if (a.available === b.available) return 0;
+      return a.available ? -1 : 1;
     });
   }, [selectedCategory, workers]);
 
@@ -661,23 +690,46 @@ export default function FindWorkersScreen({
               </Text>
             </View>
 
+            {!selectedProfileWorker?.available && (
+              <View style={styles.modalOfflineNotice}>
+                <Text style={styles.modalOfflineNoticeText}>
+                  ⚠️ This mistri is currently OFFLINE / Not Available Right Now. Direct booking will resume when they go online.
+                </Text>
+              </View>
+            )}
+
             <View style={styles.modalFooterRow}>
               <View>
                 <Text style={styles.modalRateLabel}>Daily Wage</Text>
                 <Text style={styles.modalRateVal}>₹{selectedProfileWorker?.rate} <Text style={{ fontSize: 13, color: '#64748B' }}>/day</Text></Text>
               </View>
 
-              <TouchableOpacity
-                style={styles.modalBookBtn}
-                onPress={() => {
-                  const w = selectedProfileWorker;
-                  setSelectedProfileWorker(null);
-                  setCheckoutWorker(w);
-                }}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.modalBookBtnText}>Proceed to Book</Text>
-              </TouchableOpacity>
+              {selectedProfileWorker?.available ? (
+                <TouchableOpacity
+                  style={styles.modalBookBtn}
+                  onPress={() => {
+                    const w = selectedProfileWorker;
+                    setSelectedProfileWorker(null);
+                    setCheckoutWorker(w);
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.modalBookBtnText}>Proceed to Book</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={[styles.modalBookBtn, { backgroundColor: '#94A3B8' }]}
+                  onPress={() => {
+                    Alert.alert(
+                      'Worker Currently Offline',
+                      `${selectedProfileWorker?.name} is currently not available for instant bookings.`
+                    );
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.modalBookBtnText}>Currently Offline</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         </View>
@@ -1141,6 +1193,70 @@ const styles = StyleSheet.create({
     fontFamily: 'Satoshi-Bold',
     fontSize: 12,
     color: '#FFFFFF',
+  },
+  bookActionBtnOffline: {
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  bookActionTextOffline: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 12,
+    color: '#94A3B8',
+  },
+  cardAvailBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+    marginTop: 4,
+    marginBottom: 2,
+  },
+  cardAvailOnline: {
+    backgroundColor: '#F0FDF4',
+  },
+  cardAvailOffline: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  cardAvailDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  cardDotOnline: {
+    backgroundColor: '#16A34A',
+  },
+  cardDotOffline: {
+    backgroundColor: '#94A3B8',
+  },
+  cardAvailText: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 10,
+  },
+  cardTextOnline: {
+    color: '#15803D',
+  },
+  cardTextOffline: {
+    color: '#64748B',
+  },
+  modalOfflineNotice: {
+    backgroundColor: '#FEF3C7',
+    padding: 10,
+    borderRadius: 10,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  modalOfflineNoticeText: {
+    fontFamily: 'Satoshi-Medium',
+    fontSize: 11.5,
+    color: '#92400E',
+    lineHeight: 16,
   },
 
   /* Modals */
