@@ -8,7 +8,12 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.mistripro.app"
+      "bundleIdentifier": "com.mistripro.app",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Mistri Pro needs your GPS location to connect you with verified skilled mistris and contractors near you.",
+        "NSCameraUsageDescription": "Mistri Pro needs camera access to capture Aadhaar verification documents and profile photos.",
+        "NSPhotoLibraryUsageDescription": "Mistri Pro needs photo library access to upload identity verification documents."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -17,13 +22,30 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "package": "com.mistripro.app"
+      "package": "com.mistripro.app",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "READ_MEDIA_IMAGES",
+        "VIBRATE",
+        "INTERNET",
+        "POST_NOTIFICATIONS"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
       "expo-sharing"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "5320c82e-3b9d-46a5-b6df-cd443ec17d96"
+      }
+    },
+    "owner": "yashendrajain030205"
   }
 }

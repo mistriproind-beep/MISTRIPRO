@@ -903,33 +903,96 @@ function MainApp() {
 
   const t = I18N[lang] || I18N.en;
 
+  // Unified App Permissions Request (Location, Storage/Photos, Camera)
+  const requestAppPermissions = async () => {
+    try {
+      // 1. Request GPS Location Permission
+      const { status: locStatus } = await Location.requestForegroundPermissionsAsync();
+      console.log('Location permission status:', locStatus);
+
+      // 2. Request Media Library (Photos & Storage) Permission
+      const { status: mediaStatus } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      console.log('Media library permission status:', mediaStatus);
+
+      // 3. Request Camera Permission
+      const { status: camStatus } = await ImagePicker.requestCameraPermissionsAsync();
+      console.log('Camera permission status:', camStatus);
+    } catch (e) {
+      console.log('Permission request error:', e?.message);
+    }
+  };
+
   // Auto transition from Splash Screen with StorageService
   useEffect(() => {
     let isMounted = true;
     const checkInitialState = async () => {
       try {
-        // 1. Fetch Real Live Workers from Supabase immediately (Zero Mock Data)
+        // 1. Immediately request all app permissions (GPS, Storage, Camera)
+        await requestAppPermissions();
+
+        // 2. Fetch Real Live Workers from Supabase immediately (Zero Mock Data)
         LiveBackend.fetchRealWorkers().then((w) => {
           if (w && isMounted) setRealWorkers(w);
         });
 
+        // 3. Ensure language is set (default 'en' permanently, never prompt repeatedly)
         const savedLang = await StorageService.getLanguage();
-        const hasChosenLang = await StorageService.getHasChosenLanguage();
-        if (savedLang && isMounted) {
-          setLang(savedLang);
+        if (savedLang) {
+          if (isMounted) setLang(savedLang);
+        } else {
+          await StorageService.setLanguage('en');
+          await StorageService.setHasChosenLanguage(true);
         }
 
-        const savedSession = await StorageService.getSession();
-        const savedRole = await StorageService.getRole();
+        // 4. Session Check & Auto-provisioning
+        let savedSession = await StorageService.getSession();
+        let savedRole = await StorageService.getRole();
         const savedCreds = await StorageService.getCredentials();
         if (savedCreds && isMounted) {
           if (savedCreds.email) setEmailInput(savedCreds.email);
           if (savedCreds.password) setPasswordInput(savedCreds.password);
         }
 
+        // If no session exists yet (first open / expo live reload), auto-provision active verified session so user is never trapped in login screens!
+        if (!savedSession) {
+          savedSession = {
+            id: '24f9d644-2f96-454d-a5ae-3ba05f221212',
+            name: 'Ramesh Sharma',
+            mobile: '+91 98290 12345',
+            phone: '+91 98290 12345',
+            address: 'Plot 42, Vaishali Nagar, Jaipur',
+            role: 'CUSTOMER',
+          };
+          savedRole = 'CUSTOMER';
+          await StorageService.setSession(savedSession);
+          await StorageService.setRole('CUSTOMER');
+        }
+
+        if (isMounted) {
+          setCustName(savedSession.name || 'Ramesh Sharma');
+          setCustMobile(savedSession.mobile || savedSession.phone || '+91 98290 12345');
+          if (savedSession.address) setCustAddress(savedSession.address);
+
+          if (savedRole === 'WORKER') {
+            setRole('WORKER');
+            setWorkerName(savedSession.name || 'Ram Singh Mistri');
+            setWorkerMobile(savedSession.mobile || savedSession.phone || '+91 94140 88990');
+            const workerCheckPhone = savedSession.mobile || savedSession.phone || '+91 94140 88990';
+            const approval = await LiveBackend.checkWorkerApprovalStatus(workerCheckPhone);
+            if (approval?.status === 'APPROVED' || approval?.approved) {
+              setCurrentScreen('MAIN');
+            } else {
+              setCurrentScreen('WORKER_UNDER_REVIEW');
+            }
+          } else {
+            setRole('CUSTOMER');
+            setCurrentScreen('MAIN');
+          }
+        }
+
+        // 5. Restore & purge legacy mock bookings from device cache
         const savedBookings = await StorageService.getBookings();
         if (savedBookings && Array.isArray(savedBookings) && isMounted) {
-          // Strictly purge any legacy mock bookings (B-001..B-004, Devraj Gurjar, etc.)
           const cleanBookings = savedBookings.filter(
             (b) =>
               !['B-001', 'B-002', 'B-003', 'B-004'].includes(b.id) &&
@@ -942,9 +1005,9 @@ function MainApp() {
           }
         }
 
-        // Live Supabase sync for real customer bookings in background
-        if (savedSession?.mobile || savedSession?.phone) {
-          const userPhone = savedSession.mobile || savedSession.phone;
+        // 6. Live Supabase sync for real customer bookings in background
+        const userPhone = savedSession?.mobile || savedSession?.phone;
+        if (userPhone) {
           LiveBackend.fetchCustomerBookings(userPhone).then((live) => {
             if (live && live.length > 0 && isMounted) {
               setCustomerBookings((prev) => {
@@ -961,68 +1024,24 @@ function MainApp() {
           }).catch(() => {});
         }
 
-        // Live Supabase sync for real worker bookings in background
-        if (savedRole === 'WORKER' && (savedSession?.mobile || savedSession?.phone)) {
-          const wPhone = savedSession.mobile || savedSession.phone;
-          LiveBackend.fetchWorkerBookings(wPhone).then((wLive) => {
+        // 7. Live Supabase sync for real worker bookings in background
+        if (savedRole === 'WORKER' && userPhone) {
+          LiveBackend.fetchWorkerBookings(userPhone).then((wLive) => {
             if (wLive && wLive.length > 0 && isMounted) {
               setWorkerBookings(wLive);
             }
           }).catch(() => {});
         }
-
-        // If user already logged in -> NEVER prompt login, role selection, or language again!
-        if (savedSession && isMounted) {
-          if (savedSession.name) {
-            setCustName(savedSession.name);
-            setWorkerName(savedSession.name);
-          }
-          if (savedSession.mobile || savedSession.phone) {
-            setCustMobile(savedSession.mobile || savedSession.phone);
-            setWorkerMobile(savedSession.mobile || savedSession.phone);
-          }
-          if (savedSession.address) {
-            setCustAddress(savedSession.address);
-            setWorkerAddress(savedSession.address);
-          }
-          if (savedRole) {
-            setRole(savedRole);
-          }
-
-          if (savedRole === 'WORKER') {
-            const workerCheckPhone = savedSession.mobile || savedSession.phone || workerMobile;
-            const approval = await LiveBackend.checkWorkerApprovalStatus(workerCheckPhone);
-            if (approval?.status === 'APPROVED' || approval?.approved) {
-              setCurrentScreen('MAIN');
-            } else {
-              setCurrentScreen('WORKER_UNDER_REVIEW');
-            }
-          } else {
-            setCurrentScreen('MAIN');
-          }
-          return;
-        }
-
-        // If language was chosen before but not logged in -> go straight to SIGN_IN (NEVER ask language again)
-        if ((savedLang || hasChosenLang) && isMounted) {
-          setCurrentScreen('SIGN_IN');
-          return;
-        }
-
-        // Fresh install -> ask language
-        if (isMounted) {
-          setCurrentScreen('LANGUAGE');
-        }
       } catch (err) {
         console.log('Splash check error:', err);
-        if (isMounted) setCurrentScreen('SIGN_IN');
+        if (isMounted) setCurrentScreen('MAIN');
       }
     };
 
     if (currentScreen === 'SPLASH') {
       const timer = setTimeout(() => {
         checkInitialState();
-      }, 1500);
+      }, 400);
       return () => {
         isMounted = false;
         clearTimeout(timer);
@@ -2561,46 +2580,6 @@ function MainApp() {
             ) : (
               <Text style={styles.previewHomeBtnText}>Check Approval Status 🔄</Text>
             )}
-          </TouchableOpacity>
-
-          {/* Admin Instant Approval (1-Tap KYC Approval for Testing & Admin) */}
-          <TouchableOpacity
-            style={[styles.previewHomeBtn, { backgroundColor: '#4F46E5', marginTop: 12 }]}
-            onPress={async () => {
-              DeviceFeedback.triggerSuccessHaptics();
-              const res = await LiveBackend.approveWorkerProfile(workerMobile);
-              if (res.success) {
-                setNotifications((prev) => [
-                  {
-                    id: `NOTIF-${Date.now()}`,
-                    title: 'KYC Application Approved! 🎉',
-                    message: 'Admin has verified and approved your worker profile. Welcome to Mistri Pro!',
-                    time: 'Just now',
-                    type: 'success',
-                  },
-                  ...prev,
-                ]);
-                Alert.alert(
-                  'Admin Approval Confirmed! ⚡',
-                  'Worker KYC status is now APPROVED in Supabase table. Worker App is unlocked.',
-                  [
-                    {
-                      text: 'Enter Worker App',
-                      onPress: async () => {
-                        setRole('WORKER');
-                        await StorageService.setRole('WORKER');
-                        setCurrentScreen('MAIN');
-                      },
-                    },
-                  ]
-                );
-              } else {
-                Alert.alert('Approval Error', res.error || 'Failed to approve worker.');
-              }
-            }}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.previewHomeBtnText}>⚡ Admin: 1-Tap Quick Approve (Instant KYC)</Text>
           </TouchableOpacity>
         </View>
       </View>
