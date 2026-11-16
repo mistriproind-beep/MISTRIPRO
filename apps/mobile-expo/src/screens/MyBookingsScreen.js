@@ -287,7 +287,9 @@ export default function MyBookingsScreen({
                   <View style={styles.waitingBanner}>
                     <Clock size={14} color="#D97706" />
                     <Text style={styles.waitingBannerText}>
-                      Waiting for {workerName} to confirm request. Escrow deposit is locked safely.
+                      {workerName.includes('Searching')
+                        ? 'Broadcasting to nearby verified workers... Waiting for worker assignment.'
+                        : `Waiting for ${workerName} to confirm request. Escrow deposit is locked safely.`}
                     </Text>
                   </View>
                 )}

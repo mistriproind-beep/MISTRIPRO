@@ -696,13 +696,15 @@ function MainApp() {
       const newBookingId = savedBooking?.id || `B-${Date.now().toString().slice(-4)}`;
 
       // 1. Add to Customer Bookings List
+      const isSpecific = bookingDetails.workerName && !bookingDetails.workerName.includes('Searching');
       const newCustBooking = {
         id: newBookingId,
         booking_code: `BK-${Date.now().toString().slice(-4)}`,
-        workerName: bookingDetails.workerName,
-        workerAvatar: bookingDetails.workerAvatar || bookingDetails.workerName.slice(0, 2).toUpperCase(),
+        workerName: isSpecific ? bookingDetails.workerName : 'Searching Nearby Workers...',
+        requestedWorkerName: bookingDetails.workerName,
+        workerAvatar: isSpecific ? (bookingDetails.workerAvatar || bookingDetails.workerName.slice(0, 2).toUpperCase()) : '⏳',
         workerColor: bookingDetails.workerColor || '#4F46E5',
-        workerPhone: bookingDetails.workerPhone || '+91 94140 88990',
+        workerPhone: '',
         worker_skill: bookingDetails.workerSkill,
         category: bookingDetails.workerSkill,
         title: `${bookingDetails.workerSkill} Service Request`,
@@ -784,18 +786,23 @@ function MainApp() {
   };
 
   const handleApproveAlert = async (alertItem) => {
+    const approvingWorkerName = workerProfile?.name || workerName || 'Ram Singh Mistri';
+    const approvingWorkerPhone = workerMobile || '+91 94140 88990';
+    const bookingId = alertItem.bookingId;
+
     setWorkerAlerts((prev) => prev.filter((a) => a.id !== alertItem.id));
     const newBooking = {
-      id: alertItem.bookingId || `WB-${Date.now().toString().slice(-4)}`,
-      customerName: alertItem.customerName,
+      id: bookingId || `WB-${Date.now().toString().slice(-4)}`,
+      booking_code: `BK-${Date.now().toString().slice(-4)}`,
+      customerName: alertItem.customerName || 'Customer',
       customerAvatar: alertItem.customerAvatar || 'CU',
       customerColor: alertItem.customerColor || '#0284C7',
       customerPhone: alertItem.customerPhone || '+91 98290 12345',
-      category: alertItem.category,
-      title: alertItem.title,
-      location: alertItem.location,
+      category: alertItem.category || 'General Labour',
+      title: alertItem.title || 'Service Booking',
+      location: alertItem.location || 'Sawai Madhopur, Rajasthan',
       distance: alertItem.distance || '2.4 km',
-      date: alertItem.date,
+      date: alertItem.date || 'Today, Immediate',
       timing: alertItem.timing || '9:00 AM – 5:00 PM',
       amount: alertItem.offeredRate,
       duration: alertItem.duration || '1 Day',
@@ -808,8 +815,34 @@ function MainApp() {
       ...prev.filter((b) => b.id !== newBooking.id),
     ]);
 
-    if (alertItem.bookingId) {
-      await LiveBackend.updateBookingStatus(alertItem.bookingId, 'confirmed', 1);
+    // Update customer bookings immediately to show the assigned worker's name
+    let updatedCustomerList = [];
+    setCustomerBookings((prev) => {
+      updatedCustomerList = prev.map((b) => {
+        if (b.id === bookingId || b.id === newBooking.id) {
+          return {
+            ...b,
+            status: 'confirmed',
+            workerName: approvingWorkerName,
+            workerPhone: approvingWorkerPhone,
+            workerAvatar: approvingWorkerName.slice(0, 2).toUpperCase(),
+            progress_step: 1,
+          };
+        }
+        return b;
+      });
+      return updatedCustomerList;
+    });
+
+    await StorageService.setBookings(updatedCustomerList);
+
+    if (bookingId) {
+      await LiveBackend.updateBookingStatus(bookingId, {
+        status: 'confirmed',
+        worker_name: approvingWorkerName,
+        worker_phone: approvingWorkerPhone,
+        progress_step: 1,
+      });
     }
 
     DeviceFeedback.triggerSuccessHaptics();
@@ -818,7 +851,7 @@ function MainApp() {
       {
         id: `NOTIF-${Date.now()}`,
         title: 'Booking Confirmed! 🎉',
-        message: `${workerProfile.name} accepted the booking. You can now call and track live work.`,
+        message: `${approvingWorkerName} accepted the booking request. Assigned to job with live tracking.`,
         time: 'Just now',
         type: 'success',
       },
@@ -2786,14 +2819,14 @@ function MainApp() {
               workers={realWorkers}
               onDeployContractorBooking={async (payload) => {
                 try {
-                  await LiveBackend.createContractorBooking(payload);
+                  const bookingId = `CB-${Date.now().toString().slice(-4)}`;
                   const newContractorBooking = {
-                    id: `CB-${Date.now().toString().slice(-4)}`,
+                    id: bookingId,
                     booking_code: `BK-CREW-${Date.now().toString().slice(-4)}`,
-                    workerName: `${payload.totalWorkers} Worker Crew (${payload.assignedWorkers?.[0]?.name || 'Raj Mistri'} & Team)`,
-                    workerAvatar: 'CR',
+                    workerName: 'Searching Nearby Crew...',
+                    workerAvatar: '⏳',
                     workerColor: '#4F46E5',
-                    workerPhone: payload.assignedWorkers?.[0]?.phone || '+91 94140 88990',
+                    workerPhone: '',
                     worker_skill: 'Contractor Crew',
                     category: 'Contractor',
                     title: `${payload.totalWorkers} Workers Crew Deployment`,
@@ -2804,14 +2837,50 @@ function MainApp() {
                     duration: payload.duration || '1 Day',
                     total_amount: payload.totalAmount,
                     amount: `₹${payload.totalAmount}`,
-                    status: 'active',
+                    status: 'waiting_confirmation',
                     progress_step: 1,
-                    razorpay_payment_id: `pay_test_${Date.now().toString().slice(-8)}`,
+                    razorpay_payment_id: payload.paymentId || `pay_test_${Date.now().toString().slice(-8)}`,
                   };
+
                   setCustomerBookings((prev) => [newContractorBooking, ...prev]);
                   await StorageService.setBookings([newContractorBooking, ...customerBookings]);
+
+                  // Dispatch alert to all nearby workers
+                  const custInitials = (custName || 'CU').split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
+                  const newAlert = {
+                    id: `ALT-${Date.now().toString().slice(-4)}`,
+                    bookingId: bookingId,
+                    customerName: custName || 'Customer',
+                    customerAvatar: custInitials,
+                    customerColor: '#4F46E5',
+                    customerPhone: custMobile || '+91 98290 12345',
+                    category: 'Contractor Crew',
+                    title: `${payload.totalWorkers} Workers Crew Deployment`,
+                    location: payload.siteLocation || 'Sawai Madhopur, Rajasthan',
+                    distance: '1.2 km',
+                    date: 'Today, Immediate',
+                    timing: '9:00 AM – 5:00 PM',
+                    offeredRate: `₹${payload.totalAmount}`,
+                    platformFee: 99,
+                    escrowLocked: true,
+                    timestamp: 'Just now',
+                  };
+                  setWorkerAlerts((prev) => [newAlert, ...prev]);
+
+                  LiveBackend.createContractorBooking({
+                    ...payload,
+                    bookingId,
+                    customerName: custName || 'Customer',
+                    customerPhone: custMobile || '+91 98290 12345',
+                    paymentId: payload.paymentId,
+                    status: 'waiting_confirmation',
+                  }).catch((e) => console.log('Contractor booking sync err:', e));
+
                   DeviceFeedback.triggerSuccessHaptics();
-                  Alert.alert('Contractor Crew Dispatched! 🚀', 'Available nearby workers have been assigned to your project. Visible in My Bookings.');
+                  Alert.alert(
+                    'Booking Placed & Escrow Locked! 💳',
+                    `Payment of ₹${payload.totalAmount} secured via Razorpay. Alert sent to nearby workers. Track worker acceptance in My Bookings.`
+                  );
                   setActiveTab('BOOKINGS');
                 } catch (e) {
                   console.log('Contractor booking error:', e);

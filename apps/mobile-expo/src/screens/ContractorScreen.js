@@ -26,6 +26,7 @@ import {
 } from 'lucide-react-native';
 import * as Location from 'expo-location';
 import { DeviceFeedback } from '../services/deviceFeedback';
+import RazorpayModal from '../components/RazorpayModal';
 
 const CREW_ROLES = [
   { id: 'mason', name: 'Mason (Raj Mistri)', icon: '🧱', baseRate: 1100, unit: 'day' },
@@ -58,6 +59,8 @@ export default function ContractorScreen({ insets, onNavigateTab, onDeployContra
 
   // Payment Method
   const [payMethod, setPayMethod] = useState('upi'); // 'upi' | 'cash' | 'escrow'
+  const [showRazorpayModal, setShowRazorpayModal] = useState(false);
+  const [razorpayBookingData, setRazorpayBookingData] = useState(null);
 
   // Update crew counter
   const updateCount = (roleId, delta) => {
@@ -151,7 +154,7 @@ export default function ContractorScreen({ insets, onNavigateTab, onDeployContra
       [
         { text: 'Modify', style: 'cancel' },
         {
-          text: 'Confirm & Book',
+          text: 'Proceed to Payment →',
           onPress: () => {
             DeviceFeedback.triggerSuccessHaptics();
             const liveList = Array.isArray(workers) ? workers : [];
@@ -185,20 +188,18 @@ export default function ContractorScreen({ insets, onNavigateTab, onDeployContra
               totalAmount: subtotal + 99 + Math.round(subtotal * 0.05),
             };
 
-            if (onDeployContractorBooking) {
-              onDeployContractorBooking(contractorPayload);
-            }
+            const bookingData = {
+              workerName: `${totalWorkers} Worker Crew`,
+              workerSkill: 'Contractor Crew Deployment',
+              workerFee: subtotal,
+              platformFee: 99,
+              txnFee: Math.round(subtotal * 0.05),
+              totalAmount: subtotal + 99 + Math.round(subtotal * 0.05),
+              contractorPayload,
+            };
 
-            Alert.alert(
-              '🎉 Crew Booked Successfully!',
-              `Your ${totalWorkers}-member crew (${assigned.map((w) => w.name).join(', ')}) has been assigned and will report to ${siteLocation}. Tracking updates active in Bookings.`,
-              [
-                {
-                  text: 'View in My Bookings',
-                  onPress: () => onNavigateTab && onNavigateTab('BOOKINGS'),
-                },
-              ]
-            );
+            setRazorpayBookingData(bookingData);
+            setShowRazorpayModal(true);
           },
         },
       ]
@@ -572,6 +573,24 @@ export default function ContractorScreen({ insets, onNavigateTab, onDeployContra
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* ─── RAZORPAY CHECKOUT MODAL ─── */}
+      <RazorpayModal
+        visible={showRazorpayModal}
+        onClose={() => setShowRazorpayModal(false)}
+        bookingData={razorpayBookingData}
+        onPaymentSuccess={(completedDetails) => {
+          setShowRazorpayModal(false);
+          if (onDeployContractorBooking && razorpayBookingData?.contractorPayload) {
+            onDeployContractorBooking({
+              ...razorpayBookingData.contractorPayload,
+              paymentId: completedDetails.paymentId,
+              paymentMethod: completedDetails.paymentMethod,
+              totalAmount: completedDetails.totalAmount,
+            });
+          }
+        }}
+      />
     </View>
   );
 }
