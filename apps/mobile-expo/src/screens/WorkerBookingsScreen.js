@@ -40,7 +40,11 @@ export default function WorkerBookingsScreen({
   onNavigateTab,
 }) {
   const [tab, setTab] = useState('ACTIVE'); // 'ACTIVE' | 'HISTORY'
-  const [localBookings, setLocalBookings] = useState(bookings);
+  const [localBookings, setLocalBookings] = useState(bookings || []);
+
+  React.useEffect(() => {
+    setLocalBookings(bookings || []);
+  }, [bookings]);
 
   const activeBookings = localBookings.filter((b) => b.status === 'active');
   const historyBookings = localBookings.filter((b) => b.status === 'completed');

@@ -27,7 +27,6 @@ import {
 import * as Location from 'expo-location';
 
 import { CATEGORIES, CATEGORY_GROUPS } from '../data/categories';
-import { MOCK_WORKERS } from '../data/mockWorkers';
 import RazorpayModal from '../components/RazorpayModal';
 
 /* ─── helpers ─── */
@@ -50,6 +49,7 @@ export default function CustomerHomeScreen({
   onBookWorker,
   onOpenNotifications,
   notificationsCount = 0,
+  workers = [],
 }) {
   const [locationText, setLocationText] = useState('Sawai Madhopur, Rajasthan');
   const [locationLoading, setLocationLoading] = useState(true);
@@ -130,7 +130,8 @@ export default function CustomerHomeScreen({
     }).slice(0, 4);
 
     // 2. Matching online workers
-    const matchingWorkers = MOCK_WORKERS.filter((w) => {
+    const liveList = Array.isArray(workers) ? workers : [];
+    const matchingWorkers = liveList.filter((w) => {
       if (w.available !== true) return false;
       const wName = (w.name || '').toLowerCase();
       const wSkill = (w.skill || '').toLowerCase();
@@ -143,11 +144,12 @@ export default function CustomerHomeScreen({
       workers: matchingWorkers,
       totalCount: matchingCategories.length + matchingWorkers.length,
     };
-  }, [searchQuery]);
+  }, [searchQuery, workers]);
 
   // Filter Workers: Online Only + Category Filter + Search Query Filter (Uber/Ola Real-Time Logic)
   const nearbyWorkers = useMemo(() => {
-    return MOCK_WORKERS.filter((w) => {
+    const liveList = Array.isArray(workers) ? workers : [];
+    return liveList.filter((w) => {
       // 1. Online / Available only (Offline workers are strictly hidden from customers)
       if (w.available !== true) return false;
 
@@ -218,7 +220,7 @@ export default function CustomerHomeScreen({
 
       return true;
     });
-  }, [searchQuery, selectedCategory]);
+  }, [searchQuery, selectedCategory, workers]);
 
   const handleProceedToBooking = (worker) => {
     setSelectedWorker(null);

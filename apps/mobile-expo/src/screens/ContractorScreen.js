@@ -25,7 +25,6 @@ import {
   Check,
 } from 'lucide-react-native';
 import * as Location from 'expo-location';
-import { MOCK_WORKERS } from '../data/mockWorkers';
 import { DeviceFeedback } from '../services/deviceFeedback';
 
 const CREW_ROLES = [
@@ -39,7 +38,7 @@ const CREW_ROLES = [
   { id: 'plumber', name: 'Plumber', icon: '🔧', baseRate: 950, unit: 'day' },
 ];
 
-export default function ContractorScreen({ insets, onNavigateTab, onDeployContractorBooking }) {
+export default function ContractorScreen({ insets, onNavigateTab, onDeployContractorBooking, workers = [] }) {
   // Crew selection: { [roleId]: count }
   const [crewCounts, setCrewCounts] = useState({
     mason: 2,
@@ -155,7 +154,8 @@ export default function ContractorScreen({ insets, onNavigateTab, onDeployContra
           text: 'Confirm & Book',
           onPress: () => {
             DeviceFeedback.triggerSuccessHaptics();
-            const availableWorkers = MOCK_WORKERS.filter((w) => w.available === true);
+            const liveList = Array.isArray(workers) ? workers : [];
+            const availableWorkers = liveList.filter((w) => w.available === true);
             const assigned = availableWorkers.slice(0, totalWorkers).map((w) => ({
               workerId: w.id,
               name: w.name,

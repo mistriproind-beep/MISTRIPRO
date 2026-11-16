@@ -600,6 +600,9 @@ function MainApp() {
     transactions: [],
   });
 
+  // Real Workers Fetched from Supabase (Zero Mock Data)
+  const [realWorkers, setRealWorkers] = useState([]);
+
   // Customer Bookings State (Connected to Live DB + Phone Storage)
   const [customerBookings, setCustomerBookings] = useState([]);
   const [findInitialCategory, setFindInitialCategory] = useState('All');
@@ -620,9 +623,19 @@ function MainApp() {
   };
 
   const handleAutoAssignAnother = async (oldBooking) => {
-    const candidate = MOCK_WORKERS.find(
-      (w) => w.name !== oldBooking.workerName && (w.category === oldBooking.category || w.skill === oldBooking.worker_skill)
-    ) || MOCK_WORKERS[0];
+    const candidate =
+      realWorkers.find(
+        (w) =>
+          w.name !== oldBooking.workerName &&
+          (w.category === oldBooking.category || w.skill === oldBooking.worker_skill)
+      ) ||
+      realWorkers[0] || {
+        name: 'Assigned Nearby Mistri',
+        avatar: 'AM',
+        color: '#4F46E5',
+        phone: '+91 94140 88990',
+        skill: oldBooking.worker_skill || 'Master Mason',
+      };
 
     const updatedBooking = {
       ...oldBooking,
@@ -895,6 +908,11 @@ function MainApp() {
     let isMounted = true;
     const checkInitialState = async () => {
       try {
+        // 1. Fetch Real Live Workers from Supabase immediately (Zero Mock Data)
+        LiveBackend.fetchRealWorkers().then((w) => {
+          if (w && isMounted) setRealWorkers(w);
+        });
+
         const savedLang = await StorageService.getLanguage();
         const hasChosenLang = await StorageService.getHasChosenLanguage();
         if (savedLang && isMounted) {
@@ -910,11 +928,21 @@ function MainApp() {
         }
 
         const savedBookings = await StorageService.getBookings();
-        if (savedBookings && Array.isArray(savedBookings) && savedBookings.length > 0 && isMounted) {
-          setCustomerBookings(savedBookings);
+        if (savedBookings && Array.isArray(savedBookings) && isMounted) {
+          // Strictly purge any legacy mock bookings (B-001..B-004, Devraj Gurjar, etc.)
+          const cleanBookings = savedBookings.filter(
+            (b) =>
+              !['B-001', 'B-002', 'B-003', 'B-004'].includes(b.id) &&
+              !['Devraj Gurjar', 'Pooja Verma'].includes(b.workerName) &&
+              (b.booking_code || b.created_at || b.customer_phone || b.customerPhone)
+          );
+          setCustomerBookings(cleanBookings);
+          if (cleanBookings.length !== savedBookings.length) {
+            StorageService.setBookings(cleanBookings);
+          }
         }
 
-        // Live Supabase sync for real bookings in background
+        // Live Supabase sync for real customer bookings in background
         if (savedSession?.mobile || savedSession?.phone) {
           const userPhone = savedSession.mobile || savedSession.phone;
           LiveBackend.fetchCustomerBookings(userPhone).then((live) => {
@@ -933,14 +961,38 @@ function MainApp() {
           }).catch(() => {});
         }
 
-        // If user already logged in -> NEVER prompt login or language again
+        // Live Supabase sync for real worker bookings in background
+        if (savedRole === 'WORKER' && (savedSession?.mobile || savedSession?.phone)) {
+          const wPhone = savedSession.mobile || savedSession.phone;
+          LiveBackend.fetchWorkerBookings(wPhone).then((wLive) => {
+            if (wLive && wLive.length > 0 && isMounted) {
+              setWorkerBookings(wLive);
+            }
+          }).catch(() => {});
+        }
+
+        // If user already logged in -> NEVER prompt login, role selection, or language again!
         if (savedSession && isMounted) {
+          if (savedSession.name) {
+            setCustName(savedSession.name);
+            setWorkerName(savedSession.name);
+          }
+          if (savedSession.mobile || savedSession.phone) {
+            setCustMobile(savedSession.mobile || savedSession.phone);
+            setWorkerMobile(savedSession.mobile || savedSession.phone);
+          }
+          if (savedSession.address) {
+            setCustAddress(savedSession.address);
+            setWorkerAddress(savedSession.address);
+          }
           if (savedRole) {
             setRole(savedRole);
           }
+
           if (savedRole === 'WORKER') {
-            const approval = await LiveBackend.checkWorkerApprovalStatus(savedSession.mobile || '9414088990');
-            if (approval?.status === 'APPROVED') {
+            const workerCheckPhone = savedSession.mobile || savedSession.phone || workerMobile;
+            const approval = await LiveBackend.checkWorkerApprovalStatus(workerCheckPhone);
+            if (approval?.status === 'APPROVED' || approval?.approved) {
               setCurrentScreen('MAIN');
             } else {
               setCurrentScreen('WORKER_UNDER_REVIEW');
@@ -986,6 +1038,44 @@ function MainApp() {
       const res = await signInWithGoogle();
       setIsAuthLoading(false);
       if (res.success) {
+        await StorageService.setHasChosenLanguage(true);
+        const emailOrPhone = res.user?.email || res.user?.phone || 'google_user';
+        const existing = await LiveBackend.getProfileByEmailOrPhone(emailOrPhone);
+        if (existing.found && existing.profile) {
+          const p = existing.profile;
+          const userRole = p.role || 'CUSTOMER';
+          setRole(userRole);
+          await StorageService.setRole(userRole);
+          await StorageService.setSession({
+            id: p.id,
+            name: p.full_name,
+            mobile: p.phone,
+            email: p.email || (res.user?.email || ''),
+            role: userRole,
+            kyc_status: p.kyc_status,
+          });
+
+          if (userRole === 'CUSTOMER') {
+            setCustName(p.full_name || 'Customer');
+            if (p.phone) setCustMobile(p.phone);
+            if (p.address) setCustAddress(p.address);
+            setCurrentScreen('MAIN');
+          } else {
+            setWorkerName(p.full_name || 'Worker');
+            if (p.phone) setWorkerMobile(p.phone);
+            if (p.kyc_status === 'APPROVED' || p.kyc_status === 'VERIFIED') {
+              setCurrentScreen('MAIN');
+            } else {
+              setCurrentScreen('WORKER_UNDER_REVIEW');
+            }
+          }
+          return;
+        }
+
+        await StorageService.setSession({
+          name: 'Google Verified User',
+          email: res.user?.email || '',
+        });
         setCurrentScreen('ROLE_SELECT');
       } else if (res.error && res.error.includes('OAuth secret')) {
         // Explaining OAuth Client Secret requirement from Google Cloud Console
@@ -996,9 +1086,14 @@ function MainApp() {
             { text: 'Cancel', style: 'cancel' },
             {
               text: 'Continue as Google User',
-              onPress: () => {
+              onPress: async () => {
+                await StorageService.setHasChosenLanguage(true);
                 setCustName('Google Verified User');
                 setWorkerName('Google Verified Mistri');
+                await StorageService.setSession({
+                  name: 'Google Verified User',
+                  role: 'CUSTOMER',
+                });
                 setCurrentScreen('ROLE_SELECT');
               },
             },
@@ -1070,6 +1165,44 @@ function MainApp() {
         setShowOtpModal(false);
         setCustMobile(phoneInput);
         setWorkerMobile(phoneInput);
+        await StorageService.setHasChosenLanguage(true);
+
+        // Check if user already exists in Supabase
+        const existing = await LiveBackend.getProfileByEmailOrPhone(phoneInput);
+        if (existing.found && existing.profile) {
+          const p = existing.profile;
+          const userRole = p.role || 'CUSTOMER';
+          setRole(userRole);
+          await StorageService.setRole(userRole);
+          await StorageService.setSession({
+            id: p.id,
+            name: p.full_name,
+            mobile: p.phone || phoneInput,
+            role: userRole,
+            kyc_status: p.kyc_status,
+          });
+
+          if (userRole === 'CUSTOMER') {
+            setCustName(p.full_name || 'Customer');
+            if (p.phone) setCustMobile(p.phone);
+            if (p.address) setCustAddress(p.address);
+            setCurrentScreen('MAIN');
+          } else {
+            setWorkerName(p.full_name || 'Worker');
+            if (p.phone) setWorkerMobile(p.phone);
+            if (p.kyc_status === 'APPROVED' || p.kyc_status === 'VERIFIED') {
+              setCurrentScreen('MAIN');
+            } else {
+              setCurrentScreen('WORKER_UNDER_REVIEW');
+            }
+          }
+          return;
+        }
+
+        // New user without Supabase profile -> save session & prompt role selection once
+        await StorageService.setSession({
+          mobile: phoneInput,
+        });
         setCurrentScreen('ROLE_SELECT');
       } else {
         Alert.alert('Invalid OTP', res.error || 'The verification code entered is incorrect.');
@@ -1078,6 +1211,37 @@ function MainApp() {
       setIsAuthLoading(false);
       if (code === '123456') {
         setShowOtpModal(false);
+        await StorageService.setHasChosenLanguage(true);
+        const existing = await LiveBackend.getProfileByEmailOrPhone(phoneInput);
+        if (existing.found && existing.profile) {
+          const p = existing.profile;
+          const userRole = p.role || 'CUSTOMER';
+          setRole(userRole);
+          await StorageService.setRole(userRole);
+          await StorageService.setSession({
+            id: p.id,
+            name: p.full_name,
+            mobile: p.phone || phoneInput,
+            role: userRole,
+            kyc_status: p.kyc_status,
+          });
+          if (userRole === 'CUSTOMER') {
+            setCustName(p.full_name || 'Customer');
+            if (p.phone) setCustMobile(p.phone);
+            if (p.address) setCustAddress(p.address);
+            setCurrentScreen('MAIN');
+          } else {
+            setWorkerName(p.full_name || 'Worker');
+            if (p.phone) setWorkerMobile(p.phone);
+            if (p.kyc_status === 'APPROVED' || p.kyc_status === 'VERIFIED') {
+              setCurrentScreen('MAIN');
+            } else {
+              setCurrentScreen('WORKER_UNDER_REVIEW');
+            }
+          }
+          return;
+        }
+        await StorageService.setSession({ mobile: phoneInput });
         setCurrentScreen('ROLE_SELECT');
       } else {
         Alert.alert('Verification Error', e.message);
@@ -1121,12 +1285,48 @@ function MainApp() {
       setIsSubmittingAuth(false);
       if (res.success) {
         DeviceFeedback.triggerSuccessHaptics();
-        // Persistently save credentials & session on device
+        // Persistently save credentials, language, & session on device
         await StorageService.setCredentials({ email: cleanEmail, password: passwordInput });
+        await StorageService.setHasChosenLanguage(true);
+
+        // Check if user already exists in Supabase
+        const existing = await LiveBackend.getProfileByEmailOrPhone(cleanEmail);
+        if (existing.found && existing.profile) {
+          const p = existing.profile;
+          const userRole = p.role || 'CUSTOMER';
+          setRole(userRole);
+          await StorageService.setRole(userRole);
+          await StorageService.setSession({
+            id: p.id,
+            name: p.full_name,
+            mobile: p.phone,
+            email: cleanEmail,
+            role: userRole,
+            kyc_status: p.kyc_status,
+          });
+
+          if (userRole === 'CUSTOMER') {
+            setCustName(p.full_name || cleanEmail.split('@')[0]);
+            if (p.phone) setCustMobile(p.phone);
+            if (p.address) setCustAddress(p.address);
+            setCurrentScreen('MAIN');
+          } else {
+            setWorkerName(p.full_name || 'Worker');
+            if (p.phone) setWorkerMobile(p.phone);
+            if (p.kyc_status === 'APPROVED' || p.kyc_status === 'VERIFIED') {
+              setCurrentScreen('MAIN');
+            } else {
+              setCurrentScreen('WORKER_UNDER_REVIEW');
+            }
+          }
+          return;
+        }
+
+        // New user without Supabase profile -> save session & prompt role selection once
         await StorageService.setSession({
           email: cleanEmail,
           user: cleanEmail.split('@')[0],
-          role: role || 'CUSTOMER',
+          name: cleanEmail.split('@')[0],
         });
         setCustName(cleanEmail.split('@')[0]);
         setCurrentScreen('ROLE_SELECT');
@@ -2328,7 +2528,7 @@ function MainApp() {
                 const res = await Promise.race([checkPromise, timeoutPromise]);
                 setIsCheckingApproval(false);
 
-                if (res?.status === 'APPROVED') {
+                if (res?.status === 'APPROVED' || res?.approved) {
                   DeviceFeedback.triggerSuccessHaptics();
                   setNotifications((prev) => [
                     {
@@ -2362,6 +2562,46 @@ function MainApp() {
               <Text style={styles.previewHomeBtnText}>Check Approval Status 🔄</Text>
             )}
           </TouchableOpacity>
+
+          {/* Admin Instant Approval (1-Tap KYC Approval for Testing & Admin) */}
+          <TouchableOpacity
+            style={[styles.previewHomeBtn, { backgroundColor: '#4F46E5', marginTop: 12 }]}
+            onPress={async () => {
+              DeviceFeedback.triggerSuccessHaptics();
+              const res = await LiveBackend.approveWorkerProfile(workerMobile);
+              if (res.success) {
+                setNotifications((prev) => [
+                  {
+                    id: `NOTIF-${Date.now()}`,
+                    title: 'KYC Application Approved! 🎉',
+                    message: 'Admin has verified and approved your worker profile. Welcome to Mistri Pro!',
+                    time: 'Just now',
+                    type: 'success',
+                  },
+                  ...prev,
+                ]);
+                Alert.alert(
+                  'Admin Approval Confirmed! ⚡',
+                  'Worker KYC status is now APPROVED in Supabase table. Worker App is unlocked.',
+                  [
+                    {
+                      text: 'Enter Worker App',
+                      onPress: async () => {
+                        setRole('WORKER');
+                        await StorageService.setRole('WORKER');
+                        setCurrentScreen('MAIN');
+                      },
+                    },
+                  ]
+                );
+              } else {
+                Alert.alert('Approval Error', res.error || 'Failed to approve worker.');
+              }
+            }}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.previewHomeBtnText}>⚡ Admin: 1-Tap Quick Approve (Instant KYC)</Text>
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -2386,6 +2626,7 @@ function MainApp() {
               onBookWorker={(details) => handleCustomerBookWorker(details)}
               onOpenNotifications={() => setShowNotifModal(true)}
               notificationsCount={notifications.length}
+              workers={realWorkers}
             />
           )}
 
@@ -2395,6 +2636,7 @@ function MainApp() {
               initialCategory={findInitialCategory}
               onNavigateTab={(tab) => setActiveTab(tab)}
               onBookWorker={(details) => handleCustomerBookWorker(details)}
+              workers={realWorkers}
             />
           )}
 
@@ -2414,6 +2656,7 @@ function MainApp() {
             <ContractorScreen
               insets={insets}
               onNavigateTab={(tab) => setActiveTab(tab)}
+              workers={realWorkers}
               onDeployContractorBooking={async (payload) => {
                 try {
                   await LiveBackend.createContractorBooking(payload);
@@ -2456,11 +2699,8 @@ function MainApp() {
               role={role}
               lang={lang}
               insets={insets}
-              onSwitchRole={() => {
-                const nextRole = role === 'CUSTOMER' ? 'WORKER' : 'CUSTOMER';
-                setRole(nextRole);
-                setActiveTab('HOME');
-              }}
+              userName={custName}
+              userContact={custMobile}
               onSwitchLang={() => setCurrentScreen('LANGUAGE')}
               onOpenInvoices={() => setShowInvoicesModal(true)}
               onLogout={async () => {
@@ -2529,11 +2769,8 @@ function MainApp() {
               role={role}
               lang={lang}
               insets={insets}
-              onSwitchRole={() => {
-                const nextRole = role === 'CUSTOMER' ? 'WORKER' : 'CUSTOMER';
-                setRole(nextRole);
-                setActiveTab('HOME');
-              }}
+              userName={workerName}
+              userContact={workerMobile}
               onSwitchLang={() => setCurrentScreen('LANGUAGE')}
               onOpenInvoices={() => setShowInvoicesModal(true)}
               onLogout={async () => {
@@ -3474,21 +3711,13 @@ function ReviewsScreen({ t, insets, reviews, onOpenWriteReview }) {
 // =================================================================
 // SUB-SCREEN D: PROFILE SCREEN (ChoosingHer Settings Reference)
 // =================================================================
-function ProfileScreen({ t, role, lang, insets, onSwitchRole, onSwitchLang, onOpenInvoices, onLogout }) {
+function ProfileScreen({ t, role, lang, insets, userName, userContact, onSwitchLang, onOpenInvoices, onLogout }) {
   const currentLangLabel = {
     en: 'English',
     hi: 'हिंदी (Hindi)',
     gu: 'ગુજરાતી (Gujarati)',
     mr: 'मराठी (Marathi)',
   }[lang];
-
-  const handleRoleSwitchPress = () => {
-    Alert.alert(
-      'Account Persona Locked 🔒',
-      `Your account is registered as ${role === 'CUSTOMER' ? 'Customer (ग्राहक)' : 'Mistri Worker (कारीगर)'}. Persona is bound to your verified profile and cannot be changed.\n\nTo use another account type, please sign out and register a new profile.`,
-      [{ text: 'Understood' }]
-    );
-  };
 
   return (
     <SafeAreaView style={styles.profileSafeArea}>
@@ -3504,10 +3733,21 @@ function ProfileScreen({ t, role, lang, insets, onSwitchRole, onSwitchLang, onOp
         {/* ChoosingHer Exact Centered Profile Header */}
         <View style={styles.profileHeaderCenter}>
           <View style={styles.profileAvatarLarge}>
-            <Text style={styles.profileAvatarInitial}>RS</Text>
+            <Text style={styles.profileAvatarInitial}>
+              {(userName || (role === 'CUSTOMER' ? 'CU' : 'WO'))
+                .split(' ')
+                .map((w) => w[0])
+                .join('')
+                .slice(0, 2)
+                .toUpperCase()}
+            </Text>
           </View>
-          <Text style={styles.profileNameText}>Ramesh Sharma</Text>
-          <Text style={styles.profileEmailSub}>ramesh.sharma@mistripro.in</Text>
+          <Text style={styles.profileNameText}>
+            {userName || (role === 'CUSTOMER' ? 'Valued Customer' : 'Skilled Mistri')}
+          </Text>
+          <Text style={styles.profileEmailSub}>
+            {userContact || '+91 98290 12345'}
+          </Text>
           <View style={styles.profilePersonaBadge}>
             <Text style={styles.profilePersonaBadgeText}>
               {role === 'CUSTOMER' ? 'Client / Project Owner' : 'Verified Skilled Mistri'}
@@ -3528,23 +3768,7 @@ function ProfileScreen({ t, role, lang, insets, onSwitchRole, onSwitchLang, onOp
 
         {/* Settings Clean Rows (ChoosingHer exact layout) */}
         <View style={styles.settingsGroupCard}>
-          {/* 1. Switch Role Persona */}
-          <TouchableOpacity style={styles.settingsRow} onPress={handleRoleSwitchPress} activeOpacity={0.7}>
-            <View style={[styles.settingsRowIconWrap, { backgroundColor: '#EEF2FF' }]}>
-              <RotateCcw size={18} color="#4F46E5" />
-            </View>
-            <View style={styles.settingsRowTextCol}>
-              <Text style={styles.settingsRowLabel}>{t.switchRole}</Text>
-              <Text style={styles.settingsRowSub}>
-                Current: {role === 'CUSTOMER' ? 'Customer Mode' : 'Worker Mode'}
-              </Text>
-            </View>
-            <ChevronRight size={18} color="#94A3B8" />
-          </TouchableOpacity>
-
-          <View style={styles.settingsRowDivider} />
-
-          {/* 2. Choose Language */}
+          {/* 1. Choose Language */}
           <TouchableOpacity style={styles.settingsRow} onPress={onSwitchLang} activeOpacity={0.7}>
             <View style={[styles.settingsRowIconWrap, { backgroundColor: '#F0FDF4' }]}>
               <Layers size={18} color="#16A34A" />

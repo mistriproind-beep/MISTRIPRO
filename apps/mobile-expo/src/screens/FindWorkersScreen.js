@@ -29,7 +29,6 @@ import {
 import { WebView } from 'react-native-webview';
 import * as Location from 'expo-location';
 import { CATEGORIES } from '../data/categories';
-import { MOCK_WORKERS } from '../data/mockWorkers';
 import RazorpayModal from '../components/RazorpayModal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -120,6 +119,7 @@ export default function FindWorkersScreen({
   onBookWorker,
   onNavigateTab,
   initialCategory = 'All',
+  workers = [],
 }) {
   const [selectedCategory, setSelectedCategory] = useState(initialCategory || 'All');
 
@@ -195,11 +195,12 @@ export default function FindWorkersScreen({
 
   // Base filtered list: Only online workers matching selected trade (Strict Uber/Ola online filter)
   const baseWorkers = useMemo(() => {
+    const liveList = Array.isArray(workers) ? workers : [];
     if (selectedCategory === 'All') {
-      return MOCK_WORKERS.filter((w) => w.available === true);
+      return liveList.filter((w) => w.available === true);
     }
     const catTarget = selectedCategory.toLowerCase();
-    return MOCK_WORKERS.filter((w) => {
+    return liveList.filter((w) => {
       if (w.available !== true) return false;
       const wCat = (w.category || '').toLowerCase();
       const wSkill = (w.skill || '').toLowerCase();
@@ -216,7 +217,7 @@ export default function FindWorkersScreen({
       const workerCombined = `${wCat} ${wSkill}`.toLowerCase();
       return cleanTokens.some((tok) => workerCombined.includes(tok));
     });
-  }, [selectedCategory]);
+  }, [selectedCategory, workers]);
 
   // Dynamically place workers around the user's REAL live GPS location
   const liveWorkers = useMemo(() => {
