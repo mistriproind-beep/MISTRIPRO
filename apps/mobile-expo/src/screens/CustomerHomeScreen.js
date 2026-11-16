@@ -50,6 +50,7 @@ export default function CustomerHomeScreen({
   onOpenNotifications,
   notificationsCount = 0,
   workers = [],
+  userName = 'User',
 }) {
   const [locationText, setLocationText] = useState('Sawai Madhopur, Rajasthan');
   const [locationLoading, setLocationLoading] = useState(true);
@@ -63,6 +64,15 @@ export default function CustomerHomeScreen({
   const [showRazorpayModal, setShowRazorpayModal] = useState(false);
   const [razorpayBookingData, setRazorpayBookingData] = useState(null);
   const [showAllCategories, setShowAllCategories] = useState(false);
+
+  const userInitials = useMemo(() => {
+    const clean = (userName || 'User').trim();
+    const parts = clean.split(' ').filter(Boolean);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return clean.slice(0, 2).toUpperCase() || 'US';
+  }, [userName]);
 
   /* GPS Location */
   useEffect(() => {
@@ -367,11 +377,11 @@ export default function CustomerHomeScreen({
         <View style={styles.header}>
           <View style={styles.headerLeft}>
             <View style={styles.avatarCircle}>
-              <Text style={styles.avatarInitials}>RS</Text>
+              <Text style={styles.avatarInitials}>{userInitials}</Text>
             </View>
             <View>
               <Text style={styles.greetingSub}>Good morning 👋</Text>
-              <Text style={styles.greetingName}>Hello, Ramesh!</Text>
+              <Text style={styles.greetingName}>Hello, {userName || 'User'}!</Text>
             </View>
           </View>
           <TouchableOpacity

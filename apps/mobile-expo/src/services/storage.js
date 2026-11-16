@@ -11,6 +11,7 @@ const KEYS = {
   NOTIFICATIONS: '@mistri_notifications',
   CREDENTIALS: '@mistri_credentials',
   BOOKINGS: '@mistri_bookings',
+  ACCOUNT_REGISTRY: '@mistri_accounts_registry',
 };
 
 export const StorageService = {
@@ -72,13 +73,50 @@ export const StorageService = {
   },
   clearSession: async () => {
     try {
+      // Clear current active session tokens but preserve permanent account registry & preferences
       await AsyncStorage.multiRemove([
         KEYS.USER_SESSION,
-        KEYS.ROLE,
         KEYS.IS_DEV,
         KEYS.ONBOARDING_COMPLETED,
       ]);
     } catch (e) {}
+  },
+
+  // 2b. Permanent Account Registry (Remembers persona & profile per email / phone permanently)
+  saveAccountProfile: async (identifier, { role, name, phone, email, kyc_status, address } = {}) => {
+    try {
+      if (!identifier) return;
+      const key = String(identifier).trim().toLowerCase();
+      const raw = await AsyncStorage.getItem(KEYS.ACCOUNT_REGISTRY);
+      const registry = raw ? JSON.parse(raw) : {};
+      const existing = registry[key] || {};
+      registry[key] = {
+        ...existing,
+        identifier: key,
+        role: role || existing.role || 'CUSTOMER',
+        name: name || existing.name || '',
+        phone: phone || existing.phone || '',
+        email: email || (key.includes('@') ? key : existing.email || ''),
+        kyc_status: kyc_status || existing.kyc_status || 'VERIFIED',
+        address: address || existing.address || '',
+        updatedAt: Date.now(),
+      };
+      await AsyncStorage.setItem(KEYS.ACCOUNT_REGISTRY, JSON.stringify(registry));
+    } catch (e) {
+      console.log('saveAccountProfile error:', e);
+    }
+  },
+  getAccountProfile: async (identifier) => {
+    try {
+      if (!identifier) return null;
+      const key = String(identifier).trim().toLowerCase();
+      const raw = await AsyncStorage.getItem(KEYS.ACCOUNT_REGISTRY);
+      if (!raw) return null;
+      const registry = JSON.parse(raw);
+      return registry[key] || null;
+    } catch (e) {
+      return null;
+    }
   },
 
   // 3. User Role & Dev Status

@@ -67,7 +67,18 @@ export const LiveBackend = {
 
       let matched = null;
       if (isEmail) {
-        matched = data.find((p) => (p.email || '').toLowerCase() === cleanId);
+        const prefix = cleanId.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
+        matched = data.find((p) => {
+          const pEmail = (p.email || '').toLowerCase();
+          const pAlt = (p.alt_phone || '').toLowerCase();
+          const pName = (p.full_name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+          return (
+            pEmail === cleanId ||
+            pAlt === cleanId ||
+            (pAlt.includes('@') && pAlt === cleanId) ||
+            (prefix && pName && (pName.includes(prefix) || prefix.includes(pName)))
+          );
+        });
       } else {
         const searchDigits = cleanId.replace(/[^0-9]/g, '').slice(-10);
         matched = data.find((p) => {
@@ -178,22 +189,30 @@ export const LiveBackend = {
   syncProfile: async (profile) => {
     try {
       const cleanDigits = (profile.phone || profile.mobile || '').replace(/[^0-9]/g, '').slice(-10);
+      const emailTarget = (profile.email || '').trim().toLowerCase();
       const { data: existing } = await supabase
         .from('profiles')
-        .select('id, phone, alt_phone')
-        .limit(50);
+        .select('id, phone, alt_phone, full_name')
+        .limit(100);
 
       const found = (existing || []).find((p) => {
         const pClean = (p.phone || '').replace(/[^0-9]/g, '').slice(-10);
         const aClean = (p.alt_phone || '').replace(/[^0-9]/g, '').slice(-10);
-        return pClean === cleanDigits || aClean === cleanDigits;
+        const aLower = (p.alt_phone || '').toLowerCase();
+        const pName = (p.full_name || '').toLowerCase().trim();
+        const profName = (profile.fullName || profile.name || '').toLowerCase().trim();
+        return (
+          (cleanDigits && (pClean === cleanDigits || aClean === cleanDigits)) ||
+          (emailTarget && aLower === emailTarget) ||
+          (profName && profName.length > 2 && pName === profName)
+        );
       });
 
       const payload = {
-        phone: profile.phone || profile.mobile,
-        full_name: profile.fullName || profile.name,
+        phone: profile.phone || profile.mobile || '+91 98290 12345',
+        full_name: profile.fullName || profile.name || 'User',
         role: profile.role || 'CUSTOMER',
-        alt_phone: profile.altPhone || null,
+        alt_phone: profile.email || profile.altPhone || (found?.alt_phone ?? null),
         address: profile.address || '',
         city: profile.city || 'Sawai Madhopur',
         state: profile.state || 'Rajasthan',
