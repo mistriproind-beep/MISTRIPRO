@@ -132,7 +132,7 @@ export default function MyBookingsScreen({
         <View style={styles.headerLeftCol}>
           <Text style={styles.headerTitle}>My Bookings</Text>
           <Text style={styles.headerSubtitle}>
-            Track all active jobs, site visits & escrow payments
+            Track all active jobs, site visits & secured payments
           </Text>
         </View>
 
@@ -289,7 +289,7 @@ export default function MyBookingsScreen({
                     <Text style={styles.waitingBannerText}>
                       {workerName.includes('Searching')
                         ? 'Broadcasting to nearby verified workers... Waiting for worker assignment.'
-                        : `Waiting for ${workerName} to confirm request. Escrow deposit is locked safely.`}
+                        : `Waiting for ${workerName} to confirm request. Payment is secured safely.`}
                     </Text>
                   </View>
                 )}
@@ -342,7 +342,7 @@ export default function MyBookingsScreen({
                     </Text>
                     <View style={styles.durationBadge}>
                       <ShieldCheck size={11} color="#4F46E5" />
-                      <Text style={styles.durationBadgeText}>Escrow Safe</Text>
+                      <Text style={styles.durationBadgeText}>Payment Secured</Text>
                     </View>
                   </View>
                 </View>
@@ -350,7 +350,7 @@ export default function MyBookingsScreen({
                 {/* Price & Actions Row */}
                 <View style={styles.cardFooter}>
                   <View>
-                    <Text style={styles.amountLabel}>Total Escrow Paid</Text>
+                    <Text style={styles.amountLabel}>Total Amount Paid</Text>
                     <Text style={styles.amountValue}>{amount}</Text>
                   </View>
 
@@ -487,7 +487,7 @@ export default function MyBookingsScreen({
                         {s.step === 1 && 'Mistri has accepted your booking and is assigned to the site.'}
                         {s.step === 2 && 'Mistri has arrived at your location and is inspecting the work.'}
                         {s.step === 3 && 'Active construction & repair in progress onsite.'}
-                        {s.step === 4 && 'Work successfully completed. Escrow released.'}
+                        {s.step === 4 && 'Work successfully completed. Payment released.'}
                       </Text>
                     </View>
                   </View>

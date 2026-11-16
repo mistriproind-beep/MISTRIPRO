@@ -51,6 +51,7 @@ export default function WorkerBookingsScreen({
 
   // Phone Call
   const handleCall = (phoneNumber, customerName) => {
+    if (!phoneNumber) return;
     const cleaned = phoneNumber.replace(/[^0-9+]/g, '');
     Linking.openURL(`tel:${cleaned}`).catch(() => {
       Alert.alert('Call Customer', `Calling ${customerName} at ${phoneNumber}`);
@@ -59,6 +60,7 @@ export default function WorkerBookingsScreen({
 
   // WhatsApp
   const handleWhatsApp = (phoneNumber, customerName, title) => {
+    if (!phoneNumber) return;
     const cleaned = phoneNumber.replace(/[^0-9]/g, '');
     const text = encodeURIComponent(
       `Namaste ${customerName} ji! I am Ram Singh Mistri from Mistri Pro regarding your booking "${title}".`
@@ -132,7 +134,7 @@ export default function WorkerBookingsScreen({
               }
               Alert.alert(
                 'Job Completed! 💰',
-                `Congratulations! ${booking.amount} has been approved from Escrow into your Wallet.\n\nMoved to Previous Bookings History.`,
+                `Congratulations! ${booking.amount} has been released as payment into your Wallet.\n\nMoved to Previous Bookings History.`,
                 [
                   {
                     text: 'View Wallet',
@@ -252,7 +254,7 @@ export default function WorkerBookingsScreen({
 
                     <View style={styles.payoutBadge}>
                       <Text style={styles.payoutAmount}>{booking.amount}</Text>
-                      <Text style={styles.payoutSub}>Escrow Locked</Text>
+                      <Text style={styles.payoutSub}>Payment Secured</Text>
                     </View>
                   </View>
 
