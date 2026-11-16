@@ -117,6 +117,7 @@ const I18N = {
     continueBtn: 'Continue',
     signInTitle: 'Sign in to continue',
     signInSub: 'Please try one of the following ways to register or log in to your account.',
+    continueEmail: 'Continue with Email & Password',
     continueOTP: 'Continue with Mobile OTP',
     continueGoogle: 'Continue with Google',
     termsNotice: 'By continuing, you confirm that you have read and agreed to the Terms of Service and consent to the Privacy Policy.',
@@ -173,6 +174,7 @@ const I18N = {
     continueBtn: 'आगे बढ़ें',
     signInTitle: 'जारी रखने के लिए साइन इन करें',
     signInSub: 'अपने खाते में लॉग इन करने के लिए कृपया इनमें से कोई एक तरीका चुनें।',
+    continueEmail: 'ईमेल और पासवर्ड से आगे बढ़ें',
     continueOTP: 'मोबाइल OTP से आगे बढ़ें',
     continueGoogle: 'Google से आगे बढ़ें',
     termsNotice: 'जारी रखकर, आप पुष्टि करते हैं कि आपने सेवा की शर्तें और गोपनीयता नीति पढ़ ली हैं।',
@@ -229,6 +231,7 @@ const I18N = {
     continueBtn: 'આગળ વધો',
     signInTitle: 'આગળ વધવા માટે સાઇન ઇન કરો',
     signInSub: 'તમારા ખાતામાં લૉગ ઇન કરવા માટે નીચેનામાંથી કોઈ વિકલ્પ પસંદ કરો.',
+    continueEmail: 'ઇમેઇલ અને પાસવર્ડ સાથે આગળ વધો',
     continueOTP: 'મોબાઇલ OTP સાથે ચાલુ રાખો',
     continueGoogle: 'Google સાથે ચાલુ રાખો',
     termsNotice: 'ચાલુ રાખીને, તમે સેવાની શરતો અને ગોપનીયતા નીતિ સાથે સંમત થાઓ છો.',
@@ -285,6 +288,7 @@ const I18N = {
     continueBtn: 'पुढे चला',
     signInTitle: 'पुढे जाण्यासाठी साइन इन करा',
     signInSub: 'कृपया खात्यात लॉग इन करण्यासाठी खालीलपैकी एक पर्याय निवडा.',
+    continueEmail: 'ईमेल आणि पासवर्डद्वारे पुढे जा',
     continueOTP: 'मोबाईल OTP द्वारे पुढे जा',
     continueGoogle: 'Google द्वारे पुढे जा',
     termsNotice: 'पुढे जाऊन, आपण सेवेच्या अटी व गोपनीयता धोरणाशी सहमत आहात.',
@@ -587,12 +591,17 @@ function MainApp() {
 
   // Dedicated Worker State (Profile, Availability, Alerts, Bookings, Wallet)
   const [workerProfile, setWorkerProfile] = useState(INITIAL_WORKER_PROFILE);
-  const [workerAlerts, setWorkerAlerts] = useState(INITIAL_ALERTS);
-  const [workerBookings, setWorkerBookings] = useState(INITIAL_WORKER_BOOKINGS);
-  const [workerWallet, setWorkerWallet] = useState(INITIAL_WALLET);
+  const [workerAlerts, setWorkerAlerts] = useState([]);
+  const [workerBookings, setWorkerBookings] = useState([]);
+  const [workerWallet, setWorkerWallet] = useState({
+    availableBalance: 0,
+    escrowLockedBalance: 0,
+    totalLifetimeEarnings: 0,
+    transactions: [],
+  });
 
-  // Customer Bookings State (Connected to Live DB + Mock Bookings)
-  const [customerBookings, setCustomerBookings] = useState(MOCK_BOOKINGS);
+  // Customer Bookings State (Connected to Live DB + Phone Storage)
+  const [customerBookings, setCustomerBookings] = useState([]);
   const [findInitialCategory, setFindInitialCategory] = useState('All');
   const [showNotifModal, setShowNotifModal] = useState(false);
   const [notifications, setNotifications] = useState([
@@ -887,6 +896,7 @@ function MainApp() {
     const checkInitialState = async () => {
       try {
         const savedLang = await StorageService.getLanguage();
+        const hasChosenLang = await StorageService.getHasChosenLanguage();
         if (savedLang && isMounted) {
           setLang(savedLang);
         }
@@ -900,8 +910,27 @@ function MainApp() {
         }
 
         const savedBookings = await StorageService.getBookings();
-        if (savedBookings && savedBookings.length > 0 && isMounted) {
+        if (savedBookings && Array.isArray(savedBookings) && savedBookings.length > 0 && isMounted) {
           setCustomerBookings(savedBookings);
+        }
+
+        // Live Supabase sync for real bookings in background
+        if (savedSession?.mobile || savedSession?.phone) {
+          const userPhone = savedSession.mobile || savedSession.phone;
+          LiveBackend.fetchCustomerBookings(userPhone).then((live) => {
+            if (live && live.length > 0 && isMounted) {
+              setCustomerBookings((prev) => {
+                const combined = [
+                  ...live,
+                  ...prev.filter(
+                    (p) => !live.some((l) => l.id === p.id || l.booking_code === p.booking_code)
+                  ),
+                ];
+                StorageService.setBookings(combined);
+                return combined;
+              });
+            }
+          }).catch(() => {});
         }
 
         // If user already logged in -> NEVER prompt login or language again
@@ -923,7 +952,7 @@ function MainApp() {
         }
 
         // If language was chosen before but not logged in -> go straight to SIGN_IN (NEVER ask language again)
-        if (savedLang && isMounted) {
+        if ((savedLang || hasChosenLang) && isMounted) {
           setCurrentScreen('SIGN_IN');
           return;
         }
@@ -933,7 +962,8 @@ function MainApp() {
           setCurrentScreen('LANGUAGE');
         }
       } catch (err) {
-        if (isMounted) setCurrentScreen('LANGUAGE');
+        console.log('Splash check error:', err);
+        if (isMounted) setCurrentScreen('SIGN_IN');
       }
     };
 
@@ -1277,7 +1307,11 @@ function MainApp() {
                 <TouchableOpacity
                   key={item.code}
                   style={[styles.langRow, isSelected && styles.langRowActive]}
-                  onPress={() => setLang(item.code)}
+                  onPress={async () => {
+                    setLang(item.code);
+                    await StorageService.setLanguage(item.code);
+                    await StorageService.setHasChosenLanguage(true);
+                  }}
                   activeOpacity={0.8}
                 >
                   <View style={[styles.langCharCircle, isSelected && styles.langCharCircleActive]}>
@@ -1305,6 +1339,7 @@ function MainApp() {
             style={styles.primaryBlackBtn}
             onPress={async () => {
               await StorageService.setLanguage(lang);
+              await StorageService.setHasChosenLanguage(true);
               setCurrentScreen('SIGN_IN');
             }}
             activeOpacity={0.85}
@@ -1317,7 +1352,7 @@ function MainApp() {
   }
 
   // -------------------------------------------------------------
-  // SCREEN 3: SIGN IN TO CONTINUE (Clean Email + Password & OTP)
+  // SCREEN 3: SIGN IN TO CONTINUE (Clean 3-Button Option Menu)
   // -------------------------------------------------------------
   if (currentScreen === 'SIGN_IN') {
     return (
@@ -1326,7 +1361,6 @@ function MainApp() {
         <ScrollView
           contentContainerStyle={[styles.signInContent, { paddingBottom: Math.max(insets.bottom + 20, 30) }]}
           showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
         >
           {/* Top Animated Lottie Graphics */}
           <View style={styles.signInLottieWrapper}>
@@ -1340,96 +1374,21 @@ function MainApp() {
 
           {/* Heading and subtext */}
           <Text style={styles.signInMainHeading}>{t.signInTitle}</Text>
-          <Text style={styles.signInSubHeading}>
-            Enter your Email ID & Password to sign in or register instantly.
-          </Text>
+          <Text style={styles.signInSubHeading}>{t.signInSub}</Text>
 
-          {/* Email ID & Password Form */}
-          <View style={styles.emailFormCard}>
-            {/* Email Field */}
-            <View style={styles.authInputFieldGroup}>
-              <Text style={styles.authInputLabel}>Email Address (ईमेल आईडी)</Text>
-              <View style={styles.authInputRow}>
-                <Mail size={18} color="#64748B" />
-                <TextInput
-                  style={styles.authTextInput}
-                  placeholder="name@example.com"
-                  placeholderTextColor="#94A3B8"
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  value={emailInput}
-                  onChangeText={setEmailInput}
-                />
-              </View>
-            </View>
-
-            {/* Password Field */}
-            <View style={[styles.authInputFieldGroup, { marginTop: 12 }]}>
-              <View style={styles.passwordLabelRow}>
-                <Text style={styles.authInputLabel}>Password (पासवर्ड)</Text>
-                <TouchableOpacity
-                  onPress={() => {
-                    setForgotTarget(emailInput || '');
-                    setIsForgotOtpSent(false);
-                    setForgotOtp('');
-                    setForgotNewPass('');
-                    setShowForgotModal(true);
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.forgotPassLink}>Forgot? (भूल गए?)</Text>
-                </TouchableOpacity>
-              </View>
-              <View style={styles.authInputRow}>
-                <Lock size={18} color="#64748B" />
-                <TextInput
-                  style={styles.authTextInput}
-                  placeholder="Enter your password"
-                  placeholderTextColor="#94A3B8"
-                  secureTextEntry={!showPassword}
-                  value={passwordInput}
-                  onChangeText={setPasswordInput}
-                />
-                <TouchableOpacity
-                  onPress={() => setShowPassword(!showPassword)}
-                  activeOpacity={0.7}
-                  style={styles.passwordEyeBtn}
-                >
-                  {showPassword ? (
-                    <EyeOff size={18} color="#64748B" />
-                  ) : (
-                    <Eye size={18} color="#64748B" />
-                  )}
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* Submit Email Login Button */}
+          {/* Clean Primary Option Buttons */}
+          <View style={styles.signInActionsGroup}>
+            {/* 1. Email ID & Password Button (Navigates to dedicated page) */}
             <TouchableOpacity
-              style={styles.authEmailButton}
-              onPress={handleEmailLogin}
-              disabled={isSubmittingAuth}
+              style={styles.authBlackButton}
+              onPress={() => setCurrentScreen('EMAIL_LOGIN')}
               activeOpacity={0.85}
             >
-              {isSubmittingAuth ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
-                <Text style={styles.authEmailButtonText}>Sign In with Email →</Text>
-              )}
+              <Mail size={20} color="#FFFFFF" style={{ marginRight: 10 }} />
+              <Text style={styles.authBlackButtonText}>{t.continueEmail}</Text>
             </TouchableOpacity>
-          </View>
 
-          {/* Clean Divider */}
-          <View style={styles.authDividerWrap}>
-            <View style={styles.authDividerLine} />
-            <Text style={styles.authDividerText}>OR CONTINUE WITH</Text>
-            <View style={styles.authDividerLine} />
-          </View>
-
-          {/* Secondary Action Buttons */}
-          <View style={styles.signInActionsGroup}>
-            {/* 1. Mobile OTP */}
+            {/* 2. White Outlined Mobile OTP Button */}
             <TouchableOpacity
               style={styles.authOutlineButton}
               onPress={() => {
@@ -1439,11 +1398,11 @@ function MainApp() {
               }}
               activeOpacity={0.8}
             >
-              <Smartphone size={20} color="#0F172A" />
+              <Smartphone size={20} color="#0F172A" style={{ marginRight: 10 }} />
               <Text style={styles.authOutlineButtonText}>{t.continueOTP}</Text>
             </TouchableOpacity>
 
-            {/* 2. Continue with Google */}
+            {/* 3. Continue with Google Button */}
             <TouchableOpacity
               style={styles.authGoogleOutlineBtn}
               onPress={handleGoogleLogin}
@@ -1580,6 +1539,132 @@ function MainApp() {
             </View>
           </KeyboardAvoidingView>
         </Modal>
+      </SafeAreaView>
+    );
+  }
+
+  // -------------------------------------------------------------
+  // SCREEN 3B: EMAIL & PASSWORD SIGN IN (Dedicated Page)
+  // -------------------------------------------------------------
+  if (currentScreen === 'EMAIL_LOGIN') {
+    return (
+      <SafeAreaView style={styles.signInSafeArea}>
+        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
+        >
+          {/* Header with Back button */}
+          <View style={styles.emailPageHeader}>
+            <TouchableOpacity
+              style={styles.roleBackBtn}
+              onPress={() => setCurrentScreen('SIGN_IN')}
+              activeOpacity={0.7}
+            >
+              <ChevronRight size={22} color="#0F172A" style={{ transform: [{ rotate: '180deg' }] }} />
+            </TouchableOpacity>
+            <Text style={styles.emailPageHeaderTitle}>Email Authentication</Text>
+            <View style={{ width: 40 }} />
+          </View>
+
+          <ScrollView
+            contentContainerStyle={[styles.emailPageScrollContent, { paddingBottom: Math.max(insets.bottom + 20, 30) }]}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            {/* Top Mail Icon Badge */}
+            <View style={styles.emailHeaderIconWrap}>
+              <Mail size={32} color="#4F46E5" />
+            </View>
+
+            <Text style={styles.emailPageHeading}>Sign in with Email</Text>
+            <Text style={styles.emailPageSub}>
+              Enter your registered Email ID & Password to sign in or register instantly.
+            </Text>
+
+            {/* Email Field */}
+            <View style={styles.authInputFieldGroup}>
+              <Text style={styles.authInputLabel}>Email Address (ईमेल आईडी) *</Text>
+              <View style={styles.authInputRow}>
+                <Mail size={18} color="#64748B" />
+                <TextInput
+                  style={styles.authTextInput}
+                  placeholder="name@example.com"
+                  placeholderTextColor="#94A3B8"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  value={emailInput}
+                  onChangeText={setEmailInput}
+                  autoFocus
+                />
+              </View>
+            </View>
+
+            {/* Password Field */}
+            <View style={[styles.authInputFieldGroup, { marginTop: 14 }]}>
+              <View style={styles.passwordLabelRow}>
+                <Text style={styles.authInputLabel}>Password (पासवर्ड) *</Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    setForgotTarget(emailInput || '');
+                    setIsForgotOtpSent(false);
+                    setForgotOtp('');
+                    setForgotNewPass('');
+                    setShowForgotModal(true);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.forgotPassLink}>Forgot Password? (पासवर्ड भूल गए?)</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.authInputRow}>
+                <Lock size={18} color="#64748B" />
+                <TextInput
+                  style={styles.authTextInput}
+                  placeholder="Enter password (min 4 chars)"
+                  placeholderTextColor="#94A3B8"
+                  secureTextEntry={!showPassword}
+                  value={passwordInput}
+                  onChangeText={setPasswordInput}
+                />
+                <TouchableOpacity
+                  onPress={() => setShowPassword(!showPassword)}
+                  activeOpacity={0.7}
+                  style={styles.passwordEyeBtn}
+                >
+                  {showPassword ? (
+                    <EyeOff size={18} color="#64748B" />
+                  ) : (
+                    <Eye size={18} color="#64748B" />
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Primary Sign In Button */}
+            <TouchableOpacity
+              style={styles.authEmailLargeButton}
+              onPress={handleEmailLogin}
+              disabled={isSubmittingAuth}
+              activeOpacity={0.85}
+            >
+              {isSubmittingAuth ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Text style={styles.authEmailLargeButtonText}>Sign In with Email →</Text>
+              )}
+            </TouchableOpacity>
+
+            {/* Helper Notice */}
+            <View style={styles.emailHelperBox}>
+              <Sparkles size={16} color="#4F46E5" />
+              <Text style={styles.emailHelperText}>
+                New user? Entering your email and password will create your verified account automatically.
+              </Text>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
 
         {/* ---------------------------------------------------------
             FORGOT PASSWORD RECOVERY MODAL (OTP RESET)
@@ -1654,7 +1739,7 @@ function MainApp() {
                   <Text style={[styles.inputLabel, { marginTop: 12 }]}>Set New Password</Text>
                   <TextInput
                     style={styles.phoneTextInput}
-                    placeholder="Enter new password (min 6 chars)"
+                    placeholder="Enter new password (min 4 chars)"
                     placeholderTextColor="#94A3B8"
                     secureTextEntry
                     value={forgotNewPass}
@@ -3956,6 +4041,86 @@ const styles = StyleSheet.create({
     fontFamily: 'Satoshi-Medium',
     fontSize: 15,
     color: '#0F172A',
+  },
+  // Dedicated Email Page Styles
+  emailPageHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  emailPageHeaderTitle: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 16,
+    color: '#0F172A',
+  },
+  emailPageScrollContent: {
+    paddingHorizontal: 24,
+    paddingTop: 24,
+  },
+  emailHeaderIconWrap: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#EEF2FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  emailPageHeading: {
+    fontFamily: 'Satoshi-Black',
+    fontSize: 26,
+    color: '#0F172A',
+    letterSpacing: -0.5,
+    marginBottom: 8,
+  },
+  emailPageSub: {
+    fontFamily: 'Satoshi-Regular',
+    fontSize: 14,
+    lineHeight: 21,
+    color: '#64748B',
+    marginBottom: 24,
+  },
+  authEmailLargeButton: {
+    backgroundColor: '#0F172A',
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 22,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  authEmailLargeButtonText: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 15,
+    color: '#FFFFFF',
+    letterSpacing: 0.2,
+  },
+  emailHelperBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
+    padding: 14,
+    marginTop: 20,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 10,
+  },
+  emailHelperText: {
+    flex: 1,
+    fontFamily: 'Satoshi-Regular',
+    fontSize: 12,
+    lineHeight: 18,
+    color: '#64748B',
   },
   signInFooter: {
     paddingHorizontal: 12,

@@ -177,6 +177,46 @@ export const LiveBackend = {
     }
   },
 
+  // 4b. Fetch Customer Bookings from Supabase
+  fetchCustomerBookings: async (customerPhone) => {
+    try {
+      if (!customerPhone) return [];
+      const clean = customerPhone.replace(/[^0-9]/g, '');
+      const last10 = clean.slice(-10);
+      const { data, error } = await supabase
+        .from('bookings')
+        .select('*')
+        .or(`customer_phone.ilike.%${last10}%`)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data || [];
+    } catch (err) {
+      console.log('LiveBackend.fetchCustomerBookings:', err.message);
+      return [];
+    }
+  },
+
+  // 4c. Fetch Worker Bookings from Supabase
+  fetchWorkerBookings: async (workerPhone) => {
+    try {
+      if (!workerPhone) return [];
+      const clean = workerPhone.replace(/[^0-9]/g, '');
+      const last10 = clean.slice(-10);
+      const { data, error } = await supabase
+        .from('bookings')
+        .select('*')
+        .or(`worker_phone.ilike.%${last10}%`)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data || [];
+    } catch (err) {
+      console.log('LiveBackend.fetchWorkerBookings:', err.message);
+      return [];
+    }
+  },
+
   // 5. Update Booking Status (e.g. Worker Confirms, Rejects, or Progresses Steps)
   updateBookingStatus: async (bookingId, updates, progressStep) => {
     try {

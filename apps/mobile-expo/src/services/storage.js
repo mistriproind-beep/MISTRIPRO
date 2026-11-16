@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const KEYS = {
   LANG: '@mistri_language',
+  HAS_CHOSEN_LANG: '@mistri_has_chosen_lang',
   USER_SESSION: '@mistri_session',
   ROLE: '@mistri_user_role',
   IS_DEV: '@mistri_is_dev',
@@ -35,9 +36,23 @@ export const StorageService = {
       return null;
     }
   },
+  getHasChosenLanguage: async () => {
+    try {
+      const val = await AsyncStorage.getItem(KEYS.HAS_CHOSEN_LANG);
+      return val === 'true';
+    } catch (e) {
+      return false;
+    }
+  },
+  setHasChosenLanguage: async (chosen = true) => {
+    try {
+      await AsyncStorage.setItem(KEYS.HAS_CHOSEN_LANG, chosen ? 'true' : 'false');
+    } catch (e) {}
+  },
   setLanguage: async (langCode) => {
     try {
       await AsyncStorage.setItem(KEYS.LANG, langCode);
+      await AsyncStorage.setItem(KEYS.HAS_CHOSEN_LANG, 'true');
     } catch (e) {}
   },
 
