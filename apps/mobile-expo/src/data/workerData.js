@@ -2,7 +2,7 @@
 
 export const INITIAL_WORKER_PROFILE = {
   id: 'w-me',
-  name: 'Ram Singh Mistri',
+  name: '',
   avatar: 'RS',
   color: '#4F46E5',
   skill: 'Master Mason (राजमिस्त्री)',

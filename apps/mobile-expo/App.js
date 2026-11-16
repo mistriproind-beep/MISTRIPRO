@@ -587,17 +587,17 @@ function MainApp() {
 
   // Customer Onboarding Form State
   const [custPhotoUri, setCustPhotoUri] = useState(null);
-  const [custName, setCustName] = useState('User');
+  const [custName, setCustName] = useState('');
   const [custMobile, setCustMobile] = useState('');
-  const [custAddress, setCustAddress] = useState('Sawai Madhopur, Rajasthan');
+  const [custAddress, setCustAddress] = useState('');
 
   // Worker Onboarding Form State
   const [workerPhotoUri, setWorkerPhotoUri] = useState(null);
-  const [workerName, setWorkerName] = useState('Ram Singh Mistri');
-  const [workerMobile, setWorkerMobile] = useState('+91 94140 88990');
-  const [workerAltMobile, setWorkerAltMobile] = useState('+91 98280 11223');
-  const [workerAddress, setWorkerAddress] = useState('Ward 12, Mansarovar, Jaipur, Rajasthan');
-  const [workerSkills, setWorkerSkills] = useState(['Mason (Raj Mistri)', 'Tile & Marble Installer']);
+  const [workerName, setWorkerName] = useState('');
+  const [workerMobile, setWorkerMobile] = useState('');
+  const [workerAltMobile, setWorkerAltMobile] = useState('');
+  const [workerAddress, setWorkerAddress] = useState('');
+  const [workerSkills, setWorkerSkills] = useState([]);
   const [aadhaarFrontUri, setAadhaarFrontUri] = useState(null);
   const [aadhaarBackUri, setAadhaarBackUri] = useState(null);
 
@@ -688,7 +688,7 @@ function MainApp() {
       const savedBooking = await LiveBackend.createBooking({
         ...bookingDetails,
         customerName: custName || 'Customer',
-        customerPhone: custMobile || '+91 98290 12345',
+        customerPhone: custMobile || '',
         siteLocation: 'Sawai Madhopur, Rajasthan',
         status: 'WAITING_CONFIRMATION',
       });
@@ -731,7 +731,7 @@ function MainApp() {
         customerName: custName || 'Customer',
         customerAvatar: custInitials,
         customerColor: '#4F46E5',
-        customerPhone: custMobile || '+91 98290 12345',
+        customerPhone: custMobile || '',
         category: bookingDetails.workerSkill,
         title: `${bookingDetails.workerSkill} Service Request`,
         location: 'Sawai Madhopur, Rajasthan',
@@ -740,7 +740,7 @@ function MainApp() {
         timing: '9:00 AM – 5:00 PM',
         offeredRate: `₹${bookingDetails.workerFee || 950}`,
         platformFee: 99,
-        escrowLocked: true,
+        paymentLocked: true,
         timestamp: 'Just now',
       };
       setWorkerAlerts((prev) => [newAlert, ...prev]);
@@ -751,7 +751,7 @@ function MainApp() {
         customerName: custName || 'Customer',
         customerAvatar: custInitials,
         customerColor: '#4F46E5',
-        customerPhone: custMobile || '+91 98290 12345',
+        customerPhone: custMobile || '',
         category: bookingDetails.workerSkill,
         title: `${bookingDetails.workerSkill} Service Request`,
         location: 'Sawai Madhopur, Rajasthan',
@@ -762,7 +762,7 @@ function MainApp() {
         duration: '1 Day',
         status: 'waiting_confirmation',
         step: 1,
-        escrowStatus: 'LOCKED_IN_ESCROW',
+        paymentStatus: 'PAID_VIA_RAZORPAY',
       };
       setWorkerBookings((prev) => [newWorkerBooking, ...prev]);
 
@@ -786,8 +786,8 @@ function MainApp() {
   };
 
   const handleApproveAlert = async (alertItem) => {
-    const approvingWorkerName = workerProfile?.name || workerName || 'Ram Singh Mistri';
-    const approvingWorkerPhone = workerMobile || '+91 94140 88990';
+    const approvingWorkerName = workerProfile?.name || workerName || '';
+    const approvingWorkerPhone = workerMobile || '';
     const bookingId = alertItem.bookingId;
 
     setWorkerAlerts((prev) => prev.filter((a) => a.id !== alertItem.id));
@@ -808,7 +808,7 @@ function MainApp() {
       duration: alertItem.duration || '1 Day',
       status: 'confirmed',
       step: 1, // Approved
-      escrowStatus: 'LOCKED_IN_ESCROW',
+      paymentStatus: 'PAID_VIA_RAZORPAY',
     };
     setWorkerBookings((prev) => [
       newBooking,
@@ -2853,7 +2853,7 @@ function MainApp() {
                     customerName: custName || 'Customer',
                     customerAvatar: custInitials,
                     customerColor: '#4F46E5',
-                    customerPhone: custMobile || '+91 98290 12345',
+                    customerPhone: custMobile || '',
                     category: 'Contractor Crew',
                     title: `${payload.totalWorkers} Workers Crew Deployment`,
                     location: payload.siteLocation || 'Sawai Madhopur, Rajasthan',
@@ -2862,7 +2862,7 @@ function MainApp() {
                     timing: '9:00 AM – 5:00 PM',
                     offeredRate: `₹${payload.totalAmount}`,
                     platformFee: 99,
-                    escrowLocked: true,
+                    paymentLocked: true,
                     timestamp: 'Just now',
                   };
                   setWorkerAlerts((prev) => [newAlert, ...prev]);
@@ -2871,7 +2871,7 @@ function MainApp() {
                     ...payload,
                     bookingId,
                     customerName: custName || 'Customer',
-                    customerPhone: custMobile || '+91 98290 12345',
+                    customerPhone: custMobile || '',
                     paymentId: payload.paymentId,
                     status: 'waiting_confirmation',
                   }).catch((e) => console.log('Contractor booking sync err:', e));
