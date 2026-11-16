@@ -209,8 +209,8 @@ export const LiveBackend = {
       });
 
       const payload = {
-        phone: profile.phone || profile.mobile || '+91 98290 12345',
-        full_name: profile.fullName || profile.name || 'User',
+        phone: profile.phone || profile.mobile || '',
+        full_name: profile.fullName || profile.name || 'MistriPro User',
         role: profile.role || 'CUSTOMER',
         alt_phone: profile.email || profile.altPhone || (found?.alt_phone ?? null),
         address: profile.address || '',

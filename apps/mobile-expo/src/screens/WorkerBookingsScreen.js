@@ -63,7 +63,7 @@ export default function WorkerBookingsScreen({
     if (!phoneNumber) return;
     const cleaned = phoneNumber.replace(/[^0-9]/g, '');
     const text = encodeURIComponent(
-      `Namaste ${customerName} ji! I am Ram Singh Mistri from Mistri Pro regarding your booking "${title}".`
+      `Namaste ${customerName || 'Sir'}! I am your verified Mistri from Mistri Pro regarding your booking "${title}".`
     );
     Linking.openURL(`whatsapp://send?phone=${cleaned}&text=${text}`).catch(() => {
       Alert.alert('WhatsApp', `Opening WhatsApp chat with ${customerName} (${phoneNumber}).`);

@@ -657,7 +657,7 @@ export default function FindWorkersScreen({
             <View style={styles.credentialsBox}>
               <ShieldCheck size={16} color="#15803D" />
               <Text style={styles.credentialsText}>
-                Aadhaar Verified Mistri • Escrow Safe • Police Verification Cleared
+                Aadhaar Verified Mistri • Razorpay Protected • Police Verification Cleared
               </Text>
             </View>
 
@@ -683,13 +683,13 @@ export default function FindWorkersScreen({
         </View>
       </Modal>
 
-      {/* ─── CHECKOUT & ESCROW PAYMENT SHEET ─── */}
+      {/* ─── CHECKOUT & SECURE PAYMENT SHEET ─── */}
       <Modal visible={!!checkoutWorker} transparent animationType="slide">
         <View style={styles.modalBackdrop}>
           <View style={styles.modalSheet}>
             <View style={styles.modalSheetHeader}>
               <View>
-                <Text style={styles.modalSheetTitle}>Confirm Booking & Escrow</Text>
+                <Text style={styles.modalSheetTitle}>Confirm Booking & Pay</Text>
                 <Text style={styles.modalSheetSub}>{checkoutWorker?.name} • {checkoutWorker?.skill}</Text>
               </View>
               <TouchableOpacity onPress={() => setCheckoutWorker(null)}>
@@ -707,7 +707,7 @@ export default function FindWorkersScreen({
                 <Text style={styles.billVal}>₹99</Text>
               </View>
               <View style={styles.billRow}>
-                <Text style={styles.billItem}>Digital Escrow & Processing (5%)</Text>
+                <Text style={styles.billItem}>Gateway & Service Processing (5%)</Text>
                 <Text style={styles.billVal}>₹{Math.round((checkoutWorker?.rate || 950) * 0.05)}</Text>
               </View>
               <View style={styles.billDivider} />
@@ -722,7 +722,7 @@ export default function FindWorkersScreen({
             <View style={styles.escrowNotice}>
               <ShieldCheck size={16} color="#15803D" />
               <Text style={styles.escrowNoticeText}>
-                Your money is held safely in Digital Escrow and only released after you confirm the work is completed onsite.
+                100% Protected Payment: Processed securely via Razorpay. Money is transferred to mistri only after you confirm work completion.
               </Text>
             </View>
 

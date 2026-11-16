@@ -1,163 +1,152 @@
--- ========================================================
--- MISTRI PRO: PRODUCTION SUPABASE DATABASE SCHEMA
--- ========================================================
+-- ==============================================================================
+-- MISTRI PRO - COMPLETE PRODUCTION DATABASE SCHEMA FOR SUPABASE
+-- Run this in Supabase SQL Editor: https://supabase.com/dashboard/project/jmdijseowvqvldlhhwsp/sql
+-- ==============================================================================
 
--- Enable UUID extension if not already enabled
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
--- 1. Profiles Table (Customers, Workers, Admins)
+-- 1. PROFILES TABLE (Customers, Workers, Contractors, Admins)
 CREATE TABLE IF NOT EXISTS public.profiles (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  role TEXT DEFAULT 'CUSTOMER', -- 'CUSTOMER' | 'WORKER' | 'ADMIN'
+  role TEXT NOT NULL DEFAULT 'CUSTOMER' CHECK (role IN ('CUSTOMER', 'WORKER', 'CONTRACTOR', 'ADMIN')),
   full_name TEXT NOT NULL,
-  phone TEXT NOT NULL UNIQUE,
-  alt_phone TEXT,
+  phone TEXT,
+  alt_phone TEXT, -- used also for email login identification
+  email TEXT,
   avatar_url TEXT,
   address TEXT,
   city TEXT DEFAULT 'Sawai Madhopur',
   state TEXT DEFAULT 'Rajasthan',
-  kyc_status TEXT DEFAULT 'PENDING', -- 'PENDING' | 'APPROVED' | 'REJECTED'
-  is_approved BOOLEAN DEFAULT false,
-  is_dev BOOLEAN DEFAULT false,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
+  kyc_status TEXT DEFAULT 'PENDING' CHECK (kyc_status IN ('PENDING', 'APPROVED', 'VERIFIED', 'REJECTED')),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 2. Worker Profiles Table (Skills, Aadhaar, Rates, Live Availability)
+-- 2. WORKER PROFILES TABLE (Trade skills, rates, availability & ratings)
 CREATE TABLE IF NOT EXISTS public.worker_profiles (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
   skills TEXT[] DEFAULT '{}',
-  experience_years INT DEFAULT 1,
-  daily_rate NUMERIC DEFAULT 950,
-  rate_type TEXT DEFAULT 'day', -- 'day' | 'hour'
+  experience_years INTEGER DEFAULT 5,
+  daily_rate INTEGER DEFAULT 800,
   aadhaar_front_url TEXT,
   aadhaar_back_url TEXT,
-  rating NUMERIC DEFAULT 5.0,
-  reviews_count INT DEFAULT 0,
-  completed_jobs_count INT DEFAULT 0,
-  is_available BOOLEAN DEFAULT true,
-  current_lat NUMERIC DEFAULT 26.0124,
-  current_lng NUMERIC DEFAULT 76.3533,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
+  rating NUMERIC(3, 1) DEFAULT 5.0,
+  reviews_count INTEGER DEFAULT 0,
+  is_available BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 3. Bookings Table (Customer to Worker Live Job Lifecycle)
+-- 3. BOOKINGS TABLE (Individual Customer -> Worker Bookings)
 CREATE TABLE IF NOT EXISTS public.bookings (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  booking_code TEXT NOT NULL UNIQUE,
-  customer_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
-  customer_name TEXT NOT NULL,
-  customer_phone TEXT NOT NULL,
-  worker_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
-  worker_name TEXT NOT NULL,
-  worker_phone TEXT NOT NULL,
-  worker_skill TEXT NOT NULL,
-  category TEXT NOT NULL,
-  title TEXT NOT NULL,
-  site_location TEXT NOT NULL,
-  site_lat NUMERIC,
-  site_lng NUMERIC,
-  scheduled_date TEXT NOT NULL,
+  id TEXT PRIMARY KEY,
+  booking_code TEXT,
+  customer_name TEXT,
+  customer_phone TEXT,
+  worker_id TEXT,
+  worker_name TEXT,
+  worker_phone TEXT,
+  worker_skill TEXT,
+  category TEXT,
+  title TEXT,
+  site_location TEXT,
+  scheduled_date TEXT DEFAULT 'Today, Immediate',
   duration TEXT DEFAULT '1 Day',
-  worker_fee NUMERIC NOT NULL,
-  platform_fee NUMERIC DEFAULT 99,
-  transaction_fee NUMERIC DEFAULT 0,
-  total_amount NUMERIC NOT NULL,
-  status TEXT DEFAULT 'WAITING_CONFIRMATION', -- 'WAITING_CONFIRMATION' | 'CONFIRMED' | 'REJECTED' | 'IN_PROGRESS' | 'COMPLETED' | 'REFUNDED'
-  progress_step INT DEFAULT 1, -- 1: Approved, 2: Visited Site, 3: Work in Progress, 4: Work Done
-  escrow_status TEXT DEFAULT 'LOCKED_IN_ESCROW', -- 'LOCKED_IN_ESCROW' | 'PAID_TO_WALLET' | 'REFUNDED'
-  rating NUMERIC,
-  feedback TEXT,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
+  worker_fee INTEGER DEFAULT 950,
+  platform_fee INTEGER DEFAULT 99,
+  transaction_fee INTEGER DEFAULT 48,
+  total_amount INTEGER DEFAULT 1097,
+  status TEXT DEFAULT 'waiting_confirmation' CHECK (status IN ('waiting_confirmation', 'confirmed', 'in_progress', 'completed', 'cancelled', 'refunded', 'rejected')),
+  progress_step INTEGER DEFAULT 1,
+  razorpay_payment_id TEXT,
+  razorpay_order_id TEXT,
+  payment_method TEXT DEFAULT 'Razorpay',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 4. Contractor Group Bookings Table
+-- 4. CONTRACTOR CREW BOOKINGS TABLE (Multi-Worker Deployments)
 CREATE TABLE IF NOT EXISTS public.contractor_bookings (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  booking_code TEXT NOT NULL UNIQUE,
-  contractor_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
-  contractor_name TEXT NOT NULL,
-  contractor_phone TEXT NOT NULL,
-  site_location TEXT NOT NULL,
-  duration TEXT NOT NULL,
-  total_workers INT NOT NULL,
-  crew_breakdown JSONB NOT NULL,
-  assigned_workers JSONB DEFAULT '[]',
-  subtotal NUMERIC NOT NULL,
-  platform_fee NUMERIC DEFAULT 99,
-  transaction_fee NUMERIC DEFAULT 0,
-  total_amount NUMERIC NOT NULL,
-  status TEXT DEFAULT 'CONFIRMED',
-  created_at TIMESTAMPTZ DEFAULT now()
+  id TEXT PRIMARY KEY,
+  booking_code TEXT,
+  customer_name TEXT,
+  customer_phone TEXT,
+  site_location TEXT,
+  duration TEXT,
+  total_workers INTEGER,
+  crew_breakdown JSONB,
+  assigned_workers JSONB,
+  subtotal INTEGER,
+  platform_fee INTEGER DEFAULT 99,
+  transaction_fee INTEGER DEFAULT 48,
+  total_amount INTEGER,
+  status TEXT DEFAULT 'waiting_confirmation',
+  razorpay_payment_id TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 5. Withdrawal Requests Table (Worker Wallet Payouts)
-CREATE TABLE IF NOT EXISTS public.withdrawal_requests (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  worker_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
-  worker_name TEXT NOT NULL,
-  worker_phone TEXT NOT NULL,
-  amount NUMERIC NOT NULL,
-  payout_method TEXT NOT NULL, -- 'UPI' | 'BANK'
-  payout_details JSONB NOT NULL,
-  status TEXT DEFAULT 'PENDING', -- 'PENDING' | 'PROCESSED' | 'REJECTED'
-  processed_at TIMESTAMPTZ,
-  created_at TIMESTAMPTZ DEFAULT now()
+-- 5. WORKER REQUESTS / BROADCAST ALERTS TABLE
+CREATE TABLE IF NOT EXISTS public.worker_requests (
+  id TEXT PRIMARY KEY,
+  booking_id TEXT,
+  worker_id TEXT,
+  customer_name TEXT,
+  customer_phone TEXT,
+  category TEXT,
+  title TEXT,
+  location TEXT,
+  offered_rate INTEGER,
+  platform_fee INTEGER DEFAULT 99,
+  status TEXT DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'ACCEPTED', 'DECLINED', 'EXPIRED')),
+  created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 6. Notifications Table (Live Push/In-App Alerts)
-CREATE TABLE IF NOT EXISTS public.notifications (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_phone TEXT NOT NULL,
-  title TEXT NOT NULL,
-  message TEXT NOT NULL,
-  type TEXT DEFAULT 'INFO', -- 'BOOKING' | 'APPROVAL' | 'ALERT' | 'ESCROW' | 'INFO'
-  is_read BOOLEAN DEFAULT false,
-  metadata JSONB DEFAULT '{}',
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-
--- 7. Reviews Table (Customer Feedback & Ratings)
+-- 6. REVIEWS & RATINGS TABLE
 CREATE TABLE IF NOT EXISTS public.reviews (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  booking_id UUID REFERENCES public.bookings(id) ON DELETE CASCADE,
-  customer_name TEXT NOT NULL,
-  worker_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
-  rating NUMERIC NOT NULL CHECK (rating >= 1 AND rating <= 5),
+  booking_id TEXT,
+  worker_id TEXT,
+  customer_name TEXT,
+  rating NUMERIC(2,1) NOT NULL DEFAULT 5.0,
   comment TEXT,
-  created_at TIMESTAMPTZ DEFAULT now()
+  created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Enable Row Level Security (RLS)
+-- ==============================================================================
+-- ENABLE ROW LEVEL SECURITY (RLS) & PUBLIC ACCESS POLICIES
+-- ==============================================================================
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.worker_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.bookings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.contractor_bookings ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.withdrawal_requests ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.worker_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.reviews ENABLE ROW LEVEL SECURITY;
 
--- Allow Public Access Policies (for testing & development)
-DROP POLICY IF EXISTS "Public profiles access" ON public.profiles;
-CREATE POLICY "Public profiles access" ON public.profiles FOR ALL USING (true) WITH CHECK (true);
+-- Allow full public read/write access for mobile app & admin panel
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Public profiles access') THEN
+    CREATE POLICY "Public profiles access" ON public.profiles FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Public worker_profiles access') THEN
+    CREATE POLICY "Public worker_profiles access" ON public.worker_profiles FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Public bookings access') THEN
+    CREATE POLICY "Public bookings access" ON public.bookings FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Public contractor_bookings access') THEN
+    CREATE POLICY "Public contractor_bookings access" ON public.contractor_bookings FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Public worker_requests access') THEN
+    CREATE POLICY "Public worker_requests access" ON public.worker_requests FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Public reviews access') THEN
+    CREATE POLICY "Public reviews access" ON public.reviews FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+END $$;
 
-DROP POLICY IF EXISTS "Public worker profiles access" ON public.worker_profiles;
-CREATE POLICY "Public worker profiles access" ON public.worker_profiles FOR ALL USING (true) WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Public bookings access" ON public.bookings;
-CREATE POLICY "Public bookings access" ON public.bookings FOR ALL USING (true) WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Public contractor bookings access" ON public.contractor_bookings;
-CREATE POLICY "Public contractor bookings access" ON public.contractor_bookings FOR ALL USING (true) WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Public withdrawal requests access" ON public.withdrawal_requests;
-CREATE POLICY "Public withdrawal requests access" ON public.withdrawal_requests FOR ALL USING (true) WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Public notifications access" ON public.notifications;
-CREATE POLICY "Public notifications access" ON public.notifications FOR ALL USING (true) WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Public reviews access" ON public.reviews;
-CREATE POLICY "Public reviews access" ON public.reviews FOR ALL USING (true) WITH CHECK (true);
+-- ==============================================================================
+-- ADMIN HELPER PROCEDURES
+-- ==============================================================================
+-- Quick approve a worker by phone or ID:
+-- UPDATE public.profiles SET kyc_status = 'APPROVED' WHERE phone = '+91 98765 43210';
+-- UPDATE public.worker_profiles SET is_available = true WHERE user_id = (SELECT id FROM public.profiles WHERE phone = '+91 98765 43210');

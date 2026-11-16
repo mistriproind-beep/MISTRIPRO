@@ -58,7 +58,7 @@ export default function ContractorScreen({ insets, onNavigateTab, onDeployContra
   const [locLoading, setLocLoading] = useState(false);
 
   // Payment Method
-  const [payMethod, setPayMethod] = useState('upi'); // 'upi' | 'cash' | 'escrow'
+  const [payMethod, setPayMethod] = useState('upi'); // 'upi' | 'card'
   const [showRazorpayModal, setShowRazorpayModal] = useState(false);
   const [razorpayBookingData, setRazorpayBookingData] = useState(null);
 
@@ -493,7 +493,7 @@ export default function ContractorScreen({ insets, onNavigateTab, onDeployContra
 
         {/* ─── SECTION 4: COST BREAKDOWN & SUMMARY ─── */}
         <View style={[styles.sectionCard, styles.summaryCard]}>
-          <Text style={styles.summaryTitle}>COST SUMMARY & ESCROW</Text>
+          <Text style={styles.summaryTitle}>COST SUMMARY & PAYMENT</Text>
 
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>
@@ -504,7 +504,7 @@ export default function ContractorScreen({ insets, onNavigateTab, onDeployContra
           </View>
 
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Platform Escrow Fee (5%)</Text>
+            <Text style={styles.summaryLabel}>Platform Service Fee (5%)</Text>
             <Text style={styles.summaryVal}>₹{platformFee.toLocaleString('en-IN')}</Text>
           </View>
 
@@ -522,7 +522,7 @@ export default function ContractorScreen({ insets, onNavigateTab, onDeployContra
 
           {/* Payment Method Pills */}
           <Text style={[styles.inputLabel, { marginTop: 16, marginBottom: 8 }]}>
-            Select Payment Mode
+            Payment Mode (Razorpay Secure)
           </Text>
           <View style={styles.paymentMethodRow}>
             <TouchableOpacity
@@ -530,25 +530,16 @@ export default function ContractorScreen({ insets, onNavigateTab, onDeployContra
               onPress={() => setPayMethod('upi')}
             >
               <Text style={[styles.payPillText, payMethod === 'upi' && styles.payPillTextActive]}>
-                UPI / GPay
+                UPI / QR / GPay
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.payPill, payMethod === 'escrow' && styles.payPillActive]}
-              onPress={() => setPayMethod('escrow')}
+              style={[styles.payPill, payMethod === 'card' && styles.payPillActive]}
+              onPress={() => setPayMethod('card')}
             >
-              <Text style={[styles.payPillText, payMethod === 'escrow' && styles.payPillTextActive]}>
-                Escrow Wallet
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.payPill, payMethod === 'cash' && styles.payPillActive]}
-              onPress={() => setPayMethod('cash')}
-            >
-              <Text style={[styles.payPillText, payMethod === 'cash' && styles.payPillTextActive]}>
-                Cash on Site
+              <Text style={[styles.payPillText, payMethod === 'card' && styles.payPillTextActive]}>
+                Cards & NetBanking
               </Text>
             </TouchableOpacity>
           </View>
@@ -557,7 +548,7 @@ export default function ContractorScreen({ insets, onNavigateTab, onDeployContra
           <View style={styles.guaranteeRow}>
             <ShieldCheck size={16} color="#15803D" />
             <Text style={styles.guaranteeText}>
-              100% Verified Aadhaar Mistris • Escrow Protection
+              100% Verified Aadhaar Mistris • Razorpay Protected
             </Text>
           </View>
 

@@ -3,19 +3,19 @@
 export const INITIAL_WORKER_PROFILE = {
   id: 'w-me',
   name: '',
-  avatar: 'RS',
+  avatar: '',
   color: '#4F46E5',
   skill: 'Master Mason (राजमिस्त्री)',
   price: 950,
   priceType: 'day', // 'day' | 'hour'
   isAvailable: true, // Online / Available for work in 15km
   kycVerified: true,
-  rating: 4.9,
-  reviewsCount: 84,
-  completedJobsCount: 128,
-  phone: '+91 98290 12345',
-  location: 'Sawai Madhopur, Rajasthan',
-  bio: '12+ years experience in RCC structures, brick masonry, plastering, and stone cladding.',
+  rating: 5.0,
+  reviewsCount: 0,
+  completedJobsCount: 0,
+  phone: '',
+  location: '',
+  bio: '',
 };
 
 export const WORKER_TUTORIALS = [

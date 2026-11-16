@@ -78,6 +78,7 @@ import {
   Eye,
   EyeOff,
   KeyRound,
+  Edit3,
 } from 'lucide-react-native';
 
 import CustomerHomeScreen from './src/screens/CustomerHomeScreen';
@@ -645,7 +646,7 @@ function MainApp() {
         name: 'Assigned Nearby Mistri',
         avatar: 'AM',
         color: '#4F46E5',
-        phone: '+91 94140 88990',
+        phone: '',
         skill: oldBooking.worker_skill || 'Master Mason',
       };
 
@@ -797,7 +798,7 @@ function MainApp() {
       customerName: alertItem.customerName || 'Customer',
       customerAvatar: alertItem.customerAvatar || 'CU',
       customerColor: alertItem.customerColor || '#0284C7',
-      customerPhone: alertItem.customerPhone || '+91 98290 12345',
+      customerPhone: alertItem.customerPhone || custMobile || '',
       category: alertItem.category || 'General Labour',
       title: alertItem.title || 'Service Booking',
       location: alertItem.location || 'Sawai Madhopur, Rajasthan',
@@ -913,11 +914,73 @@ function MainApp() {
           amount: numericAmount,
           date: 'Today',
           status: 'COMPLETED',
-          method: 'Escrow Release',
+          method: 'Direct Payment Payout',
         },
         ...prev.transactions,
       ],
     }));
+  };
+
+  const handleSaveProfile = async ({ name, contact, address }) => {
+    try {
+      if (role === 'CUSTOMER') {
+        if (name) setCustName(name);
+        if (contact) setCustMobile(contact);
+        if (address) setCustAddress(address);
+        const targetId = contact || emailInput || 'customer';
+        await StorageService.saveAccountProfile(targetId, {
+          name: name || custName,
+          phone: contact || custMobile,
+          role: 'CUSTOMER',
+          address: address || custAddress,
+        });
+        await StorageService.setSession({
+          name: name || custName,
+          phone: contact || custMobile,
+          mobile: contact || custMobile,
+          role: 'CUSTOMER',
+        });
+        await LiveBackend.syncProfile({
+          fullName: name || custName,
+          phone: contact || custMobile,
+          role: 'CUSTOMER',
+          address: address || custAddress,
+        });
+      } else {
+        if (name) setWorkerName(name);
+        if (contact) setWorkerMobile(contact);
+        if (address) setWorkerAddress(address);
+        setWorkerProfile((prev) => ({
+          ...prev,
+          name: name || workerName,
+          phone: contact || workerMobile,
+          location: address || workerAddress,
+        }));
+        const targetId = contact || emailInput || 'worker';
+        await StorageService.saveAccountProfile(targetId, {
+          name: name || workerName,
+          phone: contact || workerMobile,
+          role: 'WORKER',
+          address: address || workerAddress,
+        });
+        await StorageService.setSession({
+          name: name || workerName,
+          phone: contact || workerMobile,
+          mobile: contact || workerMobile,
+          role: 'WORKER',
+        });
+        await LiveBackend.syncProfile({
+          fullName: name || workerName,
+          phone: contact || workerMobile,
+          role: 'WORKER',
+          address: address || workerAddress,
+        });
+      }
+      DeviceFeedback.triggerSuccessHaptics();
+      Alert.alert('Profile Saved! ✅', 'Your profile details have been saved to your phone and Supabase.');
+    } catch (err) {
+      console.log('handleSaveProfile err:', err);
+    }
   };
 
   const handleWithdrawSuccess = (amount, newTxn) => {
@@ -2897,6 +2960,8 @@ function MainApp() {
               insets={insets}
               userName={custName}
               userContact={custMobile}
+              userAddress={custAddress}
+              onSaveProfile={handleSaveProfile}
               onSwitchLang={() => setCurrentScreen('LANGUAGE')}
               onOpenInvoices={() => setShowInvoicesModal(true)}
               onLogout={async () => {
@@ -2967,6 +3032,8 @@ function MainApp() {
               insets={insets}
               userName={workerName}
               userContact={workerMobile}
+              userAddress={workerAddress}
+              onSaveProfile={handleSaveProfile}
               onSwitchLang={() => setCurrentScreen('LANGUAGE')}
               onOpenInvoices={() => setShowInvoicesModal(true)}
               onLogout={async () => {
@@ -3909,7 +3976,31 @@ function ReviewsScreen({ t, insets, reviews, onOpenWriteReview }) {
 // =================================================================
 // SUB-SCREEN D: PROFILE SCREEN (ChoosingHer Settings Reference)
 // =================================================================
-function ProfileScreen({ t, role, lang, insets, userName, userContact, onSwitchLang, onOpenInvoices, onLogout }) {
+function ProfileScreen({
+  t,
+  role,
+  lang,
+  insets,
+  userName,
+  userContact,
+  userAddress,
+  onSaveProfile,
+  onSwitchLang,
+  onOpenInvoices,
+  onLogout,
+}) {
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editName, setEditName] = useState(userName || '');
+  const [editContact, setEditContact] = useState(userContact || '');
+  const [editAddress, setEditAddress] = useState(userAddress || '');
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    setEditName(userName || '');
+    setEditContact(userContact || '');
+    setEditAddress(userAddress || '');
+  }, [userName, userContact, userAddress]);
+
   const currentLangLabel = {
     en: 'English',
     hi: 'हिंदी (Hindi)',
@@ -3944,13 +4035,23 @@ function ProfileScreen({ t, role, lang, insets, userName, userContact, onSwitchL
             {userName || (role === 'CUSTOMER' ? 'Valued Customer' : 'Skilled Mistri')}
           </Text>
           <Text style={styles.profileEmailSub}>
-            {userContact || '+91 98290 12345'}
+            {userContact || (role === 'CUSTOMER' ? 'Customer Contact' : 'Worker Contact')}
           </Text>
           <View style={styles.profilePersonaBadge}>
             <Text style={styles.profilePersonaBadgeText}>
               {role === 'CUSTOMER' ? 'Client / Project Owner' : 'Verified Skilled Mistri'}
             </Text>
           </View>
+
+          {/* Edit Profile Button */}
+          <TouchableOpacity
+            style={styles.editProfilePill}
+            onPress={() => setShowEditModal(true)}
+            activeOpacity={0.8}
+          >
+            <Edit3 size={13} color="#4F46E5" />
+            <Text style={styles.editProfilePillText}>Edit Profile</Text>
+          </TouchableOpacity>
         </View>
 
         {/* ChoosingHer Invite Friends / Promo Banner */}
@@ -4055,6 +4156,88 @@ function ProfileScreen({ t, role, lang, insets, userName, userContact, onSwitchL
 
         <Text style={styles.versionText}>MISTRI PRO • Build v2.4.0 (Enterprise Pro)</Text>
       </ScrollView>
+
+      {/* EDIT PROFILE MODAL */}
+      <Modal visible={showEditModal} animationType="slide" transparent onRequestClose={() => setShowEditModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { paddingBottom: Math.max(insets.bottom + 20, 24) }]}>
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={styles.modalTitle}>Edit Profile Details</Text>
+                <Text style={styles.modalSubtitle}>Update your name, contact & location</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowEditModal(false)}>
+                <X size={20} color="#0F172A" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ marginTop: 16 }} showsVerticalScrollIndicator={false}>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Full Name</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={editName}
+                  onChangeText={setEditName}
+                  placeholder="Enter your full name"
+                  placeholderTextColor="#94A3B8"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Phone / Mobile Number</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={editContact}
+                  onChangeText={setEditContact}
+                  placeholder="e.g. 9876543210"
+                  placeholderTextColor="#94A3B8"
+                  keyboardType="phone-pad"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>City / Location Address</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={editAddress}
+                  onChangeText={setEditAddress}
+                  placeholder="e.g. Sawai Madhopur, Rajasthan"
+                  placeholderTextColor="#94A3B8"
+                />
+              </View>
+
+              <TouchableOpacity
+                style={[styles.primaryActionBtn, { marginTop: 14, backgroundColor: '#4F46E5', borderRadius: 12, paddingVertical: 14, alignItems: 'center' }]}
+                disabled={isSaving}
+                onPress={async () => {
+                  if (!editName.trim()) {
+                    Alert.alert('Required', 'Please enter your name');
+                    return;
+                  }
+                  setIsSaving(true);
+                  if (onSaveProfile) {
+                    await onSaveProfile({
+                      name: editName.trim(),
+                      contact: editContact.trim(),
+                      address: editAddress.trim(),
+                    });
+                  }
+                  setIsSaving(false);
+                  setShowEditModal(false);
+                }}
+              >
+                {isSaving ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={[styles.primaryActionBtnText, { color: '#FFFFFF', fontWeight: 'bold' }]}>
+                    Save Changes & Sync
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -5507,6 +5690,23 @@ const styles = StyleSheet.create({
   profilePersonaBadgeText: {
     fontSize: 12,
     fontWeight: '600',
+    color: '#4F46E5',
+  },
+  editProfilePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+  },
+  editProfilePillText: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 12,
     color: '#4F46E5',
   },
 

@@ -199,13 +199,13 @@ export default function WorkerEarningsScreen({
             </View>
             <View style={styles.walletStatDivider} />
             <View style={styles.walletStatItem}>
-              <Text style={styles.walletStatLabel}>In Escrow</Text>
-              <Text style={styles.walletStatValue}>₹{walletData?.escrowLocked || '950'}</Text>
+              <Text style={styles.walletStatLabel}>Pending Jobs</Text>
+              <Text style={styles.walletStatValue}>₹{walletData?.escrowLocked || '0'}</Text>
             </View>
             <View style={styles.walletStatDivider} />
             <View style={styles.walletStatItem}>
               <Text style={styles.walletStatLabel}>Total Lifetime</Text>
-              <Text style={styles.walletStatValue}>₹{walletData?.totalLifetimeEarnings || '28,400'}</Text>
+              <Text style={styles.walletStatValue}>₹{walletData?.totalLifetimeEarnings || '0'}</Text>
             </View>
           </View>
 
@@ -220,13 +220,13 @@ export default function WorkerEarningsScreen({
           </TouchableOpacity>
         </View>
 
-        {/* 2. Security & Escrow Guarantee Note */}
+        {/* 2. Security & Payment Guarantee Note */}
         <View style={styles.securityBanner}>
           <ShieldCheck size={18} color="#15803D" />
           <View style={styles.securityTextCol}>
-            <Text style={styles.securityTitle}>100% Escrow Protected Earnings</Text>
+            <Text style={styles.securityTitle}>100% Protected & Guaranteed Earnings</Text>
             <Text style={styles.securitySub}>
-              Customers deposit funds upfront. Once you finish work, payments are directly credited to your wallet without delay.
+              Customers pay via Razorpay upfront. Once you finish work, wages are directly credited to your account without delay.
             </Text>
           </View>
         </View>

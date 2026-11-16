@@ -203,10 +203,10 @@ export default function WorkerAlertsScreen({
                   <Text style={styles.timeTagText}>{alertItem.date} ({alertItem.duration})</Text>
                 </View>
 
-                {alertItem.escrowProtected && (
+                {(alertItem.escrowProtected || alertItem.paymentLocked) && (
                   <View style={styles.escrowBadge}>
                     <ShieldCheck size={11} color="#15803D" />
-                    <Text style={styles.escrowBadgeText}>Escrow Safe</Text>
+                    <Text style={styles.escrowBadgeText}>Payment Protected</Text>
                   </View>
                 )}
               </View>
