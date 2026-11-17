@@ -111,6 +111,40 @@ CREATE TABLE IF NOT EXISTS public.reviews (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- 7. PLATFORM SETTINGS & LIVE RATE CONTROLS TABLE
+CREATE TABLE IF NOT EXISTS public.platform_settings (
+  id TEXT PRIMARY KEY DEFAULT 'global',
+  commission_rate NUMERIC(4, 2) DEFAULT 5.0,
+  platform_fee INTEGER DEFAULT 99,
+  base_daily_rates JSONB DEFAULT '{"mason": 950, "electrician": 850, "plumber": 850, "painter": 800, "carpenter": 900, "labour": 600}'::jsonb,
+  banner_announcement TEXT DEFAULT 'Welcome to Mistri Pro! Verified mistris available on demand.',
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Seed default settings
+INSERT INTO public.platform_settings (id, commission_rate, platform_fee)
+VALUES ('global', 5.0, 99)
+ON CONFLICT (id) DO NOTHING;
+
+-- 8. STORAGE BUCKET FOR WORKER KYC AADHAAR DOCUMENTS
+INSERT INTO storage.buckets (id, name, public) 
+VALUES ('kyc-documents', 'kyc-documents', true)
+ON CONFLICT (id) DO NOTHING;
+
+-- Allow public read & upload on kyc-documents bucket
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Public read kyc-documents') THEN
+    CREATE POLICY "Public read kyc-documents" ON storage.objects FOR SELECT USING (bucket_id = 'kyc-documents');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Public upload kyc-documents') THEN
+    CREATE POLICY "Public upload kyc-documents" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'kyc-documents');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Public update kyc-documents') THEN
+    CREATE POLICY "Public update kyc-documents" ON storage.objects FOR UPDATE USING (bucket_id = 'kyc-documents');
+  END IF;
+END $$;
+
 -- ==============================================================================
 -- ENABLE ROW LEVEL SECURITY (RLS) & PUBLIC ACCESS POLICIES
 -- ==============================================================================
@@ -120,6 +154,7 @@ ALTER TABLE public.bookings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.contractor_bookings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.worker_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.reviews ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.platform_settings ENABLE ROW LEVEL SECURITY;
 
 -- Allow full public read/write access for mobile app & admin panel
 DO $$
@@ -141,6 +176,9 @@ BEGIN
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Public reviews access') THEN
     CREATE POLICY "Public reviews access" ON public.reviews FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Public platform_settings access') THEN
+    CREATE POLICY "Public platform_settings access" ON public.platform_settings FOR ALL USING (true) WITH CHECK (true);
   END IF;
 END $$;
 

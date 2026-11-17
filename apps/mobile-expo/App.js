@@ -2912,9 +2912,18 @@ function MainApp() {
             disabled={isSubmittingWorker}
             onPress={async () => {
               if (!workerName.trim() || !workerMobile.trim() || workerSkills.length === 0) {
-                Alert.alert('Required Fields', 'Please fill name, mobile, and select at least one skill.');
+                Alert.alert('Required Fields ⚠️', 'Please fill your full name, mobile number, and select at least one primary skill.');
                 return;
               }
+
+              if (!aadhaarFrontUri || !aadhaarBackUri) {
+                Alert.alert(
+                  'Aadhaar Verification Mandatory 🆔',
+                  'Both Aadhaar Front and Aadhaar Back photos are strictly compulsory for worker verification. Please upload or capture both sides to proceed.'
+                );
+                return;
+              }
+
               setIsSubmittingWorker(true);
               DeviceFeedback.triggerSuccessHaptics();
 

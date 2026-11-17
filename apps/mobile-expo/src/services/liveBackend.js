@@ -431,6 +431,37 @@ export const LiveBackend = {
     }
   },
 
+  // Upload Image to Supabase Storage (Aadhaar KYC)
+  uploadDocumentToStorage: async (uri, fileName) => {
+    if (!uri) return null;
+    try {
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      const filePath = `aadhaar/${fileName}`;
+
+      const { data, error } = await supabase.storage
+        .from('kyc-documents')
+        .upload(filePath, blob, {
+          contentType: 'image/jpeg',
+          upsert: true,
+        });
+
+      if (error) {
+        console.log('Supabase storage upload error:', error.message);
+        return uri;
+      }
+
+      const { data: publicData } = supabase.storage
+        .from('kyc-documents')
+        .getPublicUrl(filePath);
+
+      return publicData?.publicUrl || uri;
+    } catch (err) {
+      console.log('Upload fallback to local URI:', err.message);
+      return uri;
+    }
+  },
+
   // 5. Submit Worker KYC Profile for Admin Approval
   submitWorkerKYC: async (workerProfile) => {
     try {
@@ -482,6 +513,26 @@ export const LiveBackend = {
         userId = created.id;
       }
 
+      // Upload Aadhaar Front & Back images to Supabase Storage
+      let frontUrl = workerProfile.aadhaarFrontUri || null;
+      let backUrl = workerProfile.aadhaarBackUri || null;
+      try {
+        if (workerProfile.aadhaarFrontUri && !workerProfile.aadhaarFrontUri.startsWith('http')) {
+          frontUrl = await LiveBackend.uploadDocumentToStorage(
+            workerProfile.aadhaarFrontUri,
+            `${cleanDigits || 'worker'}_front_${Date.now()}.jpg`
+          );
+        }
+        if (workerProfile.aadhaarBackUri && !workerProfile.aadhaarBackUri.startsWith('http')) {
+          backUrl = await LiveBackend.uploadDocumentToStorage(
+            workerProfile.aadhaarBackUri,
+            `${cleanDigits || 'worker'}_back_${Date.now()}.jpg`
+          );
+        }
+      } catch (uploadErr) {
+        console.log('Aadhaar upload notice:', uploadErr.message);
+      }
+
       // Upsert worker details in worker_profiles table
       const { data: wpExisting } = await supabase
         .from('worker_profiles')
@@ -495,6 +546,8 @@ export const LiveBackend = {
             skills: workerProfile.skills || ['Master Mason'],
             experience_years: workerProfile.experienceYears || 5,
             daily_rate: workerProfile.dailyRate || 800,
+            aadhaar_front_url: frontUrl,
+            aadhaar_back_url: backUrl,
             is_available: true,
           })
           .eq('user_id', userId);
@@ -505,6 +558,8 @@ export const LiveBackend = {
             skills: workerProfile.skills || ['Master Mason'],
             experience_years: workerProfile.experienceYears || 5,
             daily_rate: workerProfile.dailyRate || 800,
+            aadhaar_front_url: frontUrl,
+            aadhaar_back_url: backUrl,
             is_available: true,
             rating: 5,
             reviews_count: 0,
@@ -512,7 +567,7 @@ export const LiveBackend = {
         ]);
       }
 
-      return { success: true, userId };
+      return { success: true, userId, frontUrl, backUrl };
     } catch (err) {
       console.log('LiveBackend.submitWorkerKYC fallback:', err.message);
       return { success: false, error: err.message };
