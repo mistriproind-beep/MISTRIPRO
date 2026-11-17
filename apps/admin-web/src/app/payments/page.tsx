@@ -49,9 +49,16 @@ export default function PaymentsPage() {
   }, []);
 
   const totalGross = bookings.reduce((sum, b) => sum + (Number(b.total_amount) || 0), 0);
-  const totalPlatformFees = bookings.reduce((sum, b) => sum + (Number(b.platform_fee) || 99) + (Number(b.transaction_fee) || 48), 0);
-  const settledTotal = bookings.filter((b) => b.payout_settled).reduce((sum, b) => sum + (Number(b.worker_fee) || 0), 0);
-  const pendingTotal = bookings.filter((b) => !b.payout_settled && b.status !== 'cancelled').reduce((sum, b) => sum + (Number(b.worker_fee) || 800), 0);
+  const totalPlatformFees = bookings.reduce(
+    (sum, b) => sum + (Number(b.platform_fee) || 99) + (Number(b.transaction_fee) || 48),
+    0
+  );
+  const settledTotal = bookings
+    .filter((b) => b.payout_settled)
+    .reduce((sum, b) => sum + (Number(b.worker_fee) || 0), 0);
+  const pendingTotal = bookings
+    .filter((b) => !b.payout_settled && b.status !== 'cancelled')
+    .reduce((sum, b) => sum + (Number(b.worker_fee) || 800), 0);
 
   const filtered = bookings.filter((b) => {
     const isSettled = Boolean(b.payout_settled);
@@ -68,142 +75,125 @@ export default function PaymentsPage() {
       (b.customer_name || '').toLowerCase().includes(q) ||
       (b.worker_name || '').toLowerCase().includes(q) ||
       (b.razorpay_payment_id || '').toLowerCase().includes(q) ||
-      (b.id || '').toLowerCase().includes(q);
+      b.id.toLowerCase().includes(q);
 
     return matchesFilter && matchesSearch;
   });
 
   // 1-Tap Settle Payout to Worker
-  const handleMarkSettled = async (booking: any) => {
-    setSettlingId(booking.id);
-    const refCode = `SETTLE-TXN-${Date.now()}`;
+  const handleSettlePayout = async (bookingId: string) => {
+    setSettlingId(bookingId);
     try {
       const { error } = await supabase
         .from('bookings')
         .update({
           payout_settled: true,
-          payout_reference: refCode,
+          payout_settled_at: new Date().toISOString(),
+          status: 'completed',
           updated_at: new Date().toISOString(),
         })
-        .eq('id', booking.id);
+        .eq('id', bookingId);
 
       if (error) throw error;
 
       setBookings((prev) =>
-        prev.map((b) =>
-          b.id === booking.id ? { ...b, payout_settled: true, payout_reference: refCode } : b
-        )
+        prev.map((b) => (b.id === bookingId ? { ...b, payout_settled: true } : b))
       );
-
-      alert(`✅ Payout of ₹${booking.worker_fee} for worker ${booking.worker_name} marked as SETTLED!\nRef: ${refCode}`);
     } catch (err: any) {
-      alert(`Settlement error: ${err?.message}`);
+      alert(`Settlement failed: ${err.message}`);
     } finally {
       setSettlingId(null);
     }
   };
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
+    <div className="space-y-6 font-sans">
       {/* Top Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-white tracking-tight flex items-center gap-2">
-            Payment Approvals & Financial Settlement
-            <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30">
-              RAZORPAY LIVE TEST
-            </span>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2.5">
+            <span>Financial Ledger & Payout Settlement</span>
           </h1>
-          <p className="text-sm text-slate-400 mt-1">
-            Monitor incoming customer payments, platform commissions, and release worker daily wage settlements.
+          <p className="text-xs text-slate-500 mt-1">
+            Realtime Razorpay order reconciliation, platform margins, and worker payout authorization.
           </p>
         </div>
 
         <button
           onClick={fetchPayments}
           disabled={loading}
-          className="self-start md:self-auto flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs font-semibold text-slate-300 hover:text-white hover:border-slate-700 transition cursor-pointer"
+          className="self-start md:self-auto flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-slate-200/80 shadow-subtle text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
         >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-amber-400' : ''}`} />
+          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-orange-600' : ''}`} />
           <span>Reload Ledger</span>
         </button>
       </div>
 
-      {/* KPI Cards */}
+      {/* Financial KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        <div className="bg-slate-900/90 rounded-2xl p-6 border border-slate-800 shadow-xl">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Gross Volume</span>
-            <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20">
-              <IndianRupee className="w-5 h-5" />
-            </div>
+        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-card">
+          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+            Gross Marketplace GMV
+          </span>
+          <div className="text-2xl font-bold text-slate-900 mt-2">
+            ₹{totalGross.toLocaleString('en-IN')}
           </div>
-          <div className="mt-4">
-            <span className="text-3xl font-black text-white">₹{totalGross.toLocaleString()}</span>
-            <p className="text-xs text-slate-400 mt-1 flex items-center gap-1">
-              <TrendingUp className="w-3.5 h-3.5 text-emerald-400 inline" />
-              <span>Razorpay Verified</span>
-            </p>
-          </div>
+          <p className="text-[11px] text-emerald-600 mt-1 flex items-center gap-1 font-semibold">
+            <TrendingUp className="w-3 h-3" />
+            <span>Customer Escrow Collections</span>
+          </p>
         </div>
 
-        <div className="bg-slate-900/90 rounded-2xl p-6 border border-slate-800 shadow-xl">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Platform Revenue</span>
-            <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-              <TrendingUp className="w-5 h-5" />
-            </div>
+        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-card">
+          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+            Platform Margins
+          </span>
+          <div className="text-2xl font-bold text-slate-900 mt-2">
+            ₹{totalPlatformFees.toLocaleString('en-IN')}
           </div>
-          <div className="mt-4">
-            <span className="text-3xl font-black text-emerald-400">₹{totalPlatformFees.toLocaleString()}</span>
-            <p className="text-xs text-slate-400 mt-1">Platform commissions & GST</p>
-          </div>
+          <p className="text-[11px] text-slate-500 mt-1">10% Platform + ₹49 Convenience</p>
         </div>
 
-        <div className="bg-slate-900/90 rounded-2xl p-6 border border-amber-500/30 ring-1 ring-amber-500/20 shadow-xl">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Worker Payouts Due</span>
-            <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
-              <Clock className="w-5 h-5" />
-            </div>
+        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-card">
+          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+            Settled to Workers
+          </span>
+          <div className="text-2xl font-bold text-emerald-600 mt-2">
+            ₹{settledTotal.toLocaleString('en-IN')}
           </div>
-          <div className="mt-4">
-            <span className="text-3xl font-black text-amber-400">₹{pendingTotal.toLocaleString()}</span>
-            <p className="text-xs text-slate-400 mt-1">Awaiting 1-Tap Transfer Approval</p>
-          </div>
+          <p className="text-[11px] text-slate-500 mt-1">Completed Bank Transfers</p>
         </div>
 
-        <div className="bg-slate-900/90 rounded-2xl p-6 border border-slate-800 shadow-xl">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Settled to Mistris</span>
-            <div className="p-2.5 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20">
-              <CheckCircle2 className="w-5 h-5" />
-            </div>
+        <div className="bg-white rounded-2xl p-5 border border-amber-300 shadow-card bg-amber-50/20">
+          <span className="text-xs font-bold text-amber-800 uppercase tracking-wider">
+            Pending Settlements
+          </span>
+          <div className="text-2xl font-bold text-amber-700 mt-2">
+            ₹{pendingTotal.toLocaleString('en-IN')}
           </div>
-          <div className="mt-4">
-            <span className="text-3xl font-black text-white">₹{settledTotal.toLocaleString()}</span>
-            <p className="text-xs text-slate-400 mt-1">Completed Bank Transfers</p>
-          </div>
+          <p className="text-[11px] text-amber-700 mt-1 font-semibold">
+            Ready for Admin Release
+          </p>
         </div>
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-900/90 p-3 rounded-2xl border border-slate-800">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-3 rounded-2xl border border-slate-200/80 shadow-subtle">
         <div className="flex items-center gap-1.5 w-full sm:w-auto">
           {(
             [
-              { key: 'ALL', label: `All Payments (${bookings.length})` },
-              { key: 'PENDING', label: 'Pending Settlement' },
-              { key: 'SETTLED', label: 'Settled / Transferred' },
+              { key: 'ALL', label: 'All Transactions' },
+              { key: 'PENDING', label: 'Awaiting Settlement' },
+              { key: 'SETTLED', label: 'Settled & Paid' },
             ] as const
           ).map((tab) => (
             <button
               key={tab.key}
               onClick={() => setFilter(tab.key)}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
                 filter === tab.key
-                  ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                  ? 'bg-slate-950 text-white shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
               }`}
             >
               {tab.label}
@@ -212,126 +202,118 @@ export default function PaymentsPage() {
         </div>
 
         <div className="relative w-full sm:w-80">
-          <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search payments, Razorpay ID, names..."
-            className="w-full bg-slate-950/70 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 transition"
+            placeholder="Search by Razorpay ID, worker..."
+            className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-1.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-slate-900 transition"
           />
         </div>
       </div>
 
-      {/* Payments Ledger Table */}
-      <div className="bg-slate-900/90 rounded-2xl border border-slate-800 overflow-hidden shadow-xl">
+      {/* Ledger Table */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 overflow-hidden shadow-card">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-slate-300">
-            <thead className="bg-slate-950/80 text-[11px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-800">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-slate-50/70 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">
               <tr>
-                <th className="px-6 py-4">Transaction / Gateway ID</th>
-                <th className="px-6 py-4">Customer & Worker</th>
-                <th className="px-6 py-4">Gross Collected</th>
-                <th className="px-6 py-4">Platform Fee</th>
-                <th className="px-6 py-4">Worker Wage Due</th>
-                <th className="px-6 py-4">Settlement Status</th>
-                <th className="px-6 py-4 text-right">Settlement Action</th>
+                <th className="px-6 py-3.5">Payment ID & Date</th>
+                <th className="px-6 py-3.5">Customer & Job</th>
+                <th className="px-6 py-3.5">Worker Recipient</th>
+                <th className="px-6 py-3.5">Gross Paid</th>
+                <th className="px-6 py-3.5">Platform Margin</th>
+                <th className="px-6 py-3.5">Worker Payout</th>
+                <th className="px-6 py-3.5">Settlement Status</th>
+                <th className="px-6 py-3.5 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/80">
+            <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
-                    <div className="w-6 h-6 border-2 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-                    <span>Loading payment transactions...</span>
+                  <td colSpan={8} className="px-6 py-12 text-center text-slate-400">
+                    <div className="w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                    <span>Loading ledger transactions...</span>
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
-                    No transactions match this filter.
+                  <td colSpan={8} className="px-6 py-12 text-center text-slate-400">
+                    No payment records found.
                   </td>
                 </tr>
               ) : (
-                filtered.map((item) => {
-                  const isSettled = Boolean(item.payout_settled);
+                filtered.map((b) => {
+                  const gross = Number(b.total_amount) || 0;
+                  const fee = (Number(b.platform_fee) || 99) + (Number(b.transaction_fee) || 48);
+                  const workerPayout = Number(b.worker_fee) || Math.max(0, gross - fee);
+                  const isSettled = Boolean(b.payout_settled);
 
                   return (
-                    <tr key={item.id} className="hover:bg-slate-800/40 transition">
-                      {/* Gateway ID */}
-                      <td className="px-6 py-4">
-                        <div className="space-y-0.5">
-                          <p className="font-mono font-bold text-white text-xs">
-                            {item.razorpay_payment_id || `pay_${item.id.slice(0, 12)}`}
-                          </p>
-                          <p className="text-[11px] text-slate-500 font-mono">Order #{item.id.slice(0, 8)}</p>
-                          <p className="text-[10px] text-slate-600">{new Date(item.created_at).toLocaleDateString()}</p>
-                        </div>
+                    <tr key={b.id} className="hover:bg-slate-50/70 transition">
+                      {/* Payment ID & Date */}
+                      <td className="px-6 py-3.5">
+                        <p className="font-mono font-bold text-slate-900">
+                          {b.razorpay_payment_id || `PAY_${b.id.slice(0, 8)}`}
+                        </p>
+                        <p className="text-[10px] text-slate-400">
+                          {new Date(b.created_at).toLocaleDateString()}
+                        </p>
                       </td>
 
-                      {/* Customer & Worker */}
-                      <td className="px-6 py-4 text-xs">
-                        <div className="space-y-0.5">
-                          <p className="font-bold text-white">{item.customer_name || 'Customer'}</p>
-                          <p className="text-slate-400">
-                            Mistri:{' '}
-                            <span className="text-amber-400 font-medium">{item.worker_name || 'Unassigned'}</span>
-                          </p>
-                        </div>
+                      {/* Customer & Job */}
+                      <td className="px-6 py-3.5">
+                        <p className="font-bold text-slate-900">{b.customer_name || 'Customer'}</p>
+                        <p className="text-[11px] text-slate-500">{b.service_type || 'Mistri Service'}</p>
                       </td>
 
-                      {/* Gross Amount */}
-                      <td className="px-6 py-4 font-black text-white text-sm">
-                        ₹{item.total_amount || 997}
+                      {/* Worker */}
+                      <td className="px-6 py-3.5">
+                        <p className="font-bold text-slate-800">{b.worker_name || 'Pending Worker'}</p>
+                        <p className="text-[10px] text-slate-400 font-mono">{b.worker_phone || ''}</p>
                       </td>
 
-                      {/* Platform Fee */}
-                      <td className="px-6 py-4 text-xs font-semibold text-emerald-400">
-                        +₹{(Number(item.platform_fee) || 99) + (Number(item.transaction_fee) || 48)}
+                      {/* Gross */}
+                      <td className="px-6 py-3.5 font-bold text-slate-900">
+                        ₹{gross.toLocaleString('en-IN')}
                       </td>
 
-                      {/* Worker Wage */}
-                      <td className="px-6 py-4 font-bold text-amber-400 text-xs">
-                        ₹{item.worker_fee || 850}
+                      {/* Margin */}
+                      <td className="px-6 py-3.5 font-semibold text-emerald-600">
+                        ₹{fee.toLocaleString('en-IN')}
+                      </td>
+
+                      {/* Worker Payout */}
+                      <td className="px-6 py-3.5 font-bold text-slate-900">
+                        ₹{workerPayout.toLocaleString('en-IN')}
                       </td>
 
                       {/* Status */}
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-3.5">
                         {isSettled ? (
-                          <div className="space-y-0.5">
-                            <span className="text-[11px] px-2.5 py-0.5 rounded-full font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                              SETTLED ✓
-                            </span>
-                            {item.payout_reference && (
-                              <p className="text-[10px] text-slate-500 font-mono truncate max-w-[120px]">
-                                {item.payout_reference}
-                              </p>
-                            )}
-                          </div>
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                            SETTLED ✓
+                          </span>
                         ) : (
-                          <span className="text-[11px] px-2.5 py-0.5 rounded-full font-bold bg-amber-400/20 text-amber-400 border border-amber-400/30 animate-pulse">
-                            PENDING PAYOUT
+                          <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold">
+                            PENDING RELEASE
                           </span>
                         )}
                       </td>
 
-                      {/* Actions */}
-                      <td className="px-6 py-4 text-right">
-                        {isSettled ? (
-                          <span className="text-xs text-slate-500 font-medium">Transferred</span>
-                        ) : (
+                      {/* Action */}
+                      <td className="px-6 py-3.5 text-right">
+                        {!isSettled ? (
                           <button
-                            onClick={() => handleMarkSettled(item)}
-                            disabled={settlingId === item.id || !item.worker_name}
-                            className="px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition shadow-md shadow-emerald-500/20 flex items-center gap-1.5 ml-auto cursor-pointer disabled:opacity-50"
+                            onClick={() => handleSettlePayout(b.id)}
+                            disabled={settlingId === b.id}
+                            className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition shadow-sm disabled:opacity-50"
                           >
-                            {settlingId === item.id ? (
-                              <div className="w-3.5 h-3.5 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
-                            ) : (
-                              <Check className="w-3.5 h-3.5" strokeWidth={3} />
-                            )}
-                            <span>Approve & Settle</span>
+                            {settlingId === b.id ? 'Settling...' : 'Release Payout'}
                           </button>
+                        ) : (
+                          <span className="text-[11px] text-slate-400 font-medium">Completed</span>
                         )}
                       </td>
                     </tr>

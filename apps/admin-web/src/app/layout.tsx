@@ -4,8 +4,8 @@ import { AuthProvider } from '@/context/AuthContext';
 import AdminLayout from '@/components/AdminLayout';
 
 export const metadata: Metadata = {
-  title: 'MISTRI PRO – SaaS Admin Operations Portal',
-  description: 'Complete Control Center for Worker KYC, User Management, Bookings & Financial Settlements',
+  title: 'MistriPro™ Operations – SaaS Super Admin Portal',
+  description: 'Mission Control for Worker Aadhaar KYC, Live Bookings, Payments, Rates & Platform Operations',
 };
 
 export default function RootLayout({
@@ -14,8 +14,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
-      <body className="bg-slate-950 text-slate-100 antialiased selection:bg-amber-400 selection:text-slate-950">
+    <html lang="en">
+      <head>
+        <link
+          rel="stylesheet"
+          href="https://api.fontshare.com/v2/css?f[]=satoshi@900,800,700,600,500,400,300&display=swap"
+        />
+      </head>
+      <body className="bg-[#F8F9FA] text-slate-900 antialiased selection:bg-orange-500 selection:text-white font-sans min-h-screen">
         <AuthProvider>
           <AdminLayout>{children}</AdminLayout>
         </AuthProvider>

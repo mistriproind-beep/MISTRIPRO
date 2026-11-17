@@ -15,10 +15,12 @@ import {
   LogOut,
   Bell,
   Star,
-  ExternalLink,
-  ChevronRight,
-  Activity,
   HardHat,
+  Search,
+  ChevronDown,
+  Layers,
+  Sliders,
+  CheckCircle2,
 } from 'lucide-react';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -26,7 +28,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const { isAuthenticated, isLoading, adminEmail, logout } = useAuth();
   const [pendingCount, setPendingCount] = useState<number>(0);
 
-  // Fetch live count of pending worker KYC approvals
+  // Fetch live count of pending worker KYC approvals from Supabase
   useEffect(() => {
     if (!isAuthenticated) return;
 
@@ -41,8 +43,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           setPendingCount(count);
         }
       } catch {
-        // Fallback default
-        setPendingCount(4);
+        setPendingCount(0);
       }
     };
 
@@ -57,199 +58,266 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center text-amber-400">
+      <div className="min-h-screen bg-[#F8F9FA] flex items-center justify-center font-sans text-slate-800">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 border-4 border-amber-400 border-t-transparent rounded-full animate-spin" />
-          <span className="text-sm font-semibold tracking-wider text-slate-300">Loading MistriPro Portal...</span>
+          <div className="w-9 h-9 border-3 border-orange-500 border-t-transparent rounded-full animate-spin" />
+          <span className="text-xs font-semibold tracking-wider text-slate-500">Loading MistriPro Portal...</span>
         </div>
       </div>
     );
   }
 
-  const navItems = [
+  const navSections = [
     {
-      name: 'Dashboard Overview',
-      href: '/',
-      icon: LayoutDashboard,
-      badge: null,
+      title: 'OPERATIONS',
+      items: [
+        {
+          name: 'Dashboard Overview',
+          href: '/',
+          icon: LayoutDashboard,
+          badge: null,
+        },
+        {
+          name: 'Worker Approvals & KYC',
+          href: '/workers',
+          icon: ShieldCheck,
+          badge: pendingCount > 0 ? String(pendingCount) : null,
+          badgeColor: 'bg-amber-100 text-amber-900 border border-amber-300 font-bold',
+        },
+        {
+          name: 'User Management',
+          href: '/users',
+          icon: Users,
+          badge: null,
+        },
+        {
+          name: 'Orders & Bookings',
+          href: '/orders',
+          icon: Briefcase,
+          badge: null,
+        },
+      ],
     },
     {
-      name: 'Worker Approvals & KYC',
-      href: '/workers',
-      icon: ShieldCheck,
-      badge: pendingCount > 0 ? String(pendingCount) : null,
-      badgeColor: 'bg-amber-400 text-slate-950 font-bold',
-    },
-    {
-      name: 'User Management',
-      href: '/users',
-      icon: Users,
-      badge: null,
-    },
-    {
-      name: 'Orders & Bookings',
-      href: '/orders',
-      icon: Briefcase,
-      badge: null,
-    },
-    {
-      name: 'Payments & Settlement',
-      href: '/payments',
-      icon: CreditCard,
-      badge: null,
-    },
-    {
-      name: 'Platform Settings & Rates',
-      href: '/settings',
-      icon: Settings,
-      badge: 'Live Sync',
-      badgeColor: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px]',
-    },
-    {
-      name: 'Customer Reviews',
-      href: '/reviews',
-      icon: Star,
-      badge: null,
+      title: 'FINANCE & CONFIG',
+      items: [
+        {
+          name: 'Payments & Settlement',
+          href: '/payments',
+          icon: CreditCard,
+          badge: null,
+        },
+        {
+          name: 'Platform Settings & Rates',
+          href: '/settings',
+          icon: Sliders,
+          badge: null,
+        },
+        {
+          name: 'Customer Reviews',
+          href: '/reviews',
+          icon: Star,
+          badge: null,
+        },
+        {
+          name: 'Contractor Projects',
+          href: '/projects',
+          icon: HardHat,
+          badge: null,
+        },
+      ],
     },
   ];
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex font-sans antialiased">
-      {/* Sidebar */}
-      <aside className="w-72 bg-slate-900 border-r border-slate-800 flex flex-col shrink-0">
-        {/* Brand */}
-        <div className="p-6 border-b border-slate-800 flex items-center gap-3">
-          <div className="w-11 h-11 rounded-xl bg-gradient-to-tr from-amber-500 to-amber-300 text-slate-950 flex items-center justify-center font-black text-xl shadow-lg shadow-amber-500/20">
-            MP
-          </div>
-          <div>
-            <h1 className="font-extrabold text-lg text-white tracking-wide flex items-center gap-1.5">
-              MISTRI PRO
-              <span className="text-[10px] bg-amber-400/20 text-amber-400 px-1.5 py-0.5 rounded font-mono">SAAS</span>
-            </h1>
-            <p className="text-xs text-slate-400">Super Admin Center</p>
-          </div>
-        </div>
-
-        {/* Live Status Pill */}
-        <div className="mx-4 my-3 px-3 py-2 rounded-lg bg-slate-950/70 border border-slate-800 flex items-center justify-between text-xs">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-slate-300 font-medium">Supabase Cloud</span>
-          </div>
-          <span className="text-[10px] text-emerald-400 font-mono">CONNECTED</span>
-        </div>
-
-        {/* Navigation */}
-        <nav className="flex-1 px-3 py-2 space-y-1 text-sm font-medium overflow-y-auto">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = pathname === item.href;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition group ${
-                  isActive
-                    ? 'bg-amber-400 text-slate-950 font-bold shadow-md shadow-amber-400/10'
-                    : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                }`}
-              >
-                <Icon
-                  className={`w-5 h-5 shrink-0 ${
-                    isActive ? 'text-slate-950' : 'text-slate-400 group-hover:text-amber-400'
-                  }`}
-                />
-                <span className="truncate">{item.name}</span>
-                {item.badge && (
-                  <span
-                    className={`ml-auto px-2 py-0.5 rounded-full text-xs font-semibold ${
-                      item.badgeColor || 'bg-slate-800 text-slate-200'
-                    }`}
-                  >
-                    {item.badge}
-                  </span>
-                )}
-              </Link>
-            );
-          })}
-        </nav>
-
-        {/* User Card & Logout */}
-        <div className="p-4 border-t border-slate-800 bg-slate-900/50">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-bold flex items-center justify-center text-xs shrink-0 shadow">
-                SA
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs font-bold text-white truncate">Super Administrator</p>
-                <p className="text-[11px] text-slate-400 truncate font-mono">{adminEmail || 'admin@mistripro.com'}</p>
-              </div>
+    <div className="min-h-screen flex bg-[#F8F9FA] font-sans antialiased text-slate-900">
+      {/* Left Sidebar */}
+      <aside className="w-64 bg-white border-r border-slate-200/80 flex flex-col shrink-0 min-h-screen sticky top-0 h-screen overflow-y-auto">
+        {/* Workspace Brand Header */}
+        <div className="p-4 border-b border-slate-100">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-orange-500 to-amber-500 text-white flex items-center justify-center font-black text-base shadow-sm">
+              M
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-slate-900 tracking-tight leading-none">
+                MistriPro™
+              </h2>
+              <span className="text-[11px] text-slate-400 font-medium">
+                Admin Control Center
+              </span>
             </div>
           </div>
-          <button
-            onClick={logout}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-bold transition border border-rose-500/20 cursor-pointer"
-          >
-            <LogOut className="w-4 h-4" />
-            <span>Secure Sign Out</span>
+
+          {/* Workspace Pill Dropdown */}
+          <button className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200/60 text-xs font-semibold text-slate-700 transition">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+              <span>MistriPro HQ (Live)</span>
+            </div>
+            <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
           </button>
+        </div>
+
+        {/* Quick Search Trigger */}
+        <div className="px-4 pt-3 pb-1">
+          <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-slate-50 border border-slate-200/70 text-xs text-slate-400">
+            <div className="flex items-center gap-2">
+              <Search className="w-3.5 h-3.5" />
+              <span>Quick search...</span>
+            </div>
+            <kbd className="px-1.5 py-0.5 text-[10px] font-mono bg-white border border-slate-200 rounded text-slate-500">
+              ⌘K
+            </kbd>
+          </div>
+        </div>
+
+        {/* Navigation Sections */}
+        <div className="flex-1 px-3 py-3 space-y-6">
+          {navSections.map((section) => (
+            <div key={section.title}>
+              <div className="px-3 pb-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                {section.title}
+              </div>
+              <nav className="space-y-1">
+                {section.items.map((item) => {
+                  const isActive = pathname === item.href;
+                  const Icon = item.icon;
+
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition ${
+                        isActive
+                          ? 'bg-slate-950 text-white shadow-sm font-semibold'
+                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <Icon
+                          className={`w-4 h-4 ${
+                            isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-600'
+                          }`}
+                        />
+                        <span>{item.name}</span>
+                      </div>
+                      {item.badge && (
+                        <span
+                          className={`px-2 py-0.5 text-[10px] font-bold rounded-full ${
+                            item.badgeColor || 'bg-slate-200 text-slate-800'
+                          }`}
+                        >
+                          {item.badge}
+                        </span>
+                      )}
+                    </Link>
+                  );
+                })}
+              </nav>
+            </div>
+          ))}
+        </div>
+
+        {/* Bottom Superuser Profile Card */}
+        <div className="p-3 border-t border-slate-100">
+          <div className="p-2.5 rounded-2xl bg-slate-50 border border-slate-200/70">
+            <div className="flex items-center gap-2.5 mb-2.5">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-slate-900 to-slate-700 text-white font-bold text-xs flex items-center justify-center shrink-0">
+                SA
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-bold text-slate-900 truncate">Super Admin</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                </div>
+                <div className="text-[11px] text-slate-500 truncate">{adminEmail || 'admin@mistripro.com'}</div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1 pt-1 border-t border-slate-200/60">
+              <Link
+                href="/settings"
+                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-[11px] font-medium text-slate-600 hover:bg-white hover:text-slate-900 transition"
+              >
+                <Settings className="w-3.5 h-3.5" />
+                <span>Settings</span>
+              </Link>
+              <button
+                onClick={logout}
+                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-[11px] font-medium text-red-600 hover:bg-red-50 transition"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Sign Out</span>
+              </button>
+            </div>
+          </div>
         </div>
       </aside>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 bg-slate-950">
+      <div className="flex-1 flex flex-col min-w-0">
         {/* Top Navbar */}
-        <header className="h-16 bg-slate-900/80 backdrop-blur-md border-b border-slate-800 flex items-center justify-between px-8 sticky top-0 z-20">
-          <div className="flex items-center gap-3 text-sm">
-            <span className="text-slate-400 font-medium">MistriPro Operations</span>
-            <span className="text-slate-600">/</span>
-            <span className="text-slate-100 font-bold capitalize">
-              {pathname === '/' ? 'Dashboard' : pathname.replace('/', '').replace('-', ' ')}
-            </span>
+        <header className="h-16 px-8 bg-white border-b border-slate-200/80 flex items-center justify-between sticky top-0 z-20">
+          <div className="flex items-center gap-3">
+            <h1 className="text-base font-bold text-slate-900">
+              {pathname === '/'
+                ? 'Overview Dashboard'
+                : pathname === '/workers'
+                ? 'Worker Verification & KYC'
+                : pathname === '/users'
+                ? 'User Management'
+                : pathname === '/orders'
+                ? 'Orders & Operations'
+                : pathname === '/payments'
+                ? 'Financial Ledger & Payouts'
+                : pathname === '/settings'
+                ? 'Platform Rates & Settings'
+                : pathname === '/reviews'
+                ? 'Reviews & Ratings'
+                : 'Project Management'}
+            </h1>
+            <div className="h-4 w-px bg-slate-200" />
+            <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+              <span>Live Supabase Connected</span>
+            </div>
           </div>
 
-          <div className="flex items-center gap-4">
-            {/* Quick App Link */}
-            <a
-              href="https://expo.dev/accounts/yashendrajain030205/projects/mistripro/builds"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 hover:text-white transition border border-slate-700"
-            >
-              <span>EAS Android Builds</span>
-              <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
-            </a>
+          <div className="flex items-center gap-3">
+            {/* Urgent Pending Badge Shortcut */}
+            {pendingCount > 0 && (
+              <Link
+                href="/workers"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 text-xs font-bold transition animate-pulse"
+              >
+                <ShieldCheck className="w-3.5 h-3.5 text-amber-600" />
+                <span>{pendingCount} KYC Pending</span>
+              </Link>
+            )}
 
-            {/* Notification Badge */}
-            <Link
-              href="/workers"
-              className="relative p-2 text-slate-400 hover:text-slate-100 rounded-lg hover:bg-slate-800 transition"
-              title="Pending KYC Approvals"
-            >
-              <Bell className="w-5 h-5" />
-              {pendingCount > 0 && (
-                <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-amber-400 rounded-full animate-ping" />
-              )}
-              {pendingCount > 0 && (
-                <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-amber-400 rounded-full" />
-              )}
-            </Link>
-
-            {/* Live Indicator */}
-            <div className="flex items-center gap-2 pl-3 border-l border-slate-800">
-              <span className="relative flex h-2.5 w-2.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-              </span>
-              <span className="text-xs font-mono text-emerald-400 font-bold">SYSTEM ACTIVE</span>
+            {/* Quick action buttons */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => window.location.reload()}
+                className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 transition"
+              >
+                Refresh Data
+              </button>
+              <Link
+                href="/settings"
+                className="px-3 py-1.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-white text-xs font-semibold shadow-sm transition"
+              >
+                Commission Rates
+              </Link>
             </div>
           </div>
         </header>
 
-        {/* Page Content Body */}
-        <main className="flex-1 p-8 overflow-y-auto">{children}</main>
+        {/* Page Inner Content */}
+        <main className="flex-1 p-8 min-w-0">
+          <div className="max-w-7xl mx-auto">{children}</div>
+        </main>
       </div>
     </div>
   );

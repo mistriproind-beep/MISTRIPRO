@@ -59,8 +59,8 @@ export default function OrdersPage() {
           name: p.full_name,
           phone: p.phone,
           skills: wp.skills || ['General Mistri'],
-          dailyRate: wp.daily_rate || 800,
           isAvailable: wp.is_available ?? true,
+          kycStatus: p.kyc_status,
         };
       });
 
@@ -77,40 +77,32 @@ export default function OrdersPage() {
   }, []);
 
   const filteredBookings = bookings.filter((b) => {
-    const matchesStatus =
-      statusFilter === 'ALL'
-        ? true
-        : statusFilter === 'WAITING'
-        ? b.status === 'waiting_confirmation' || !b.worker_name
-        : b.status === statusFilter;
-
+    const matchesStatus = statusFilter === 'ALL' || b.status === statusFilter;
     const q = search.toLowerCase().trim();
-    const matchesSearch =
+    const matchesQuery =
       !q ||
+      b.id.toLowerCase().includes(q) ||
       (b.customer_name || '').toLowerCase().includes(q) ||
       (b.worker_name || '').toLowerCase().includes(q) ||
-      (b.id || '').toLowerCase().includes(q) ||
-      (b.site_location || '').toLowerCase().includes(q) ||
-      (b.category || '').toLowerCase().includes(q);
+      (b.service_type || '').toLowerCase().includes(q) ||
+      (b.address || '').toLowerCase().includes(q);
 
-    return matchesStatus && matchesSearch;
+    return matchesStatus && matchesQuery;
   });
 
-  // Assign Worker to Booking
-  const handleAssignWorker = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Assign worker
+  const handleAssignWorker = async () => {
     if (!assigningBooking || !selectedWorkerId) return;
-    const worker = workers.find((w) => w.id === selectedWorkerId);
-    if (!worker) return;
-
     setActionLoading(true);
+
     try {
+      const worker = workers.find((w) => w.id === selectedWorkerId);
       const updates = {
-        worker_id: worker.id,
-        worker_name: worker.name,
-        worker_phone: worker.phone,
+        worker_id: selectedWorkerId,
+        worker_name: worker?.name || 'Assigned Worker',
+        worker_phone: worker?.phone || '',
         status: 'confirmed',
-        progress_step: 2, // Step 2: Worker Assigned & En Route
+        current_step: 2, // Step 2: Worker Assigned & En Route
         updated_at: new Date().toISOString(),
       };
 
@@ -124,74 +116,73 @@ export default function OrdersPage() {
       setBookings((prev) =>
         prev.map((b) => (b.id === assigningBooking.id ? { ...b, ...updates } : b))
       );
-
       setAssigningBooking(null);
       setSelectedWorkerId('');
-      alert(`Worker "${worker.name}" assigned successfully to order #${assigningBooking.id.slice(0, 8)}! Live synced with customer app.`);
     } catch (err: any) {
-      alert(`Error assigning worker: ${err?.message}`);
+      alert(`Assignment failed: ${err.message}`);
     } finally {
       setActionLoading(false);
     }
   };
 
-  // Update Booking Progress Step Override
-  const handleUpdateStep = async (bookingId: string, newStep: number) => {
+  // Step Status Override
+  const handleStepOverride = async (bookingId: string, newStep: number, newStatus: string) => {
     try {
-      const statusMap: Record<number, string> = {
-        1: 'waiting_confirmation',
-        2: 'confirmed',
-        3: 'in_progress',
-        4: 'completed',
-      };
+      const { error } = await supabase
+        .from('bookings')
+        .update({
+          current_step: newStep,
+          status: newStatus,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', bookingId);
 
-      const updates = {
-        progress_step: newStep,
-        status: statusMap[newStep] || 'confirmed',
-        updated_at: new Date().toISOString(),
-      };
-
-      await supabase.from('bookings').update(updates).eq('id', bookingId);
-      setBookings((prev) => prev.map((b) => (b.id === bookingId ? { ...b, ...updates } : b)));
+      if (!error) {
+        setBookings((prev) =>
+          prev.map((b) =>
+            b.id === bookingId ? { ...b, current_step: newStep, status: newStatus } : b
+          )
+        );
+      }
     } catch (err: any) {
-      alert(`Error updating step: ${err?.message}`);
+      console.error(err);
     }
   };
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
-      {/* Header */}
+    <div className="space-y-6 font-sans">
+      {/* Top Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-white tracking-tight flex items-center gap-2">
-            Order & Booking Operations
-            <span className="text-xs px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-400 font-bold border border-indigo-500/30">
-              {bookings.length} Total Orders
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2.5">
+            <span>Orders & Dispatch Control</span>
+            <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-800 text-xs font-bold">
+              {bookings.length} Total Bookings
             </span>
           </h1>
-          <p className="text-sm text-slate-400 mt-1">
-            Dispatch workers to unassigned customer requests, track job progression, and resolve site milestones.
+          <p className="text-xs text-slate-500 mt-1">
+            Dispatch workers to customer requests, override step statuses, and track live job progress.
           </p>
         </div>
 
         <button
           onClick={fetchOrdersData}
           disabled={loading}
-          className="self-start md:self-auto flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs font-semibold text-slate-300 hover:text-white hover:border-slate-700 transition cursor-pointer"
+          className="self-start md:self-auto flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-slate-200/80 shadow-subtle text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
         >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-amber-400' : ''}`} />
-          <span>Reload Orders</span>
+          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-orange-600' : ''}`} />
+          <span>Reload Bookings</span>
         </button>
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-900/90 p-3 rounded-2xl border border-slate-800">
-        <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-3 rounded-2xl border border-slate-200/80 shadow-subtle">
+        <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto">
           {(
             [
-              { key: 'ALL', label: `All Orders (${bookings.length})` },
-              { key: 'WAITING', label: 'Unassigned / Waiting' },
-              { key: 'confirmed', label: 'Confirmed' },
+              { key: 'ALL', label: 'All Orders' },
+              { key: 'pending', label: 'Waiting Assignment' },
+              { key: 'confirmed', label: 'Assigned' },
               { key: 'in_progress', label: 'In Progress' },
               { key: 'completed', label: 'Completed' },
             ] as const
@@ -199,10 +190,10 @@ export default function OrdersPage() {
             <button
               key={tab.key}
               onClick={() => setStatusFilter(tab.key)}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
                 statusFilter === tab.key
-                  ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                  ? 'bg-slate-950 text-white shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
               }`}
             >
               {tab.label}
@@ -211,236 +202,214 @@ export default function OrdersPage() {
         </div>
 
         <div className="relative w-full sm:w-80">
-          <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search orders, customers, workers..."
-            className="w-full bg-slate-950/70 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 transition"
+            placeholder="Search by customer, mistri, trade..."
+            className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-1.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-slate-900 transition"
           />
         </div>
       </div>
 
-      {/* Orders List / Cards */}
-      <div className="space-y-4">
-        {loading ? (
-          <div className="p-12 text-center bg-slate-900/50 rounded-2xl border border-slate-800 text-slate-400">
-            <div className="w-8 h-8 border-2 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-            <p className="text-xs font-medium">Loading customer bookings from Supabase...</p>
-          </div>
-        ) : filteredBookings.length === 0 ? (
-          <div className="p-12 text-center bg-slate-900/50 rounded-2xl border border-dashed border-slate-800 text-slate-500">
-            <Briefcase className="w-10 h-10 text-slate-600 mx-auto mb-2" />
-            <p className="text-sm font-bold text-slate-300">No orders found</p>
-            <p className="text-xs text-slate-500 mt-1">Check back once customer orders are placed in the mobile app.</p>
-          </div>
-        ) : (
-          filteredBookings.map((order) => {
-            const isUnassigned = !order.worker_name || order.status === 'waiting_confirmation';
-            const currentStep = order.progress_step || 1;
-
-            return (
-              <div
-                key={order.id}
-                className="bg-slate-900/90 rounded-2xl border border-slate-800 p-5 shadow-xl hover:border-slate-700 transition space-y-4"
-              >
-                {/* Header Row */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800/80">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2.5 rounded-xl bg-amber-400/10 text-amber-400 font-bold border border-amber-400/20">
-                      <Briefcase className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-sm font-bold text-white">
-                          {order.title || order.category || 'General Construction Service'}
-                        </h3>
-                        <span className="text-[10px] px-2 py-0.5 rounded-full font-mono bg-slate-800 text-slate-300 border border-slate-700">
-                          #{order.id.slice(0, 8)}
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-2">
-                        <MapPin className="w-3.5 h-3.5 text-slate-500" />
-                        <span>{order.site_location || 'Jaipur Region, Rajasthan'}</span>
-                        <span>•</span>
-                        <span>{new Date(order.created_at).toLocaleDateString()}</span>
+      {/* Bookings Table */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 overflow-hidden shadow-card">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-slate-50/70 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">
+              <tr>
+                <th className="px-6 py-3.5">Order ID & Date</th>
+                <th className="px-6 py-3.5">Customer</th>
+                <th className="px-6 py-3.5">Trade & Task</th>
+                <th className="px-6 py-3.5">Assigned Mistri</th>
+                <th className="px-6 py-3.5">Amount</th>
+                <th className="px-6 py-3.5">Job Step Tracker</th>
+                <th className="px-6 py-3.5 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {loading ? (
+                <tr>
+                  <td colSpan={7} className="px-6 py-12 text-center text-slate-400">
+                    <div className="w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                    <span>Loading active bookings...</span>
+                  </td>
+                </tr>
+              ) : filteredBookings.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-6 py-12 text-center text-slate-400">
+                    No orders match your filter criteria.
+                  </td>
+                </tr>
+              ) : (
+                filteredBookings.map((b) => (
+                  <tr key={b.id} className="hover:bg-slate-50/70 transition">
+                    {/* ID & Date */}
+                    <td className="px-6 py-3.5">
+                      <p className="font-mono font-bold text-slate-900">
+                        #{b.id.slice(0, 8).toUpperCase()}
                       </p>
-                    </div>
-                  </div>
+                      <p className="text-[10px] text-slate-400">
+                        {new Date(b.created_at).toLocaleDateString()}
+                      </p>
+                    </td>
 
-                  <div className="flex items-center gap-3 self-end sm:self-center">
-                    <div className="text-right">
-                      <span className="text-base font-black text-emerald-400">₹{order.total_amount || 997}</span>
-                      <p className="text-[11px] text-slate-500">Paid via {order.payment_method || 'Razorpay'}</p>
-                    </div>
+                    {/* Customer */}
+                    <td className="px-6 py-3.5">
+                      <p className="font-bold text-slate-900">{b.customer_name || 'Customer'}</p>
+                      <p className="text-[11px] text-slate-500 font-mono">{b.customer_phone || ''}</p>
+                    </td>
 
-                    <span
-                      className={`text-xs px-3 py-1 rounded-full font-bold uppercase ${
-                        isUnassigned
-                          ? 'bg-amber-400/20 text-amber-400 border border-amber-400/30 animate-pulse'
-                          : order.status === 'completed'
-                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                          : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                      }`}
-                    >
-                      {isUnassigned ? 'Unassigned' : order.status}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Customer & Worker Attribution */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                  {/* Customer Card */}
-                  <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1">
-                    <p className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Customer</p>
-                    <p className="font-bold text-white text-sm">{order.customer_name || 'Customer'}</p>
-                    <div className="flex items-center gap-1.5 font-mono text-slate-300">
-                      <Phone className="w-3.5 h-3.5 text-slate-500" />
-                      <span>{order.customer_phone || '+91 98290 12345'}</span>
-                    </div>
-                  </div>
-
-                  {/* Worker Card / Assign Button */}
-                  <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1">
-                    <p className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Assigned Worker</p>
-                    {isUnassigned ? (
-                      <div className="flex items-center justify-between pt-0.5">
-                        <span className="text-amber-400 font-semibold">No Worker Assigned Yet</span>
-                        <button
-                          onClick={() => {
-                            setAssigningBooking(order);
-                            setSelectedWorkerId('');
-                          }}
-                          className="px-3 py-1 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs transition flex items-center gap-1 cursor-pointer"
-                        >
-                          <UserPlus className="w-3.5 h-3.5" />
-                          <span>Assign Worker</span>
-                        </button>
+                    {/* Trade & Task */}
+                    <td className="px-6 py-3.5">
+                      <span className="font-semibold text-slate-800">
+                        {b.service_type || b.trade || 'General Work'}
+                      </span>
+                      <div className="flex items-center gap-1 text-[11px] text-slate-400 mt-0.5">
+                        <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
+                        <span className="truncate max-w-[160px]">{b.address || 'On-site'}</span>
                       </div>
-                    ) : (
-                      <div className="flex items-center justify-between">
+                    </td>
+
+                    {/* Assigned Worker */}
+                    <td className="px-6 py-3.5">
+                      {b.worker_name && b.worker_name !== 'Unassigned' ? (
                         <div>
-                          <p className="font-bold text-white text-sm">{order.worker_name}</p>
-                          <div className="flex items-center gap-1.5 font-mono text-slate-300">
-                            <Phone className="w-3.5 h-3.5 text-slate-500" />
-                            <span>{order.worker_phone || 'N/A'}</span>
-                          </div>
+                          <p className="font-bold text-emerald-700 flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3" />
+                            <span>{b.worker_name}</span>
+                          </p>
+                          <p className="text-[10px] text-slate-400 font-mono">{b.worker_phone}</p>
                         </div>
+                      ) : (
                         <button
-                          onClick={() => {
-                            setAssigningBooking(order);
-                            setSelectedWorkerId('');
-                          }}
-                          className="text-[11px] text-amber-400 hover:text-amber-300 font-semibold underline"
+                          onClick={() => setAssigningBooking(b)}
+                          className="px-2.5 py-1 rounded-lg bg-orange-50 border border-orange-200 text-orange-800 font-bold text-[11px] hover:bg-orange-100 transition flex items-center gap-1"
                         >
-                          Reassign
+                          <UserPlus className="w-3 h-3 text-orange-600" />
+                          <span>Assign Mistri</span>
                         </button>
+                      )}
+                    </td>
+
+                    {/* Amount */}
+                    <td className="px-6 py-3.5">
+                      <span className="font-bold text-slate-900 text-sm">
+                        ₹{Number(b.total_amount || 0).toLocaleString('en-IN')}
+                      </span>
+                    </td>
+
+                    {/* Job Step Tracker Override */}
+                    <td className="px-6 py-3.5">
+                      <div className="flex items-center gap-1">
+                        {[
+                          { step: 1, label: 'Requested', status: 'pending' },
+                          { step: 2, label: 'Assigned', status: 'confirmed' },
+                          { step: 3, label: 'Working', status: 'in_progress' },
+                          { step: 4, label: 'Done', status: 'completed' },
+                        ].map((s) => (
+                          <button
+                            key={s.step}
+                            onClick={() => handleStepOverride(b.id, s.step, s.status)}
+                            title={`Click to set Step ${s.step}: ${s.label}`}
+                            className={`w-6 h-6 rounded-md text-[10px] font-bold transition flex items-center justify-center ${
+                              (b.current_step || 1) >= s.step
+                                ? 'bg-slate-950 text-white'
+                                : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
+                            }`}
+                          >
+                            {s.step}
+                          </button>
+                        ))}
                       </div>
-                    )}
-                  </div>
-                </div>
+                      <span className="text-[10px] text-slate-400 block mt-1">
+                        {b.status || 'pending'}
+                      </span>
+                    </td>
 
-                {/* Progress Step Live Tracker */}
-                <div className="pt-2 border-t border-slate-800/80">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                      Live Job Progression (Synced with Mobile App)
-                    </span>
-                    <span className="text-xs font-mono text-amber-400">Step {currentStep} of 4</span>
-                  </div>
-
-                  <div className="grid grid-cols-4 gap-2">
-                    {[
-                      { step: 1, label: '1. Request Sent' },
-                      { step: 2, label: '2. Worker Assigned' },
-                      { step: 3, label: '3. Work Started' },
-                      { step: 4, label: '4. Completed' },
-                    ].map((item) => {
-                      const isPast = currentStep >= item.step;
-                      const isCurrent = currentStep === item.step;
-
-                      return (
-                        <button
-                          key={item.step}
-                          onClick={() => handleUpdateStep(order.id, item.step)}
-                          className={`p-2 rounded-xl text-center text-xs font-bold transition border cursor-pointer ${
-                            isCurrent
-                              ? 'bg-amber-400 text-slate-950 border-amber-300 shadow-md shadow-amber-400/20'
-                              : isPast
-                              ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
-                              : 'bg-slate-950/40 text-slate-500 border-slate-800 hover:border-slate-700'
-                          }`}
-                        >
-                          <span>{item.label}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            );
-          })
-        )}
+                    {/* Actions */}
+                    <td className="px-6 py-3.5 text-right">
+                      <button
+                        onClick={() => setAssigningBooking(b)}
+                        className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition"
+                      >
+                        Reassign
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Manual Worker Assignment Modal */}
       {assigningBooking && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <UserPlus className="w-5 h-5 text-amber-400" />
-                <span>Assign Verified Worker</span>
+        <div className="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <UserPlus className="w-4 h-4 text-orange-600" />
+                <span>Assign Worker to Order</span>
               </h3>
               <button
                 onClick={() => setAssigningBooking(null)}
-                className="text-slate-400 hover:text-white transition"
+                className="text-slate-400 hover:text-slate-700 transition"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <p className="text-xs text-slate-400">
-              Select a verified mistri from the registered database to assign to order #
-              <span className="font-mono text-white">{assigningBooking.id.slice(0, 8)}</span>:
-            </p>
+            <div>
+              <p className="text-xs text-slate-500">Order ID:</p>
+              <p className="text-sm font-mono font-bold text-slate-900">
+                #{assigningBooking.id}
+              </p>
+              <p className="text-xs text-slate-600 mt-1">
+                Customer: <strong>{assigningBooking.customer_name}</strong> •{' '}
+                {assigningBooking.service_type}
+              </p>
+            </div>
 
-            <form onSubmit={handleAssignWorker} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Select Mistri</label>
-                <select
-                  required
-                  value={selectedWorkerId}
-                  onChange={(e) => setSelectedWorkerId(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-amber-400 transition"
-                >
-                  <option value="">-- Choose a Verified Worker --</option>
-                  {workers.map((w) => (
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                Select Approved Mistri
+              </label>
+              <select
+                value={selectedWorkerId}
+                onChange={(e) => setSelectedWorkerId(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-900 focus:outline-none focus:border-slate-900"
+              >
+                <option value="">-- Choose from Verified Registry --</option>
+                {workers
+                  .filter((w) => w.kycStatus === 'APPROVED')
+                  .map((w) => (
                     <option key={w.id} value={w.id}>
-                      {w.name} ({Array.isArray(w.skills) ? w.skills.join(', ') : w.skills}) - ₹{w.dailyRate}/day
+                      {w.name} ({Array.isArray(w.skills) ? w.skills.join(', ') : w.skills}) - {w.phone}
                     </option>
                   ))}
-                </select>
-              </div>
+              </select>
+            </div>
 
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setAssigningBooking(null)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={actionLoading || !selectedWorkerId}
-                  className="px-5 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs transition shadow-lg shadow-amber-400/20 disabled:opacity-50 cursor-pointer"
-                >
-                  {actionLoading ? 'Assigning...' : 'Confirm Assignment'}
-                </button>
-              </div>
-            </form>
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setAssigningBooking(null)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleAssignWorker}
+                disabled={!selectedWorkerId || actionLoading}
+                className="px-5 py-2 rounded-xl bg-slate-950 hover:bg-slate-800 text-white text-xs font-bold disabled:opacity-50"
+              >
+                {actionLoading ? 'Assigning...' : 'Confirm Assignment'}
+              </button>
+            </div>
           </div>
         </div>
       )}
