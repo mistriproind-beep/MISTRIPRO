@@ -16,5 +16,15 @@
     "handyman"
   ],
   "author": "MISTRI PRO Team",
-  "license": "UNLICENSED"
+  "license": "UNLICENSED",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@nestjs/core",
+      "@prisma/client",
+      "@prisma/engines",
+      "@scarf/scarf",
+      "bcrypt",
+      "prisma"
+    ]
+  }
 }
