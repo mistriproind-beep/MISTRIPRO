@@ -2,6 +2,7 @@
   "expo": {
     "name": "MISTRI PRO",
     "slug": "mistripro",
+    "scheme": "mistripro",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -23,6 +24,21 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "package": "com.mistripro.app",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "mistripro"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ],
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",

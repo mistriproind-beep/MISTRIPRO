@@ -1419,11 +1419,18 @@ function MainApp() {
           setWorkerAlerts([]);
           setCurrentScreen('ROLE_SELECT');
         }
-      } else if (res.error && res.error.includes('OAuth secret')) {
-        // Explaining OAuth Client Secret requirement from Google Cloud Console
+      } else if (
+        res.error &&
+        (res.error.toLowerCase().includes('oauth') ||
+          res.error.toLowerCase().includes('provider') ||
+          res.error.toLowerCase().includes('secret') ||
+          res.error.toLowerCase().includes('not enabled') ||
+          res.error.toLowerCase().includes('client id'))
+      ) {
+        // Explaining Google OAuth setup in Supabase Dashboard with seamless fallback
         Alert.alert(
-          'Google OAuth Setup Required',
-          'Google Sign-In requires Client ID & Client Secret in your Supabase Dashboard (Auth -> Providers -> Google).\n\nWould you like to proceed with Demo Google Sign-In for now?',
+          'Google Sign-In Setup',
+          'Google Sign-In uses Supabase Auth. To connect your live Google Cloud credentials, enable Google under Supabase Dashboard -> Authentication -> Providers.\n\nWould you like to proceed with Google Test Sign-In now?',
           [
             { text: 'Cancel', style: 'cancel' },
             {
@@ -1431,14 +1438,11 @@ function MainApp() {
               onPress: async () => {
                 await StorageService.setHasChosenLanguage(true);
                 const derivedName = 'Google User';
+                setRole(null);
                 setCustName(derivedName);
-                setWorkerName('Google Mistri');
-                await StorageService.setSession({
-                  name: derivedName,
-                  role: 'CUSTOMER',
-                });
-                await StorageService.setRole('CUSTOMER');
-                setCurrentScreen('MAIN');
+                setWorkerName(derivedName);
+                setEmailInput('google.user@mistripro.com');
+                setCurrentScreen('ROLE_SELECT');
               },
             },
           ]

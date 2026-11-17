@@ -9,10 +9,16 @@ WebBrowser.maybeCompleteAuthSession();
  */
 export async function signInWithGoogle() {
   try {
-    const redirectUrl = AuthSession.makeRedirectUri({
-      scheme: 'mistripro',
-      preferLocalhost: true,
-    });
+    let redirectUrl = 'mistripro://auth/callback';
+    try {
+      redirectUrl = AuthSession.makeRedirectUri({
+        scheme: 'mistripro',
+        path: 'auth/callback',
+      });
+    } catch (uriErr) {
+      console.log('Redirect URI fallback to mistripro://auth/callback:', uriErr?.message);
+      redirectUrl = 'mistripro://auth/callback';
+    }
 
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -28,20 +34,62 @@ export async function signInWithGoogle() {
     const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
 
     if (result.type === 'success' && result.url) {
-      // Parse parameters from redirect URL
-      const parsedUrl = new URL(result.url);
-      const hashParams = new URLSearchParams(parsedUrl.hash.replace('#', ''));
-      const accessToken = hashParams.get('access_token');
-      const refreshToken = hashParams.get('refresh_token');
+      // Parse parameters from redirect URL safely (supporting both hash & query params)
+      let hashString = '';
+      let searchString = '';
+      try {
+        const parsedUrl = new URL(result.url);
+        hashString = parsedUrl.hash ? parsedUrl.hash.replace(/^#/, '') : '';
+        searchString = parsedUrl.search ? parsedUrl.search.replace(/^\?/, '') : '';
+      } catch {
+        const [baseAndSearch, hash] = result.url.split('#');
+        hashString = hash || '';
+        const [, search] = (baseAndSearch || '').split('?');
+        searchString = search || '';
+      }
 
+      const hashParams = new URLSearchParams(hashString);
+      const searchParams = new URLSearchParams(searchString);
+
+      const code = searchParams.get('code') || hashParams.get('code');
+      const accessToken = hashParams.get('access_token') || searchParams.get('access_token');
+      const refreshToken = hashParams.get('refresh_token') || searchParams.get('refresh_token');
+
+      // 1. If PKCE authorization code returned, exchange for session
+      if (code) {
+        const { data: exchangeData, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+        if (exchangeError) throw exchangeError;
+        return {
+          success: true,
+          session: exchangeData.session,
+          user: exchangeData.session?.user || exchangeData.user,
+        };
+      }
+
+      // 2. If access token returned directly (implicit flow)
       if (accessToken && refreshToken) {
         const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
           access_token: accessToken,
           refresh_token: refreshToken,
         });
         if (sessionError) throw sessionError;
-        return { success: true, session: sessionData.session };
+        return {
+          success: true,
+          session: sessionData.session,
+          user: sessionData.session?.user,
+        };
       }
+
+      // Fallback: check if supabase client picked up active session
+      const { data: currentAuth } = await supabase.auth.getSession();
+      if (currentAuth?.session?.user) {
+        return {
+          success: true,
+          session: currentAuth.session,
+          user: currentAuth.session.user,
+        };
+      }
+
       return { success: true };
     }
 
