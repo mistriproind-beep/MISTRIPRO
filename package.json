@@ -17,6 +17,9 @@
   ],
   "author": "MISTRI PRO Team",
   "license": "UNLICENSED",
+  "prisma": {
+    "schema": "apps/backend/prisma/schema.prisma"
+  },
   "pnpm": {
     "onlyBuiltDependencies": [
       "@nestjs/core",
