@@ -804,7 +804,7 @@ export default function FindWorkersScreen({
             <View style={styles.credentialsBox}>
               <ShieldCheck size={16} color="#15803D" />
               <Text style={styles.credentialsText}>
-                Aadhaar Verified Mistri • Razorpay Protected • Police Verification Cleared
+                Aadhaar Verified Mistri • Razorpay Protected
               </Text>
             </View>
 

@@ -1,5 +1,6 @@
 import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
+import Constants from 'expo-constants';
 import { supabase } from './supabase';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -9,15 +10,26 @@ WebBrowser.maybeCompleteAuthSession();
  */
 export async function signInWithGoogle() {
   try {
-    let redirectUrl = 'mistripro://auth/callback';
+    // Detect environment: Expo Go uses proxy redirect, standalone uses custom scheme
+    const isExpoGo = Constants.appOwnership === 'expo';
+    
+    let redirectUrl;
     try {
-      redirectUrl = AuthSession.makeRedirectUri({
-        scheme: 'mistripro',
-        path: 'auth/callback',
-      });
+      if (isExpoGo) {
+        // Expo Go: use Expo auth proxy
+        redirectUrl = AuthSession.makeRedirectUri({ useProxy: true });
+      } else {
+        // Standalone APK/IPA: use custom scheme
+        redirectUrl = AuthSession.makeRedirectUri({
+          scheme: 'mistripro',
+          path: 'auth/callback',
+        });
+      }
     } catch (uriErr) {
-      console.log('Redirect URI fallback to mistripro://auth/callback:', uriErr?.message);
-      redirectUrl = 'mistripro://auth/callback';
+      redirectUrl = isExpoGo
+        ? 'https://auth.expo.io/@anonymous/mistripro/auth/callback'
+        : 'mistripro://auth/callback';
+      console.log('Redirect URI fallback:', redirectUrl, uriErr?.message);
     }
 
     const { data, error } = await supabase.auth.signInWithOAuth({
@@ -34,7 +46,6 @@ export async function signInWithGoogle() {
     const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
 
     if (result.type === 'success' && result.url) {
-      // Parse parameters from redirect URL safely (supporting both hash & query params)
       let hashString = '';
       let searchString = '';
       try {
@@ -55,7 +66,6 @@ export async function signInWithGoogle() {
       const accessToken = hashParams.get('access_token') || searchParams.get('access_token');
       const refreshToken = hashParams.get('refresh_token') || searchParams.get('refresh_token');
 
-      // 1. If PKCE authorization code returned, exchange for session
       if (code) {
         const { data: exchangeData, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
         if (exchangeError) throw exchangeError;
@@ -66,7 +76,6 @@ export async function signInWithGoogle() {
         };
       }
 
-      // 2. If access token returned directly (implicit flow)
       if (accessToken && refreshToken) {
         const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
           access_token: accessToken,
@@ -80,7 +89,6 @@ export async function signInWithGoogle() {
         };
       }
 
-      // Fallback: check if supabase client picked up active session
       const { data: currentAuth } = await supabase.auth.getSession();
       if (currentAuth?.session?.user) {
         return {
@@ -93,9 +101,14 @@ export async function signInWithGoogle() {
       return { success: true };
     }
 
+    if (result.type === 'cancel' || result.type === 'dismiss') {
+      return { success: false, cancelled: true };
+    }
+
     return { success: false, cancelled: true };
   } catch (err) {
-    return { success: false, error: err.message };
+    console.log('Google Sign-In error:', err?.message);
+    return { success: false, error: err.message || 'Google Sign-In failed' };
   }
 }
 

@@ -11,6 +11,8 @@ import {
   StatusBar,
   Modal,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import {
   Bell,
@@ -31,6 +33,19 @@ import { CATEGORIES, CATEGORY_GROUPS } from '../data/categories';
 import RazorpayModal from '../components/RazorpayModal';
 
 /* ─── helpers ─── */
+function getDistanceKm(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 const shortName = (full) => {
   if (!full || typeof full !== 'string') return '';
   const cleaned = full.split('(')[0].split('/')[0].trim();
@@ -67,6 +82,13 @@ export default function CustomerHomeScreen({
   const [razorpayBookingData, setRazorpayBookingData] = useState(null);
   const [showAllCategories, setShowAllCategories] = useState(false);
 
+  const [userLat, setUserLat] = useState(null);
+  const [userLon, setUserLon] = useState(null);
+  const [showLocationSearch, setShowLocationSearch] = useState(false);
+  const [locationSearchQuery, setLocationSearchQuery] = useState('');
+  const [locationResults, setLocationResults] = useState([]);
+  const [locationSearchLoading, setLocationSearchLoading] = useState(false);
+
   const userInitials = useMemo(() => {
     const clean = (typeof userName === 'string' ? userName : 'User').trim();
     const parts = clean.split(' ').filter(Boolean);
@@ -91,6 +113,8 @@ export default function CustomerHomeScreen({
           latitude: loc.coords.latitude,
           longitude: loc.coords.longitude,
         });
+        setUserLat(loc.coords.latitude);
+        setUserLon(loc.coords.longitude);
 
         if (address) {
           const area = address.subregion || address.district || address.city || address.name || 'Sawai Madhopur';
@@ -109,6 +133,40 @@ export default function CustomerHomeScreen({
     activeGroup === 'all'
       ? CATEGORIES
       : CATEGORIES.filter((c) => c.group === activeGroup);
+
+  // Location search via Nominatim
+  const searchLocationByName = async (query) => {
+    if (!query || query.trim().length < 3) {
+      setLocationResults([]);
+      return;
+    }
+    setLocationSearchLoading(true);
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query.trim())}&format=json&countrycodes=IN&limit=7&addressdetails=1`;
+      const resp = await fetch(url, {
+        headers: { 'User-Agent': 'MistriProApp/1.0 (contact@mistripro.com)' },
+      });
+      if (!resp.ok) throw new Error('Network error');
+      const data = await resp.json();
+      setLocationResults(Array.isArray(data) ? data : []);
+    } catch (e) {
+      console.log('Location search error:', e?.message);
+      setLocationResults([]);
+    } finally {
+      setLocationSearchLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (locationSearchQuery.trim().length >= 3) {
+        searchLocationByName(locationSearchQuery);
+      } else {
+        setLocationResults([]);
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [locationSearchQuery]);
 
   // Concise 8 categories unless "See All" is clicked
   const displayedCategories = showAllCategories
@@ -256,6 +314,24 @@ export default function CustomerHomeScreen({
       return aAvail ? -1 : 1;
     });
   }, [searchQuery, selectedCategory, workers]);
+
+  // Filtered by 10km distance
+  const nearbyWorkers10km = useMemo(() => {
+    return nearbyWorkers
+      .map((worker) => {
+        if (userLat && userLon && worker.latitude && worker.longitude) {
+          const dist = getDistanceKm(userLat, userLon, worker.latitude, worker.longitude);
+          return { ...worker, computedDistance: dist, distance: dist.toFixed(1) };
+        }
+        return worker;
+      })
+      .filter((worker) => {
+        if (userLat && userLon && worker.computedDistance !== undefined) {
+          return worker.computedDistance <= 10;
+        }
+        return true;
+      });
+  }, [nearbyWorkers, userLat, userLon]);
 
   const handleProceedToBooking = (worker) => {
     setSelectedWorker(null);
@@ -419,9 +495,9 @@ export default function CustomerHomeScreen({
         {/* ─── 1. Header Bar ─── */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
-            <View style={styles.avatarCircle}>
+            <TouchableOpacity style={styles.avatarCircle} activeOpacity={0.8} onPress={() => onNavigateTab && onNavigateTab('profile')}>
               <Text style={styles.avatarInitials}>{userInitials}</Text>
-            </View>
+            </TouchableOpacity>
             <View>
               <Text style={styles.greetingSub}>Good morning 👋</Text>
               <Text style={styles.greetingName}>Hello, {userName || 'User'}!</Text>
@@ -438,7 +514,7 @@ export default function CustomerHomeScreen({
         </View>
 
         {/* ─── 2. Location Picker ─── */}
-        <TouchableOpacity style={styles.locationPill} activeOpacity={0.75}>
+        <TouchableOpacity style={styles.locationPill} activeOpacity={0.75} onPress={() => setShowLocationSearch(true)}>
           <MapPin size={16} color="#4F46E5" />
           {locationLoading ? (
             <ActivityIndicator size="small" color="#4F46E5" style={{ marginLeft: 6 }} />
@@ -609,10 +685,10 @@ export default function CustomerHomeScreen({
           <View style={styles.nearbyTitleRow}>
             <Text style={styles.sectionTitle}>
               {selectedCategory
-                ? `${selectedCategory}s Online (${nearbyWorkers.length})`
+                ? `${selectedCategory}s Online (${nearbyWorkers10km.length})`
                 : searchQuery
-                ? `Search: "${searchQuery}" (${nearbyWorkers.length})`
-                : `Workers near you (${nearbyWorkers.length})`}
+                ? `Search: "${searchQuery}" (${nearbyWorkers10km.length})`
+                : `Workers near you (${nearbyWorkers10km.length})`}
             </Text>
             <View style={styles.rangeBadge}>
               <Text style={styles.rangeBadgeText}>Live GPS</Text>
@@ -629,7 +705,7 @@ export default function CustomerHomeScreen({
           )}
         </View>
 
-        {nearbyWorkers.length === 0 ? (
+        {nearbyWorkers10km.length === 0 ? (
           <View style={styles.emptyCard}>
             <Text style={{ fontSize: 30, marginBottom: 8 }}>👷‍♂️</Text>
             <Text style={styles.emptyTitle}>
@@ -646,7 +722,7 @@ export default function CustomerHomeScreen({
             </TouchableOpacity>
           </View>
         ) : (
-          nearbyWorkers.slice(0, 8).map((worker, wIdx) => (
+          nearbyWorkers10km.slice(0, 8).map((worker, wIdx) => (
             <View key={worker.id || `nw-${wIdx}`}>{renderWorkerCard({ item: worker })}</View>
           ))
         )}
@@ -811,6 +887,157 @@ export default function CustomerHomeScreen({
           }
         }}
       />
+
+      {/* Location Search Modal */}
+      <Modal
+        visible={showLocationSearch}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => setShowLocationSearch(false)}
+      >
+        <KeyboardAvoidingView
+          style={{ flex: 1, backgroundColor: '#F8F9FF' }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          {/* Header */}
+          <View style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingTop: 54,
+            paddingBottom: 16,
+            paddingHorizontal: 20,
+            backgroundColor: '#fff',
+            borderBottomWidth: 1,
+            borderBottomColor: '#E8ECFF',
+          }}>
+            <TouchableOpacity onPress={() => { setShowLocationSearch(false); setLocationSearchQuery(''); setLocationResults([]); }} style={{ marginRight: 12 }}>
+              <Text style={{ fontSize: 24, color: '#3D47D6' }}>←</Text>
+            </TouchableOpacity>
+            <Text style={{ fontSize: 20, fontWeight: '700', color: '#1A1A2E', fontFamily: 'Satoshi-Bold' }}>
+              Choose Location
+            </Text>
+          </View>
+
+          {/* Search Input */}
+          <View style={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8 }}>
+            <View style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              backgroundColor: '#fff',
+              borderRadius: 14,
+              borderWidth: 1.5,
+              borderColor: '#3D47D6',
+              paddingHorizontal: 14,
+              paddingVertical: 10,
+              shadowColor: '#3D47D6',
+              shadowOpacity: 0.08,
+              shadowRadius: 8,
+              elevation: 2,
+            }}>
+              <Text style={{ fontSize: 18, marginRight: 8 }}>🔍</Text>
+              <TextInput
+                autoFocus
+                value={locationSearchQuery}
+                onChangeText={setLocationSearchQuery}
+                placeholder="Search city, area, town in India..."
+                placeholderTextColor="#9BA3C7"
+                style={{
+                  flex: 1,
+                  fontSize: 16,
+                  color: '#1A1A2E',
+                  fontFamily: 'Satoshi-Medium',
+                }}
+              />
+              {locationSearchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => { setLocationSearchQuery(''); setLocationResults([]); }}>
+                  <Text style={{ fontSize: 18, color: '#9BA3C7' }}>✕</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+
+          {/* Loading */}
+          {locationSearchLoading && (
+            <View style={{ alignItems: 'center', paddingTop: 20 }}>
+              <ActivityIndicator size="large" color="#3D47D6" />
+              <Text style={{ marginTop: 8, color: '#6B7280', fontFamily: 'Satoshi-Regular' }}>Searching...</Text>
+            </View>
+          )}
+
+          {/* Results */}
+          <FlatList
+            data={locationResults}
+            keyExtractor={(item, index) => `${item.place_id || index}`}
+            contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 40 }}
+            renderItem={({ item }) => {
+              const parts = (item.display_name || '').split(',');
+              const mainName = parts[0]?.trim() || item.display_name;
+              const subName = parts.slice(1, 3).join(',').trim();
+              return (
+                <TouchableOpacity
+                  onPress={() => {
+                    const shortLocationName = parts.slice(0, 2).join(', ').trim();
+                    setLocationText(shortLocationName || item.display_name);
+                    setUserLat(parseFloat(item.lat));
+                    setUserLon(parseFloat(item.lon));
+                    setShowLocationSearch(false);
+                    setLocationSearchQuery('');
+                    setLocationResults([]);
+                  }}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    backgroundColor: '#fff',
+                    borderRadius: 12,
+                    paddingHorizontal: 16,
+                    paddingVertical: 14,
+                    marginBottom: 8,
+                    shadowColor: '#000',
+                    shadowOpacity: 0.04,
+                    shadowRadius: 4,
+                    elevation: 1,
+                  }}
+                >
+                  <Text style={{ fontSize: 20, marginRight: 12 }}>📍</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 15, fontWeight: '600', color: '#1A1A2E', fontFamily: 'Satoshi-Bold' }} numberOfLines={1}>
+                      {mainName}
+                    </Text>
+                    {subName ? (
+                      <Text style={{ fontSize: 12, color: '#6B7280', marginTop: 2, fontFamily: 'Satoshi-Regular' }} numberOfLines={1}>
+                        {subName}
+                      </Text>
+                    ) : null}
+                  </View>
+                </TouchableOpacity>
+              );
+            }}
+            ListEmptyComponent={
+              !locationSearchLoading && locationSearchQuery.length >= 3 ? (
+                <View style={{ alignItems: 'center', paddingTop: 40 }}>
+                  <Text style={{ fontSize: 32 }}>🗺️</Text>
+                  <Text style={{ fontSize: 16, color: '#6B7280', marginTop: 8, fontFamily: 'Satoshi-Regular' }}>
+                    No locations found
+                  </Text>
+                  <Text style={{ fontSize: 13, color: '#9BA3C7', marginTop: 4 }}>Try a different city or area name</Text>
+                </View>
+              ) : locationSearchQuery.length < 3 && locationSearchQuery.length > 0 ? (
+                <View style={{ alignItems: 'center', paddingTop: 40 }}>
+                  <Text style={{ fontSize: 13, color: '#9BA3C7', fontFamily: 'Satoshi-Regular' }}>Type at least 3 characters to search</Text>
+                </View>
+              ) : (
+                <View style={{ alignItems: 'center', paddingTop: 40 }}>
+                  <Text style={{ fontSize: 32 }}>🏙️</Text>
+                  <Text style={{ fontSize: 15, color: '#6B7280', marginTop: 8, fontFamily: 'Satoshi-Regular' }}>
+                    Search for your city or area
+                  </Text>
+                  <Text style={{ fontSize: 12, color: '#9BA3C7', marginTop: 4 }}>India locations only</Text>
+                </View>
+              )
+            }
+          />
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
