@@ -69,6 +69,12 @@ const shortName = (full) => {
   return words.slice(0, 2).join(' ');
 };
 
+const shortCity = (loc) => {
+  if (!loc || typeof loc !== 'string') return '';
+  const first = loc.split(',')[0].trim();
+  return first.length > 20 ? first.slice(0, 18) + '...' : first;
+};
+
 export default function CustomerHomeScreen({
   insets,
   onNavigateTab,
@@ -572,22 +578,22 @@ export default function CustomerHomeScreen({
 
         {/* ─── 2. Location Picker ─── */}
         <TouchableOpacity style={styles.locationPill} activeOpacity={0.75} onPress={() => setShowLocationSearch(true)}>
-          <MapPin size={16} color={isManualLocation ? '#4F46E5' : '#16A34A'} />
+          <MapPin size={15} color={isManualLocation ? '#4F46E5' : '#16A34A'} />
           {locationLoading ? (
-            <ActivityIndicator size="small" color="#4F46E5" style={{ marginLeft: 6 }} />
+            <ActivityIndicator size="small" color="#4F46E5" style={{ marginLeft: 4 }} />
           ) : (
-            <Text style={styles.locationText} numberOfLines={1}>
+            <Text style={styles.locationText} numberOfLines={1} ellipsizeMode="tail">
               {translateLocationName(locationText, lang)}
             </Text>
           )}
           {isManualLocation && (
-            <View style={{ backgroundColor: '#EEF2FF', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, marginLeft: 2 }}>
-              <Text style={{ fontSize: 9.5, fontFamily: 'Satoshi-Bold', color: '#4F46E5' }}>
+            <View style={{ backgroundColor: '#EEF2FF', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, flexShrink: 0 }}>
+              <Text style={{ fontSize: 9, fontFamily: 'Satoshi-Bold', color: '#4F46E5' }}>
                 {lang === 'hi' ? 'चुना हुआ' : lang === 'gu' ? 'પસંદ કરેલ' : lang === 'mr' ? 'निवडलेले' : 'Selected'}
               </Text>
             </View>
           )}
-          <ChevronDown size={16} color="#64748B" />
+          <ChevronDown size={14} color="#64748B" style={{ flexShrink: 0 }} />
         </TouchableOpacity>
 
         {/* ─── 3. Main Hero Card with Search ─── */}
@@ -749,41 +755,41 @@ export default function CustomerHomeScreen({
         {/* ─── 6. Nearby Workers (<10km / <50km / All) ─── */}
         <View style={styles.sectionHeader}>
           <View style={styles.nearbyTitleRow}>
-            <Text style={styles.sectionTitle}>
+            <Text style={styles.sectionTitle} numberOfLines={1} ellipsizeMode="tail">
               {selectedCategory
                 ? `${translateWorkerSkill(selectedCategory, lang)} (${nearbyWorkers10km.length})`
                 : searchQuery
                 ? `${lang === 'hi' ? 'खोज' : lang === 'gu' ? 'શોધ' : lang === 'mr' ? 'शोध' : 'Search'}: "${searchQuery}" (${nearbyWorkers10km.length})`
                 : isManualLocation
-                ? (lang === 'hi' ? `${translateLocationName(locationText, lang)} में कारीगर (${nearbyWorkers10km.length})` : lang === 'gu' ? `${translateLocationName(locationText, lang)} માં કારીગરો (${nearbyWorkers10km.length})` : lang === 'mr' ? `${translateLocationName(locationText, lang)} मधील कामगार (${nearbyWorkers10km.length})` : `Workers in ${locationText} (${nearbyWorkers10km.length})`)
-                : (lang === 'hi' ? `आपके पास उपलब्ध कारीगर (${nearbyWorkers10km.length})` : lang === 'gu' ? `તમારી નજીકના ઉપલબ્ધ કારીગરો (${nearbyWorkers10km.length})` : lang === 'mr' ? `तुमच्या जवळील उपलब्ध कामगार (${nearbyWorkers10km.length})` : `Workers near you (${nearbyWorkers10km.length})`)}
+                ? (lang === 'hi' ? `${shortCity(translateLocationName(locationText, lang))} में कारीगर (${nearbyWorkers10km.length})` : lang === 'gu' ? `${shortCity(translateLocationName(locationText, lang))} માં કારીગરો (${nearbyWorkers10km.length})` : lang === 'mr' ? `${shortCity(translateLocationName(locationText, lang))} मधील कामगार (${nearbyWorkers10km.length})` : `Workers in ${shortCity(locationText)} (${nearbyWorkers10km.length})`)
+                : (lang === 'hi' ? `पास के कारीगर (${nearbyWorkers10km.length})` : lang === 'gu' ? `નજીકના કારીગરો (${nearbyWorkers10km.length})` : lang === 'mr' ? `जवळचे कामगार (${nearbyWorkers10km.length})` : `Workers near you (${nearbyWorkers10km.length})`)}
             </Text>
             {isManualLocation ? (
               <TouchableOpacity
-                style={[styles.rangeBadge, { backgroundColor: '#FEF3C7' }]}
+                style={[styles.rangeBadge, { backgroundColor: '#FEF3C7', flexShrink: 0 }]}
                 onPress={detectAndApplyCurrentGpsLocation}
                 activeOpacity={0.8}
               >
                 <Text style={[styles.rangeBadgeText, { color: '#B45309' }]}>
-                  {lang === 'hi' ? 'GPS पर लौटें ↺' : lang === 'gu' ? 'GPS પર પાછા જાઓ ↺' : lang === 'mr' ? 'GPS वर जा ↺' : 'Reset GPS ↺'}
+                  {lang === 'hi' ? 'GPS ↺' : lang === 'gu' ? 'GPS ↺' : lang === 'mr' ? 'GPS ↺' : 'GPS ↺'}
                 </Text>
               </TouchableOpacity>
             ) : (
-              <View style={styles.rangeBadge}>
+              <View style={[styles.rangeBadge, { flexShrink: 0 }]}>
                 <Text style={styles.rangeBadgeText}>{lang === 'hi' ? 'लाइव GPS' : lang === 'gu' ? 'લાઈવ GPS' : lang === 'mr' ? 'लाइव्ह GPS' : 'Live GPS'}</Text>
               </View>
             )}
           </View>
           {(selectedCategory || searchQuery) ? (
-            <TouchableOpacity onPress={() => { setSelectedCategory(null); setSearchQuery(''); }}>
+            <TouchableOpacity onPress={() => { setSelectedCategory(null); setSearchQuery(''); }} style={{ flexShrink: 0 }}>
               <Text style={[styles.seeAll, { color: '#DC2626', fontFamily: 'Satoshi-Bold' }]}>
-                {lang === 'hi' ? 'फ़िल्टर हटाएं ✕' : lang === 'gu' ? 'ફિલ્ટર હટાવો ✕' : lang === 'mr' ? 'फिल्टर काढा ✕' : 'Clear Filter ✕'}
+                {lang === 'hi' ? 'हटाएं ✕' : lang === 'gu' ? 'હટાવો ✕' : lang === 'mr' ? 'काढा ✕' : 'Clear ✕'}
               </Text>
             </TouchableOpacity>
           ) : (
-            <TouchableOpacity onPress={() => onNavigateTab && onNavigateTab('FIND_WORKERS')}>
+            <TouchableOpacity onPress={() => onNavigateTab && onNavigateTab('FIND_WORKERS')} style={{ flexShrink: 0 }}>
               <Text style={styles.seeAll}>
-                {lang === 'hi' ? 'नक्शा खोलें →' : lang === 'gu' ? 'નકશો ખોલો →' : lang === 'mr' ? 'नकाशा उघडा →' : 'Open Map →'}
+                {lang === 'hi' ? 'नक्शा →' : lang === 'gu' ? 'નકશો →' : lang === 'mr' ? 'नकाशा →' : 'Map →'}
               </Text>
             </TouchableOpacity>
           )}
@@ -1153,7 +1159,8 @@ export default function CustomerHomeScreen({
               return (
                 <TouchableOpacity
                   onPress={() => {
-                    const shortLocationName = parts.slice(0, 2).join(', ').trim();
+                    const cleanPrimary = (mainName || parts[0] || '').trim();
+                    const shortLocationName = cleanPrimary.length > 25 ? cleanPrimary.slice(0, 22) + '...' : cleanPrimary;
                     setLocationText(shortLocationName || item.display_name);
                     setUserLat(parseFloat(item.lat));
                     setUserLon(parseFloat(item.lon));
@@ -1299,6 +1306,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
+    maxWidth: '92%',
     backgroundColor: '#FFFFFF',
     paddingHorizontal: 12,
     paddingVertical: 6,
@@ -1310,9 +1318,10 @@ const styles = StyleSheet.create({
   },
   locationText: {
     fontFamily: 'Satoshi-Medium',
-    fontSize: 13,
+    fontSize: 12.5,
     color: '#334155',
-    maxWidth: 240,
+    flexShrink: 1,
+    maxWidth: 180,
   },
   heroCard: {
     backgroundColor: '#FFFFFF',
@@ -1571,15 +1580,27 @@ const styles = StyleSheet.create({
   rangePillTextActive: {
     color: '#FFFFFF',
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginTop: 8,
+    marginBottom: 8,
+  },
   nearbyTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
+    flex: 1,
+    minWidth: 0,
+    marginRight: 8,
   },
   sectionTitle: {
     fontFamily: 'Satoshi-Bold',
-    fontSize: 15,
+    fontSize: 14.5,
     color: '#0F172A',
+    flexShrink: 1,
   },
   rangeBadge: {
     backgroundColor: '#DCFCE7',
