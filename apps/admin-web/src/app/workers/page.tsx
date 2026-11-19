@@ -139,7 +139,6 @@ export default function WorkersPage() {
           .from('worker_profiles')
           .update({
             is_available: true,
-            updated_at: new Date().toISOString(),
           })
           .eq('user_id', workerId);
       } catch (wpErr) {
@@ -460,20 +459,28 @@ export default function WorkersPage() {
 
                   <div className="aspect-[16/10] bg-slate-200 rounded-lg overflow-hidden border border-slate-200 flex items-center justify-center relative group">
                     {selectedWorker.aadhaarFront ? (
-                      <>
-                        <img
-                          src={selectedWorker.aadhaarFront}
-                          alt="Aadhaar Front"
-                          className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                        />
-                        <button
-                          onClick={() => setPreviewImage(selectedWorker.aadhaarFront)}
-                          className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-2 text-white font-bold text-xs"
-                        >
-                          <Maximize2 className="w-4 h-4" />
-                          <span>Inspect Full Size</span>
-                        </button>
-                      </>
+                      selectedWorker.aadhaarFront.startsWith('data:image') || selectedWorker.aadhaarFront.startsWith('http') ? (
+                        <>
+                          <img
+                            src={selectedWorker.aadhaarFront}
+                            alt="Aadhaar Front"
+                            className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                          />
+                          <button
+                            onClick={() => setPreviewImage(selectedWorker.aadhaarFront)}
+                            className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-2 text-white font-bold text-xs"
+                          >
+                            <Maximize2 className="w-4 h-4" />
+                            <span>Inspect Full Size</span>
+                          </button>
+                        </>
+                      ) : (
+                        <div className="text-center p-3 text-slate-500">
+                          <AlertCircle className="w-6 h-6 mx-auto mb-1 text-amber-500" />
+                          <p className="text-[11px] font-bold text-slate-700">Device File Path</p>
+                          <p className="text-[10px] text-slate-400 font-mono mt-0.5 truncate max-w-[200px]">{selectedWorker.aadhaarFront}</p>
+                        </div>
+                      )
                     ) : (
                       <div className="text-center p-4 text-slate-400">
                         <FileText className="w-6 h-6 mx-auto mb-1 opacity-50" />
@@ -500,20 +507,28 @@ export default function WorkersPage() {
 
                   <div className="aspect-[16/10] bg-slate-200 rounded-lg overflow-hidden border border-slate-200 flex items-center justify-center relative group">
                     {selectedWorker.aadhaarBack ? (
-                      <>
-                        <img
-                          src={selectedWorker.aadhaarBack}
-                          alt="Aadhaar Back"
-                          className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                        />
-                        <button
-                          onClick={() => setPreviewImage(selectedWorker.aadhaarBack)}
-                          className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-2 text-white font-bold text-xs"
-                        >
-                          <Maximize2 className="w-4 h-4" />
-                          <span>Inspect Full Size</span>
-                        </button>
-                      </>
+                      selectedWorker.aadhaarBack.startsWith('data:image') || selectedWorker.aadhaarBack.startsWith('http') ? (
+                        <>
+                          <img
+                            src={selectedWorker.aadhaarBack}
+                            alt="Aadhaar Back"
+                            className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                          />
+                          <button
+                            onClick={() => setPreviewImage(selectedWorker.aadhaarBack)}
+                            className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-2 text-white font-bold text-xs"
+                          >
+                            <Maximize2 className="w-4 h-4" />
+                            <span>Inspect Full Size</span>
+                          </button>
+                        </>
+                      ) : (
+                        <div className="text-center p-3 text-slate-500">
+                          <AlertCircle className="w-6 h-6 mx-auto mb-1 text-amber-500" />
+                          <p className="text-[11px] font-bold text-slate-700">Device File Path</p>
+                          <p className="text-[10px] text-slate-400 font-mono mt-0.5 truncate max-w-[200px]">{selectedWorker.aadhaarBack}</p>
+                        </div>
+                      )
                     ) : (
                       <div className="text-center p-4 text-slate-400">
                         <FileText className="w-6 h-6 mx-auto mb-1 opacity-50" />

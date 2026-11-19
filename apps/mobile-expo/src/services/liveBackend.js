@@ -692,7 +692,7 @@ export const LiveBackend = {
 
       const experienceYears = Number(workerProfile.experienceYears || workerProfile.experience_years) || 5;
 
-      // Upsert worker details in worker_profiles table
+      // Upsert worker details in worker_profiles table (Note: worker_profiles does not have updated_at column)
       const { data: wpExisting } = await supabase
         .from('worker_profiles')
         .select('id')
@@ -705,16 +705,16 @@ export const LiveBackend = {
         aadhaar_front_url: frontUrl,
         aadhaar_back_url: backUrl,
         is_available: true,
-        updated_at: new Date().toISOString(),
       };
 
       if (wpExisting && wpExisting.length > 0) {
-        await supabase
+        const { error: upErr } = await supabase
           .from('worker_profiles')
           .update(workerData)
           .eq('user_id', userId);
+        if (upErr) console.log('worker_profiles update notice:', upErr.message);
       } else {
-        await supabase.from('worker_profiles').insert([
+        const { error: insErr } = await supabase.from('worker_profiles').insert([
           {
             ...workerData,
             user_id: userId,
@@ -722,6 +722,7 @@ export const LiveBackend = {
             reviews_count: 0,
           },
         ]);
+        if (insErr) console.log('worker_profiles insert notice:', insErr.message);
       }
 
       return { success: true, userId, frontUrl, backUrl };
@@ -731,12 +732,64 @@ export const LiveBackend = {
     }
   },
 
+  // 5b. Update Worker Skills in Cloud & Session
+  updateWorkerSkills: async (userId, phone, newSkills) => {
+    try {
+      if (!userId && !phone) return { success: false, error: 'Identifier required' };
+      let targetUserId = userId;
+      if (!targetUserId && phone) {
+        const cleanDigits = String(phone).replace(/[^0-9]/g, '').slice(-10);
+        const { data: p } = await supabase
+          .from('profiles')
+          .select('id')
+          .ilike('phone', `%${cleanDigits}%`)
+          .limit(1);
+        if (p && p[0]) targetUserId = p[0].id;
+      }
+      if (!targetUserId) return { success: false, error: 'Worker profile not found' };
+
+      const { data: existingWp } = await supabase
+        .from('worker_profiles')
+        .select('id')
+        .eq('user_id', targetUserId);
+
+      if (existingWp && existingWp.length > 0) {
+        const { data, error } = await supabase
+          .from('worker_profiles')
+          .update({ skills: newSkills })
+          .eq('user_id', targetUserId)
+          .select();
+        if (error) throw error;
+        return { success: true, data };
+      } else {
+        const { data, error } = await supabase
+          .from('worker_profiles')
+          .insert([
+            {
+              user_id: targetUserId,
+              skills: newSkills,
+              is_available: true,
+              daily_rate: 0,
+              rating: 5.0,
+              reviews_count: 0,
+            },
+          ])
+          .select();
+        if (error) throw error;
+        return { success: true, data };
+      }
+    } catch (err) {
+      console.log('LiveBackend.updateWorkerSkills error:', err.message);
+      return { success: false, error: err.message };
+    }
+  },
+
   // 6. Check Worker KYC Approval Status (Live Query by Phone or User ID)
   checkWorkerApprovalStatus: async (phone, userId = null) => {
     try {
       if (!phone && !userId) return { approved: false, status: 'PENDING' };
 
-      let query = supabase.from('profiles').select('id, phone, alt_phone, kyc_status, role');
+      let query = supabase.from('profiles').select('id, full_name, phone, alt_phone, address, kyc_status, role');
       if (userId) {
         query = query.eq('id', userId);
       } else {
@@ -753,7 +806,7 @@ export const LiveBackend = {
         const cleanDigits = String(phone).replace(/[^0-9]/g, '').slice(-10);
         const { data: allProfiles } = await supabase
           .from('profiles')
-          .select('id, phone, alt_phone, kyc_status, role')
+          .select('id, full_name, phone, alt_phone, address, kyc_status, role')
           .limit(100);
 
         found = (allProfiles || []).find((p) => {
@@ -764,15 +817,81 @@ export const LiveBackend = {
       }
 
       if (!found) return { approved: false, status: 'PENDING' };
+
+      // Also fetch worker_profiles details (skills, aadhaar, experience)
+      let workerProfileData = null;
+      try {
+        const { data: wp } = await supabase
+          .from('worker_profiles')
+          .select('id, skills, experience_years, aadhaar_front_url, aadhaar_back_url, is_available')
+          .eq('user_id', found.id)
+          .maybeSingle();
+        if (wp) workerProfileData = wp;
+      } catch (wpErr) {
+        console.log('Worker profile fetch note:', wpErr.message);
+      }
+
       const isApproved = found.kyc_status === 'APPROVED' || found.kyc_status === 'VERIFIED';
       return {
         approved: isApproved,
         status: found.kyc_status || 'PENDING',
         profile: found,
+        workerProfile: workerProfileData,
+        skills: workerProfileData?.skills || [],
       };
     } catch (err) {
       console.log('LiveBackend.checkWorkerApprovalStatus error:', err);
       return { approved: false, status: 'PENDING' };
+    }
+  },
+
+  // 6b. Fetch Active Broadcast Notifications from Cloud
+  fetchLiveBroadcasts: async (role = 'ALL', phone = null, userId = null) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, phone, alt_phone, address, city, state, created_at')
+        .eq('role', 'ADMIN')
+        .eq('state', 'BROADCAST')
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      if (error || !data) return [];
+
+      const cleanUserPhone = phone ? String(phone).replace(/[^0-9]/g, '').slice(-10) : '';
+
+      return data
+        .filter((item) => {
+          const target = item.city || 'ALL'; // ALL | WORKER | CUSTOMER | USER
+          if (target === 'ALL') return true;
+          if (target === 'WORKER' && role === 'WORKER') return true;
+          if (target === 'CUSTOMER' && role === 'CUSTOMER') return true;
+          if (target === 'USER') {
+            const itemTargetPhone = String(item.alt_phone || '').replace(/[^0-9]/g, '').slice(-10);
+            return (cleanUserPhone && itemTargetPhone === cleanUserPhone) || (userId && item.alt_phone === userId);
+          }
+          return false;
+        })
+        .map((item) => {
+          let details = {};
+          try {
+            details = JSON.parse(item.address || '{}');
+          } catch (e) {
+            details = { message: item.address };
+          }
+          return {
+            id: item.id,
+            title: details.title || item.full_name?.replace('[BROADCAST] ', '') || 'MistriPro Broadcast',
+            message: details.message || '',
+            type: details.type || 'info',
+            priority: details.priority || 'NORMAL',
+            time: item.created_at ? new Date(item.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'Just now',
+            rawDate: item.created_at,
+          };
+        });
+    } catch (err) {
+      console.log('LiveBackend.fetchLiveBroadcasts error:', err.message);
+      return [];
     }
   },
 

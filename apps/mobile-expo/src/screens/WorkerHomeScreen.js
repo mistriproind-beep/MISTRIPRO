@@ -302,10 +302,12 @@ export default function WorkerHomeScreen({
             </View>
             <View style={styles.skillTextCol}>
               <Text style={styles.skillCardLabel}>
-                {lang === 'hi' ? 'आपकी पंजीकृत विशेषज्ञता' : 'Your Registered Trade'}
+                {lang === 'hi' ? 'आपकी पंजीकृत कार्य श्रेणियां' : 'Your Registered Trades'}
               </Text>
               <Text style={styles.skillCardTitle}>
-                {translateWorkerSkill(workerProfile?.skill || 'Mason (राजमिस्त्री)', lang)}
+                {Array.isArray(workerProfile?.skills) && workerProfile.skills.length > 0
+                  ? workerProfile.skills[0]
+                  : translateWorkerSkill(workerProfile?.skill || 'Mason (राजमिस्त्री)', lang)}
               </Text>
             </View>
             <View style={styles.verifiedSkillBadge}>
@@ -315,6 +317,54 @@ export default function WorkerHomeScreen({
               </Text>
             </View>
           </View>
+
+          {/* Multiple Selected Trade Skills Chips */}
+          {Array.isArray(workerProfile?.skills) && workerProfile.skills.length > 0 && (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 12 }}>
+              {workerProfile.skills.map((sk) => (
+                <View
+                  key={sk}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 4,
+                    paddingHorizontal: 10,
+                    paddingVertical: 5,
+                    borderRadius: 8,
+                    backgroundColor: '#EEF2FF',
+                    borderWidth: 1,
+                    borderColor: '#C7D2FE',
+                  }}
+                >
+                  <Text style={{ fontSize: 11, fontFamily: 'Satoshi-Bold', color: '#4338CA' }}>
+                    {translateWorkerSkill(sk, lang)}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* Edit / Manage Skills Button */}
+          <TouchableOpacity
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginTop: 10,
+              paddingTop: 8,
+              borderTopWidth: 1,
+              borderTopColor: '#F1F5F9',
+            }}
+            onPress={() => onNavigateTab && onNavigateTab('PROFILE')}
+            activeOpacity={0.7}
+          >
+            <Text style={{ fontSize: 11.5, fontFamily: 'Satoshi-Bold', color: '#4F46E5' }}>
+              {lang === 'hi' ? '⚙️ हुनर बदलें या नए हुनर जोड़ें →' : '⚙️ Manage or Add More Skills →'}
+            </Text>
+            <Text style={{ fontSize: 11, fontFamily: 'Satoshi-Medium', color: '#64748B' }}>
+              {Array.isArray(workerProfile?.skills) ? `${workerProfile.skills.length} Active` : '1 Active'}
+            </Text>
+          </TouchableOpacity>
 
           <View style={styles.tradeDivider} />
 

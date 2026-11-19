@@ -105,6 +105,8 @@ import { LiveBackend } from './src/services/liveBackend';
 import { InvoiceService } from './src/services/invoiceService';
 import { DeviceFeedback } from './src/services/deviceFeedback';
 import NotificationCenterModal from './src/components/NotificationCenterModal';
+import WorkerManageSkillsModal from './src/components/WorkerManageSkillsModal';
+import EditProfileModal from './src/components/EditProfileModal';
 
 const { width } = Dimensions.get('window');
 
@@ -877,16 +879,30 @@ function MainApp() {
           if (res?.approved || res?.status === 'APPROVED' || res?.status === 'VERIFIED') {
             clearInterval(pollInterval);
             DeviceFeedback.triggerSuccessHaptics();
+            const activeSkills = (res?.skills && res.skills.length > 0)
+              ? res.skills
+              : (workerSkills && workerSkills.length > 0)
+              ? workerSkills
+              : ['Mason (Raj Mistri)'];
+            if (activeSkills.length > 0) setWorkerSkills(activeSkills);
+
             await StorageService.setSession({
               mobile: targetPhone,
               phone: targetPhone,
               name: workerName || 'Mistri',
               role: 'WORKER',
               kyc_status: 'APPROVED',
+              skills: activeSkills,
+              experienceYears: res?.workerProfile?.experience_years || Number(workerExperienceYears) || 5,
             });
             await StorageService.setRole('WORKER');
             setRole('WORKER');
-            setWorkerProfile((prev) => ({ ...prev, kycStatus: 'APPROVED' }));
+            setWorkerProfile((prev) => ({
+              ...prev,
+              kycStatus: 'APPROVED',
+              skills: activeSkills,
+              skill: activeSkills.join(' • '),
+            }));
             setActiveTab('HOME');
             setCurrentScreen('MAIN');
           }
@@ -917,6 +933,29 @@ function MainApp() {
       clearInterval(interval);
     };
   }, []);
+
+  // Live Admin Broadcast Notifications Sync (Real-time Cloud Sync)
+  useEffect(() => {
+    let timer;
+    const syncBroadcasts = async () => {
+      try {
+        const userPhone = role === 'WORKER' ? workerMobile : custMobile;
+        const liveBroadcasts = await LiveBackend.fetchLiveBroadcasts(role, userPhone);
+        if (liveBroadcasts && liveBroadcasts.length > 0) {
+          setNotifications((prev) => {
+            const existingIds = new Set(prev.map((n) => n.id));
+            const newItems = liveBroadcasts.filter((b) => !existingIds.has(b.id));
+            if (newItems.length === 0) return prev;
+            return [...newItems, ...prev];
+          });
+        }
+      } catch (e) {}
+    };
+
+    syncBroadcasts();
+    timer = setInterval(syncBroadcasts, 15000); // 15s realtime polling
+    return () => clearInterval(timer);
+  }, [role, workerMobile, custMobile]);
 
   const [showNotifModal, setShowNotifModal] = useState(false);
   const [notifications, setNotifications] = useState([
@@ -1470,11 +1509,14 @@ function MainApp() {
         if (name) setWorkerName(name);
         if (contact) setWorkerMobile(contact);
         if (address) setWorkerAddress(address);
+        if (experienceYears) setWorkerExperienceYears(String(experienceYears));
+
         setWorkerProfile((prev) => ({
           ...prev,
           name: name || workerName,
           phone: contact || workerMobile,
           location: address || workerAddress,
+          experienceYears: experienceYears || prev.experienceYears,
         }));
         const targetId = contact || emailInput || 'worker';
         await StorageService.saveAccountProfile(targetId, {
@@ -1482,12 +1524,17 @@ function MainApp() {
           phone: contact || workerMobile,
           role: 'WORKER',
           address: address || workerAddress,
+          skills: workerSkills,
+          experienceYears: experienceYears || Number(workerExperienceYears) || 5,
         });
         await StorageService.setSession({
           name: name || workerName,
           phone: contact || workerMobile,
           mobile: contact || workerMobile,
           role: 'WORKER',
+          address: address || workerAddress,
+          skills: workerSkills,
+          experienceYears: experienceYears || Number(workerExperienceYears) || 5,
         });
         await LiveBackend.syncProfile({
           fullName: name || workerName,
@@ -1495,11 +1542,64 @@ function MainApp() {
           role: 'WORKER',
           address: address || workerAddress,
         });
+
+        // Sync experience to worker_profiles in Supabase
+        if (experienceYears) {
+          try {
+            const cleanDigits = String(contact || workerMobile).replace(/[^0-9]/g, '').slice(-10);
+            const { data: p } = await supabase
+              .from('profiles')
+              .select('id')
+              .ilike('phone', `%${cleanDigits}%`)
+              .limit(1);
+            if (p && p[0]) {
+              await supabase
+                .from('worker_profiles')
+                .update({ experience_years: Number(experienceYears) })
+                .eq('user_id', p[0].id);
+            }
+          } catch (expErr) {
+            console.log('Worker experience update notice:', expErr);
+          }
+        }
       }
       DeviceFeedback.triggerSuccessHaptics();
       Alert.alert('Profile Saved! ✅', 'Your profile details have been saved to your phone and Supabase.');
     } catch (err) {
       console.log('handleSaveProfile err:', err);
+    }
+  };
+
+  // Dedicated Trade Skills Manager for Worker
+  const handleUpdateWorkerSkills = async (newSkills) => {
+    try {
+      setWorkerSkills(newSkills);
+      setWorkerProfile((prev) => ({
+        ...prev,
+        skills: newSkills,
+        skill: newSkills.join(' • ') || newSkills[0] || 'General Mistri',
+      }));
+
+      const targetPhone = workerMobile || phoneInput;
+      const targetId = emailInput.trim() || targetPhone;
+
+      // 1. Update session storage
+      const activeSession = await StorageService.getSession();
+      await StorageService.setSession({
+        ...activeSession,
+        skills: newSkills,
+      });
+
+      if (targetId) {
+        await StorageService.saveAccountProfile(targetId, {
+          skills: newSkills,
+        });
+      }
+
+      // 2. Sync to Supabase worker_profiles table
+      await LiveBackend.updateWorkerSkills(activeSession?.id || workerProfile?.id, targetPhone, newSkills);
+    } catch (err) {
+      console.log('handleUpdateWorkerSkills error:', err);
     }
   };
 
@@ -1708,6 +1808,9 @@ function MainApp() {
           const userAddr = savedSession?.address || localAcct?.address || '';
           let userKyc = savedSession?.kyc_status || localAcct?.kyc_status || 'VERIFIED';
 
+          let liveWorkerSkills = [];
+          let liveWorkerExp = 5;
+
           // Check live Supabase Cloud KYC approval status for worker
           if (effectiveRole === 'WORKER') {
             try {
@@ -1717,6 +1820,12 @@ function MainApp() {
               } else if (liveStatus && liveStatus.status) {
                 userKyc = liveStatus.status;
               }
+              if (liveStatus?.skills && liveStatus.skills.length > 0) {
+                liveWorkerSkills = liveStatus.skills;
+              }
+              if (liveStatus?.workerProfile?.experience_years) {
+                liveWorkerExp = liveStatus.workerProfile.experience_years;
+              }
             } catch (kErr) {
               console.log('Live worker status check notice:', kErr);
             }
@@ -1724,6 +1833,16 @@ function MainApp() {
 
           setRole(effectiveRole);
           await StorageService.setRole(effectiveRole);
+
+          const resolvedSkills = (liveWorkerSkills && liveWorkerSkills.length > 0)
+            ? liveWorkerSkills
+            : (savedSession?.skills && savedSession.skills.length > 0)
+            ? savedSession.skills
+            : (localAcct?.skills && localAcct.skills.length > 0)
+            ? localAcct.skills
+            : [];
+          const resolvedExp = liveWorkerExp || savedSession?.experienceYears || localAcct?.experienceYears || 5;
+
           await StorageService.setSession({
             id: savedSession?.id || localAcct?.id || 'usr-' + Date.now(),
             name: userDisplayName,
@@ -1733,6 +1852,8 @@ function MainApp() {
             role: effectiveRole,
             address: userAddr,
             kyc_status: userKyc,
+            skills: resolvedSkills,
+            experienceYears: resolvedExp,
           });
 
           if (isMounted) {
@@ -1740,6 +1861,11 @@ function MainApp() {
               setWorkerName(userDisplayName);
               setWorkerMobile(userPhone);
               if (userAddr) setWorkerAddress(userAddr);
+              if (resolvedSkills.length > 0) {
+                setWorkerSkills(resolvedSkills);
+              }
+              setWorkerExperienceYears(String(resolvedExp));
+
               setWorkerProfile((prev) => ({
                 ...prev,
                 id: savedSession?.id || prev.id,
@@ -1748,6 +1874,9 @@ function MainApp() {
                 phone: userPhone || prev.phone,
                 location: userAddr || prev.location,
                 kycStatus: userKyc,
+                skills: resolvedSkills.length > 0 ? resolvedSkills : prev.skills,
+                skill: resolvedSkills.length > 0 ? resolvedSkills.join(' • ') : prev.skill,
+                experienceYears: resolvedExp,
               }));
               if (userKyc === 'APPROVED' || userKyc === 'VERIFIED') {
                 setActiveTab('HOME');
@@ -3657,8 +3786,20 @@ function MainApp() {
                 email: emailInput.trim(),
                 address: workerAddress.trim(),
                 kyc_status: 'PENDING',
+                skills: workerSkills,
+                experienceYears: Number(workerExperienceYears) || 5,
               });
               await StorageService.setRole('WORKER');
+
+              setWorkerProfile((prev) => ({
+                ...prev,
+                name: workerName.trim(),
+                phone: workerMobile.trim(),
+                location: workerAddress.trim(),
+                skills: workerSkills,
+                skill: workerSkills.join(' • ') || workerSkills[0] || 'General Mistri',
+                experienceYears: Number(workerExperienceYears) || 5,
+              }));
 
               const targetId = emailInput.trim() || workerMobile.trim();
               if (targetId) {
@@ -3669,6 +3810,8 @@ function MainApp() {
                   address: workerAddress.trim(),
                   email: emailInput.trim(),
                   kyc_status: 'PENDING',
+                  skills: workerSkills,
+                  experienceYears: Number(workerExperienceYears) || 5,
                 });
               }
 
@@ -3758,16 +3901,30 @@ function MainApp() {
 
                 if (res?.status === 'APPROVED' || res?.status === 'VERIFIED' || res?.approved) {
                   DeviceFeedback.triggerSuccessHaptics();
+                  const activeSkills = (res?.skills && res.skills.length > 0)
+                    ? res.skills
+                    : (workerSkills && workerSkills.length > 0)
+                    ? workerSkills
+                    : ['Mason (Raj Mistri)'];
+                  if (activeSkills.length > 0) setWorkerSkills(activeSkills);
+
                   await StorageService.setSession({
                     mobile: targetPhone,
                     phone: targetPhone,
                     name: workerName || 'Mistri',
                     role: 'WORKER',
                     kyc_status: 'APPROVED',
+                    skills: activeSkills,
+                    experienceYears: res?.workerProfile?.experience_years || Number(workerExperienceYears) || 5,
                   });
                   await StorageService.setRole('WORKER');
                   setRole('WORKER');
-                  setWorkerProfile((prev) => ({ ...prev, kycStatus: 'APPROVED' }));
+                  setWorkerProfile((prev) => ({
+                    ...prev,
+                    kycStatus: 'APPROVED',
+                    skills: activeSkills,
+                    skill: activeSkills.join(' • '),
+                  }));
                   setNotifications((prev) => [
                     {
                       id: `NOTIF-${Date.now()}`,
@@ -4034,6 +4191,9 @@ function MainApp() {
               userName={workerName}
               userContact={workerMobile}
               userAddress={workerAddress}
+              workerSkills={workerSkills}
+              onUpdateWorkerSkills={handleUpdateWorkerSkills}
+              workerExperienceYears={workerExperienceYears}
               onSaveProfile={handleSaveProfile}
               onSelectLang={handleSelectLanguage}
               onOpenInvoices={() => setShowInvoicesModal(true)}
@@ -4986,6 +5146,9 @@ function ProfileScreen({
   userContact,
   userAddress,
   customerWalletBalance = 0,
+  workerSkills = [],
+  onUpdateWorkerSkills,
+  workerExperienceYears = '5',
   onSaveProfile,
   onSelectLang,
   onSwitchLang,
@@ -4993,11 +5156,8 @@ function ProfileScreen({
   onLogout,
 }) {
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showSkillsModal, setShowSkillsModal] = useState(false);
   const [showLangModal, setShowLangModal] = useState(false);
-  const [editName, setEditName] = useState(userName || '');
-  const [editContact, setEditContact] = useState(userContact || '');
-  const [editAddress, setEditAddress] = useState(userAddress || '');
-  const [isSaving, setIsSaving] = useState(false);
 
   const languages = [
     { code: 'en', label: 'English', native: 'English', char: 'A' },
@@ -5005,12 +5165,6 @@ function ProfileScreen({
     { code: 'gu', label: 'Gujarati', native: 'ગુજરાતી', char: 'અ' },
     { code: 'mr', label: 'Marathi', native: 'मराठी', char: 'म' },
   ];
-
-  useEffect(() => {
-    setEditName(userName || '');
-    setEditContact(userContact || '');
-    setEditAddress(userAddress || '');
-  }, [userName, userContact, userAddress]);
 
   const currentLangLabel = {
     en: 'English',
@@ -5030,7 +5184,7 @@ function ProfileScreen({
           <Text style={styles.profileTopBarTitle}>{t.settings}</Text>
         </View>
 
-        {/* ChoosingHer Exact Centered Profile Header */}
+        {/* Exact Centered Profile Header */}
         <View style={styles.profileHeaderCenter}>
           <View style={styles.profileAvatarLarge}>
             <Text style={styles.profileAvatarInitial}>
@@ -5054,15 +5208,56 @@ function ProfileScreen({
             </Text>
           </View>
 
-          {/* Edit Profile Button */}
-          <TouchableOpacity
-            style={styles.editProfilePill}
-            onPress={() => setShowEditModal(true)}
-            activeOpacity={0.8}
-          >
-            <Edit3 size={13} color="#4F46E5" />
-            <Text style={styles.editProfilePillText}>{lang === 'hi' ? 'प्रोफ़ाइल बदलें' : 'Edit Profile'}</Text>
-          </TouchableOpacity>
+          {/* Multiple Skills Badges for Worker */}
+          {role === 'WORKER' && Array.isArray(workerSkills) && workerSkills.length > 0 && (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 6, marginTop: 10, paddingHorizontal: 16 }}>
+              {workerSkills.map((sk) => (
+                <View
+                  key={sk}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 4,
+                    paddingHorizontal: 9,
+                    paddingVertical: 4,
+                    borderRadius: 8,
+                    backgroundColor: '#EEF2FF',
+                    borderWidth: 1,
+                    borderColor: '#C7D2FE',
+                  }}
+                >
+                  <Text style={{ fontSize: 11, fontFamily: 'Satoshi-Bold', color: '#4338CA' }}>
+                    {sk}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* Action Pills Row */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 12 }}>
+            <TouchableOpacity
+              style={styles.editProfilePill}
+              onPress={() => setShowEditModal(true)}
+              activeOpacity={0.8}
+            >
+              <Edit3 size={13} color="#4F46E5" />
+              <Text style={styles.editProfilePillText}>{lang === 'hi' ? 'प्रोफ़ाइल बदलें' : 'Edit Profile'}</Text>
+            </TouchableOpacity>
+
+            {role === 'WORKER' && (
+              <TouchableOpacity
+                style={[styles.editProfilePill, { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0' }]}
+                onPress={() => setShowSkillsModal(true)}
+                activeOpacity={0.8}
+              >
+                <Briefcase size={13} color="#16A34A" />
+                <Text style={[styles.editProfilePillText, { color: '#16A34A' }]}>
+                  {lang === 'hi' ? 'हुनर जोड़ें/बदलें' : 'Manage Skills'}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
 
         {/* MistriPro Customer Virtual Wallet (Pre-arrival refund balance) */}
@@ -5102,9 +5297,9 @@ function ProfileScreen({
           </View>
         )}
 
-        {/* Settings Clean Rows (ChoosingHer exact layout) */}
+        {/* Settings Clean Rows */}
         <View style={styles.settingsGroupCard}>
-          {/* 1. Choose Language (Opens Popup Modal without Redirection) */}
+          {/* 1. Choose Language */}
           <TouchableOpacity style={styles.settingsRow} onPress={() => setShowLangModal(true)} activeOpacity={0.7}>
             <View style={[styles.settingsRowIconWrap, { backgroundColor: '#F0FDF4' }]}>
               <Layers size={18} color="#16A34A" />
@@ -5117,6 +5312,33 @@ function ProfileScreen({
           </TouchableOpacity>
 
           <View style={styles.settingsRowDivider} />
+
+          {/* 2. Worker Dedicated: Manage Trade Skills Screen */}
+          {role === 'WORKER' && (
+            <>
+              <TouchableOpacity
+                style={styles.settingsRow}
+                onPress={() => setShowSkillsModal(true)}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.settingsRowIconWrap, { backgroundColor: '#EEF2FF' }]}>
+                  <Briefcase size={18} color="#4F46E5" />
+                </View>
+                <View style={styles.settingsRowTextCol}>
+                  <Text style={styles.settingsRowLabel}>
+                    {lang === 'hi' ? 'हुनर एवं कार्य श्रेणियां' : 'Trade Skills & Services'}
+                  </Text>
+                  <Text style={styles.settingsRowSub}>
+                    {Array.isArray(workerSkills) && workerSkills.length > 0
+                      ? `${workerSkills.length} ${lang === 'hi' ? 'श्रेणियां सक्रिय ✓' : 'trades active ✓'}`
+                      : (lang === 'hi' ? 'हुनर जोड़ें या हटाएं' : 'Select or remove skills')}
+                  </Text>
+                </View>
+                <ChevronRight size={18} color="#94A3B8" />
+              </TouchableOpacity>
+              <View style={styles.settingsRowDivider} />
+            </>
+          )}
 
           {/* 3. KYC Status (Strictly shown only for Workers, NOT Customers) */}
           {role === 'WORKER' && (
@@ -5201,99 +5423,29 @@ function ProfileScreen({
         <Text style={styles.versionText}>MISTRI PRO • Build v2.4.0 (Enterprise Pro)</Text>
       </ScrollView>
 
-      {/* EDIT PROFILE MODAL (Keyboard-friendly, no overlap) */}
-      <Modal visible={showEditModal} animationType="slide" transparent onRequestClose={() => setShowEditModal(false)}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.modalOverlay}
-        >
-          <View style={[styles.modalCard, { maxHeight: '88%', paddingBottom: Math.max(insets.bottom + 16, 20) }]}>
-            <View style={styles.modalHeader}>
-              <View>
-                <Text style={styles.modalTitle}>
-                  {lang === 'hi' ? 'प्रोफ़ाइल विवरण बदलें' : 'Edit Profile Details'}
-                </Text>
-                <Text style={styles.modalSubtitle}>
-                  {lang === 'hi' ? 'अपना नाम, संपर्क और शहर अपडेट करें' : 'Update your name, contact & location'}
-                </Text>
-              </View>
-              <TouchableOpacity onPress={() => setShowEditModal(false)} style={{ padding: 4 }}>
-                <X size={20} color="#0F172A" />
-              </TouchableOpacity>
-            </View>
+      {/* FULL-SCREEN BEAUTIFUL BOXED EDIT PROFILE MODAL */}
+      <EditProfileModal
+        visible={showEditModal}
+        onClose={() => setShowEditModal(false)}
+        userName={userName}
+        userContact={userContact}
+        userAddress={userAddress}
+        role={role}
+        workerExperienceYears={workerExperienceYears}
+        onSaveProfile={onSaveProfile}
+        lang={lang}
+        insets={insets}
+      />
 
-            <ScrollView
-              style={{ marginTop: 12 }}
-              contentContainerStyle={{ paddingBottom: 28 }}
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
-            >
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>{lang === 'hi' ? 'पूरा नाम' : 'Full Name'}</Text>
-                <TextInput
-                  style={styles.textInput}
-                  value={editName}
-                  onChangeText={setEditName}
-                  placeholder={lang === 'hi' ? 'अपना पूरा नाम दर्ज करें' : 'Enter your full name'}
-                  placeholderTextColor="#94A3B8"
-                />
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>{lang === 'hi' ? 'मोबाइल नंबर' : 'Phone / Mobile Number'}</Text>
-                <TextInput
-                  style={styles.textInput}
-                  value={editContact}
-                  onChangeText={setEditContact}
-                  placeholder="e.g. 9876543210"
-                  placeholderTextColor="#94A3B8"
-                  keyboardType="phone-pad"
-                />
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>{lang === 'hi' ? 'शहर / पता' : 'City / Location Address'}</Text>
-                <TextInput
-                  style={styles.textInput}
-                  value={editAddress}
-                  onChangeText={setEditAddress}
-                  placeholder={lang === 'hi' ? 'उदा. सवाई माधोपुर, राजस्थान' : 'e.g. Sawai Madhopur, Rajasthan'}
-                  placeholderTextColor="#94A3B8"
-                />
-              </View>
-
-              <TouchableOpacity
-                style={[styles.primaryActionBtn, { marginTop: 14, backgroundColor: '#4F46E5', borderRadius: 12, paddingVertical: 14, alignItems: 'center' }]}
-                disabled={isSaving}
-                onPress={async () => {
-                  if (!editName.trim()) {
-                    Alert.alert(lang === 'hi' ? 'नाम आवश्यक' : 'Required', lang === 'hi' ? 'कृपया अपना नाम दर्ज करें' : 'Please enter your name');
-                    return;
-                  }
-                  setIsSaving(true);
-                  if (onSaveProfile) {
-                    await onSaveProfile({
-                      name: editName.trim(),
-                      contact: editContact.trim(),
-                      address: editAddress.trim(),
-                    });
-                  }
-                  setIsSaving(false);
-                  setShowEditModal(false);
-                }}
-              >
-                {isSaving ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <Text style={[styles.primaryActionBtnText, { color: '#FFFFFF', fontWeight: 'bold' }]}>
-                    {lang === 'hi' ? 'बदलाव सुरक्षित करें' : 'Save Changes & Sync'}
-                  </Text>
-                )}
-              </TouchableOpacity>
-            </ScrollView>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
+      {/* FULL-SCREEN DEDICATED WORKER SKILLS MANAGER MODAL */}
+      <WorkerManageSkillsModal
+        visible={showSkillsModal}
+        onClose={() => setShowSkillsModal(false)}
+        currentSkills={workerSkills}
+        onSaveSkills={onUpdateWorkerSkills}
+        lang={lang}
+        insets={insets}
+      />
 
       {/* CHOOSE LANGUAGE POPUP MODAL (Clean in-place selector, no redirection) */}
       <Modal

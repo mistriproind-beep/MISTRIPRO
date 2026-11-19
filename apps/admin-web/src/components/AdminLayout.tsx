@@ -96,6 +96,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           icon: Briefcase,
           badge: null,
         },
+        {
+          name: 'Broadcast & Notifications',
+          href: '/notifications',
+          icon: Bell,
+          badge: null,
+        },
       ],
     },
     {

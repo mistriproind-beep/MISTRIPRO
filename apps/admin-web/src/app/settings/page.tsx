@@ -188,7 +188,6 @@ export default function SettingsPage() {
         commission_rate: commissionRate,
         platform_fee: platformFee,
         banner_announcement: bannerAnnouncement,
-        base_daily_rates: tradeRates,
         updated_at: new Date().toISOString(),
       };
 
@@ -581,39 +580,6 @@ export default function SettingsPage() {
                   <IndianRupee className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />
                 </div>
                 <p className="text-[10px] text-slate-400 mt-1">Fixed per-booking platform charge.</p>
-              </div>
-            </div>
-
-            {/* Base Daily Wage Rates */}
-            <div className="pt-4 border-t border-slate-100">
-              <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-1">
-                Base Daily Wages by Trade Category (₹/Day)
-              </h4>
-              <p className="text-xs text-slate-500 mb-4">
-                Recommended standard daily wage rates shown on the customer booking screen.
-              </p>
-
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {Object.entries(tradeRates).map(([trade, rate]) => (
-                  <div key={trade} className="p-3 rounded-xl bg-slate-50 border border-slate-200">
-                    <label className="block text-[11px] font-bold text-slate-700 capitalize mb-1">
-                      {trade}
-                    </label>
-                    <div className="relative">
-                      <span className="text-xs text-slate-400 absolute left-2 top-1/2 -translate-y-1/2">
-                        ₹
-                      </span>
-                      <input
-                        type="number"
-                        value={rate}
-                        onChange={(e) =>
-                          setTradeRates({ ...tradeRates, [trade]: Number(e.target.value) })
-                        }
-                        className="w-full bg-white border border-slate-200 rounded-lg pl-6 pr-2 py-1 text-xs font-bold text-slate-900 focus:outline-none focus:border-slate-900"
-                      />
-                    </div>
-                  </div>
-                ))}
               </div>
             </div>
 

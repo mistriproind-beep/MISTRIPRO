@@ -193,7 +193,6 @@ export default function DashboardPage() {
             .from('worker_profiles')
             .update({
               is_available: true,
-              updated_at: new Date().toISOString(),
             })
             .eq('user_id', workerId);
         } catch (wpErr) {
