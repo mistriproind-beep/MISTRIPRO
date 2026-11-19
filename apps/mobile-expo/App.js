@@ -1053,6 +1053,18 @@ function MainApp() {
     }));
   };
 
+  // Change language across the entire app and persist immediately without page redirection
+  const handleSelectLanguage = async (newLang) => {
+    try {
+      setLang(newLang);
+      await StorageService.setLanguage(newLang);
+      await StorageService.setHasChosenLanguage(true);
+      DeviceFeedback.triggerLightHaptics();
+    } catch (err) {
+      console.log('handleSelectLanguage err:', err);
+    }
+  };
+
   // Modals
   const [showPostModal, setShowPostModal] = useState(false);
   const [postStep, setPostStep] = useState(1);
@@ -1186,17 +1198,23 @@ function MainApp() {
           if (w && isMounted) setRealWorkers(w);
         }).catch(() => {});
 
-        // 3. Ensure language is set (default 'en' permanently, never prompt repeatedly)
+        // 3. Language & First-time Launch Check (Prompt once on first install, remember permanently)
+        const hasChosenLang = await StorageService.getHasChosenLanguage();
         const savedLang = await StorageService.getLanguage();
-        if (savedLang) {
-          if (isMounted) setLang(savedLang);
-        } else {
-          await StorageService.setLanguage('en');
-          await StorageService.setHasChosenLanguage(true);
+        if (savedLang && isMounted) {
+          setLang(savedLang);
         }
 
         // 4. Session Check & Auto-provisioning
         let savedSession = await StorageService.getSession();
+
+        // First time app launch: show Language Selection screen once
+        if (!hasChosenLang) {
+          if (isMounted) {
+            setCurrentScreen('LANGUAGE');
+          }
+          return;
+        }
 
         if (savedSession && (savedSession.email || savedSession.mobile || savedSession.phone || savedSession.name)) {
           const effectiveRole = savedSession.role || 'CUSTOMER';
@@ -2001,7 +2019,28 @@ function MainApp() {
             onPress={async () => {
               await StorageService.setLanguage(lang);
               await StorageService.setHasChosenLanguage(true);
-              setCurrentScreen('SIGN_IN');
+              const session = await StorageService.getSession();
+              if (session && (session.email || session.mobile || session.phone || session.name)) {
+                const userRole = session.role || 'CUSTOMER';
+                setRole(userRole);
+                if (userRole === 'WORKER') {
+                  const checkPhone = session.mobile || session.phone;
+                  if (checkPhone) {
+                    const approval = await LiveBackend.checkWorkerApprovalStatus(checkPhone);
+                    if (approval?.status === 'APPROVED' || approval?.approved) {
+                      setCurrentScreen('MAIN');
+                    } else {
+                      setCurrentScreen('WORKER_UNDER_REVIEW');
+                    }
+                  } else {
+                    setCurrentScreen('MAIN');
+                  }
+                } else {
+                  setCurrentScreen('MAIN');
+                }
+              } else {
+                setCurrentScreen('SIGN_IN');
+              }
             }}
             activeOpacity={0.85}
           >
@@ -3216,7 +3255,7 @@ function MainApp() {
               userContact={custMobile}
               userAddress={custAddress}
               onSaveProfile={handleSaveProfile}
-              onSwitchLang={() => setCurrentScreen('LANGUAGE')}
+              onSelectLang={handleSelectLanguage}
               onOpenInvoices={() => setShowInvoicesModal(true)}
               onLogout={handleSignOut}
             />
@@ -3276,7 +3315,7 @@ function MainApp() {
               userContact={workerMobile}
               userAddress={workerAddress}
               onSaveProfile={handleSaveProfile}
-              onSwitchLang={() => setCurrentScreen('LANGUAGE')}
+              onSelectLang={handleSelectLanguage}
               onOpenInvoices={() => setShowInvoicesModal(true)}
               onLogout={handleSignOut}
             />
@@ -4215,15 +4254,24 @@ function ProfileScreen({
   userContact,
   userAddress,
   onSaveProfile,
+  onSelectLang,
   onSwitchLang,
   onOpenInvoices,
   onLogout,
 }) {
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showLangModal, setShowLangModal] = useState(false);
   const [editName, setEditName] = useState(userName || '');
   const [editContact, setEditContact] = useState(userContact || '');
   const [editAddress, setEditAddress] = useState(userAddress || '');
   const [isSaving, setIsSaving] = useState(false);
+
+  const languages = [
+    { code: 'en', label: 'English', native: 'English', char: 'A' },
+    { code: 'hi', label: 'Hindi', native: 'हिंदी', char: 'अ' },
+    { code: 'gu', label: 'Gujarati', native: 'ગુજરાતી', char: 'અ' },
+    { code: 'mr', label: 'Marathi', native: 'मराठी', char: 'म' },
+  ];
 
   useEffect(() => {
     setEditName(userName || '');
@@ -4297,8 +4345,8 @@ function ProfileScreen({
 
         {/* Settings Clean Rows (ChoosingHer exact layout) */}
         <View style={styles.settingsGroupCard}>
-          {/* 1. Choose Language */}
-          <TouchableOpacity style={styles.settingsRow} onPress={onSwitchLang} activeOpacity={0.7}>
+          {/* 1. Choose Language (Opens Popup Modal without Redirection) */}
+          <TouchableOpacity style={styles.settingsRow} onPress={() => setShowLangModal(true)} activeOpacity={0.7}>
             <View style={[styles.settingsRowIconWrap, { backgroundColor: '#F0FDF4' }]}>
               <Layers size={18} color="#16A34A" />
             </View>
@@ -4465,6 +4513,66 @@ function ProfileScreen({
                 )}
               </TouchableOpacity>
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* CHOOSE LANGUAGE POPUP MODAL (Clean in-place selector, no redirection) */}
+      <Modal
+        visible={showLangModal}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowLangModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { paddingBottom: Math.max(insets.bottom + 20, 28) }]}>
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={styles.modalTitle}>{t.chooseLanguage}</Text>
+                <Text style={styles.modalSubtitle}>{t.selectLangSub}</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowLangModal(false)} style={styles.modalCloseBtn}>
+                <X size={20} color="#0F172A" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={[styles.langList, { marginTop: 12, marginBottom: 8 }]}>
+              {languages.map((item) => {
+                const isSelected = lang === item.code;
+                return (
+                  <TouchableOpacity
+                    key={item.code}
+                    style={[styles.langRow, isSelected && styles.langRowActive]}
+                    onPress={async () => {
+                      if (onSelectLang) {
+                        await onSelectLang(item.code);
+                      } else if (onSwitchLang) {
+                        onSwitchLang(item.code);
+                      }
+                      setShowLangModal(false);
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <View style={[styles.langCharCircle, isSelected && styles.langCharCircleActive]}>
+                      <Text style={[styles.langCharText, isSelected && styles.langCharTextActive]}>
+                        {item.char}
+                      </Text>
+                    </View>
+
+                    <View style={styles.langRowTextWrap}>
+                      <Text style={[styles.langRowTitle, isSelected && styles.langRowTitleActive]}>
+                        {item.native}
+                      </Text>
+                      <Text style={styles.langRowSub}>{item.label}</Text>
+                    </View>
+
+                    <View style={[styles.radioCircle, isSelected && styles.radioCircleActive]}>
+                      {isSelected && <View style={styles.radioInnerDot} />}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
           </View>
         </View>
       </Modal>
@@ -6085,6 +6193,12 @@ const styles = StyleSheet.create({
     fontFamily: 'Satoshi-Black',
     fontSize: 20,
     color: '#0F172A',
+  },
+  modalSubtitle: {
+    fontFamily: 'Satoshi-Regular',
+    fontSize: 13,
+    color: '#64748B',
+    marginTop: 4,
   },
   modalCloseBtn: {
     width: 32,

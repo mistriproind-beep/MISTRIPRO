@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const KEYS = {
   LANG: '@mistri_language',
-  HAS_CHOSEN_LANG: '@mistri_has_chosen_lang',
+  HAS_CHOSEN_LANG: '@mistri_has_chosen_lang_v2',
   USER_SESSION: '@mistri_session',
   ROLE: '@mistri_user_role',
   IS_DEV: '@mistri_is_dev',
