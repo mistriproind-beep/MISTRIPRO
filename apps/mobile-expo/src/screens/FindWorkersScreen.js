@@ -13,6 +13,8 @@ import {
   Modal,
   AppState,
   RefreshControl,
+  Platform,
+  FlatList,
 } from 'react-native';
 import {
   MapPin,
