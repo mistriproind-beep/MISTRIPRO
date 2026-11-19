@@ -149,19 +149,25 @@ export default function WorkerAlertsScreen({
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerTitleRow}>
-          <Text style={styles.headerTitle}>Job Alerts & Requests</Text>
+          <Text style={styles.headerTitle}>
+            {lang === 'hi' ? 'जॉब अलर्ट और अनुरोध' : 'Job Alerts & Requests'}
+          </Text>
           <View style={styles.countBadge}>
-            <Text style={styles.countBadgeText}>{localAlerts.length} New</Text>
+            <Text style={styles.countBadgeText}>{localAlerts.length} {lang === 'hi' ? 'नए' : 'New'}</Text>
           </View>
         </View>
-        <Text style={styles.headerSub}>ग्राहक के काम के अनुरोध स्वीकार या अस्वीकार करें</Text>
+        <Text style={styles.headerSub}>
+          {lang === 'hi'
+            ? 'ग्राहक के काम के अनुरोध स्वीकार या अस्वीकार करें'
+            : 'Accept or decline real-time work requests from nearby customers'}
+        </Text>
 
         {/* Filter Chips */}
         <View style={styles.filterRow}>
           {[
-            { key: 'ALL', label: `All Requests (${localAlerts.length})` },
-            { key: 'TODAY', label: 'Immediate Today' },
-            { key: 'UPCOMING', label: 'Upcoming' },
+            { key: 'ALL', label: lang === 'hi' ? `सभी अनुरोध (${localAlerts.length})` : `All Requests (${localAlerts.length})` },
+            { key: 'TODAY', label: lang === 'hi' ? 'आज के कार्य' : 'Immediate Today' },
+            { key: 'UPCOMING', label: lang === 'hi' ? 'आगामी कार्य' : 'Upcoming' },
           ].map((tab) => (
             <TouchableOpacity
               key={tab.key}

@@ -25,6 +25,7 @@ import {
   X,
   Radio,
   Zap,
+  Clock,
 } from 'lucide-react-native';
 import { WORKER_TUTORIALS } from '../data/workerData';
 import { supabase } from '../services/supabase';
@@ -61,6 +62,7 @@ export default function WorkerHomeScreen({
   workerProfile,
   onUpdateProfile,
   alertsCount = 0,
+  activeBookingsCount = 0,
   walletBalance = 0,
   onNavigateTab,
   onOpenNotifications,
@@ -72,9 +74,6 @@ export default function WorkerHomeScreen({
     return true;
   });
   const [isSyncingAvailability, setIsSyncingAvailability] = useState(false);
-  const [showPriceModal, setShowPriceModal] = useState(false);
-  const [editPrice, setEditPrice] = useState(String(workerProfile?.price || workerProfile?.daily_rate || 950));
-  const [editRateType, setEditRateType] = useState(workerProfile?.priceType || 'day');
 
   // Keep state in sync if parent prop workerProfile changes
   useEffect(() => {
@@ -168,28 +167,6 @@ export default function WorkerHomeScreen({
     } finally {
       setIsSyncingAvailability(false);
     }
-  };
-
-  // Save new price
-  const handleSavePrice = async () => {
-    const num = parseInt(editPrice, 10);
-    if (isNaN(num) || num <= 0) {
-      Alert.alert('Invalid Price', 'Please enter a valid rate in Rupees (₹).');
-      return;
-    }
-    if (onUpdateProfile) {
-      onUpdateProfile({ price: num, daily_rate: num, priceType: editRateType });
-    }
-    setShowPriceModal(false);
-
-    try {
-      const target = resolveWorkerTarget(workerProfile);
-      await LiveBackend.updateWorkerDailyRate(target, num);
-    } catch (e) {
-      console.log('WorkerHomeScreen: updateWorkerDailyRate error:', e);
-    }
-
-    Alert.alert('Price Updated ✓', `Your daily rate is now ₹${num}/${editRateType}. Saved successfully!`);
   };
 
   // Open YouTube tutorial
@@ -317,56 +294,41 @@ export default function WorkerHomeScreen({
           </View>
         </View>
 
-        {/* 3. Skill & Set Price Card (With Editable Button) */}
-        <View style={styles.skillPriceCard}>
+        {/* 3. Trade & Verified Skill Card (Direct On-Site Quote Model - Zero Daily Rate) */}
+        <View style={styles.skillTradeCard}>
           <View style={styles.skillCardHeader}>
             <View style={styles.skillIconCircle}>
-              <Briefcase size={18} color="#4F46E5" />
+              <Briefcase size={20} color="#4F46E5" />
             </View>
             <View style={styles.skillTextCol}>
               <Text style={styles.skillCardLabel}>
-                {lang === 'hi' ? 'चुना हुआ प्राथमिक कार्य' : lang === 'gu' ? 'પસંદ કરેલ મુખ્ય કામ' : lang === 'mr' ? 'निवडलेला मुख्य व्यवसाय' : 'Selected Primary Trade'}
+                {lang === 'hi' ? 'आपकी पंजीकृत विशेषज्ञता' : 'Your Registered Trade'}
               </Text>
               <Text style={styles.skillCardTitle}>
                 {translateWorkerSkill(workerProfile?.skill || 'Mason (राजमिस्त्री)', lang)}
               </Text>
             </View>
-          </View>
-
-          <View style={styles.priceDivider} />
-
-          <View style={styles.priceRow}>
-            <View>
-              <Text style={styles.priceLabel}>
-                {lang === 'hi' ? 'आपकी काम की दर' : lang === 'gu' ? 'તમારો કામનો દર' : lang === 'mr' ? 'तुमचा कामाचा दर' : 'Your Working Rate'}
-              </Text>
-              <View style={styles.priceValueRow}>
-                <Text style={styles.priceSymbol}>₹</Text>
-                <Text style={styles.priceAmount}>{workerProfile?.price || workerProfile?.daily_rate || 950}</Text>
-                <Text style={styles.priceUnit}>
-                  /{workerProfile?.priceType === 'day' ? (lang === 'hi' ? 'दिन' : lang === 'gu' ? 'દિવસ' : lang === 'mr' ? 'दिवस' : 'day') : workerProfile?.priceType || 'day'}
-                </Text>
-              </View>
-              <Text style={styles.priceHint}>
-                {lang === 'hi' ? 'बुकिंग के समय ग्राहकों को दिखाई देगा' : lang === 'gu' ? 'બુકિંગ વખતે ગ્રાહકોને દેખાશે' : lang === 'mr' ? 'बुकिंग दरम्यान ग्राहकांना दिसेल' : 'Shown to customers when booking'}
+            <View style={styles.verifiedSkillBadge}>
+              <ShieldCheck size={13} color="#15803D" />
+              <Text style={styles.verifiedSkillText}>
+                {lang === 'hi' ? 'सत्यापित' : 'Verified'}
               </Text>
             </View>
+          </View>
 
-            {/* Editable Button */}
-            <TouchableOpacity
-              style={styles.editPriceBtn}
-              onPress={() => {
-                setEditPrice(String(workerProfile?.price || workerProfile?.daily_rate || 950));
-                setEditRateType(workerProfile?.priceType || 'day');
-                setShowPriceModal(true);
-              }}
-              activeOpacity={0.8}
-            >
-              <Edit3 size={15} color="#4F46E5" />
-              <Text style={styles.editPriceBtnText}>
-                {lang === 'hi' ? 'दर बदलें' : lang === 'gu' ? 'ભાવ બદલો' : lang === 'mr' ? 'दर बदला' : 'Edit Price'}
+          <View style={styles.tradeDivider} />
+
+          <View style={styles.pricingModelRow}>
+            <View style={styles.pricingModelBadge}>
+              <Text style={styles.pricingModelBadgeText}>
+                {lang === 'hi' ? 'ऑन-साइट डायरेक्ट कोटेशन मॉडल' : 'Direct On-Site Quote Model'}
               </Text>
-            </TouchableOpacity>
+            </View>
+            <Text style={styles.pricingModelExplanation}>
+              {lang === 'hi'
+                ? 'ग्राहक ₹99 बुकिंग शुल्क देकर आपको साइट पर बुलाते हैं। आप साइट देखकर ग्राहक से सीधे वास्तविक कार्य शुल्क तय करते हैं।'
+                : 'Customers book your visit by paying ₹99 upfront. You inspect the work at the customer site and agree on the actual price directly with them.'}
+            </Text>
           </View>
         </View>
 
@@ -382,10 +344,10 @@ export default function WorkerHomeScreen({
             </View>
             <Text style={styles.statCount}>{alertsCount}</Text>
             <Text style={styles.statTitle}>
-              {lang === 'hi' ? 'नए अलर्ट' : lang === 'gu' ? 'નવા એલર્ટ' : lang === 'mr' ? 'नवीन सूचना' : 'New Alerts'}
+              {lang === 'hi' ? 'नए अलर्ट' : 'New Alerts'}
             </Text>
             <Text style={styles.statSub}>
-              {lang === 'hi' ? 'देखने के लिए टैप करें →' : lang === 'gu' ? 'જોવા માટે ટૅપ કરો →' : lang === 'mr' ? 'पाहण्यासाठी टॅप करा →' : 'Tap to view →'}
+              {lang === 'hi' ? 'देखने के लिए टैप करें →' : 'Tap to view →'}
             </Text>
           </TouchableOpacity>
 
@@ -397,12 +359,12 @@ export default function WorkerHomeScreen({
             <View style={[styles.statIconWrap, { backgroundColor: '#EEF2FF' }]}>
               <Briefcase size={16} color="#4F46E5" />
             </View>
-            <Text style={styles.statCount}>2 {lang === 'hi' ? 'सक्रिय' : lang === 'gu' ? 'સક્રિય' : lang === 'mr' ? 'सक्रिय' : 'Active'}</Text>
+            <Text style={styles.statCount}>{activeBookingsCount} {lang === 'hi' ? 'सक्रिय' : 'Active'}</Text>
             <Text style={styles.statTitle}>
-              {lang === 'hi' ? 'चल रहे काम' : lang === 'gu' ? 'ચાલુ કામ' : lang === 'mr' ? 'सुरू कामे' : 'Ongoing Jobs'}
+              {lang === 'hi' ? 'चल रहे काम' : 'Ongoing Jobs'}
             </Text>
             <Text style={styles.statSub}>
-              {lang === 'hi' ? 'प्रगति देखें →' : lang === 'gu' ? 'પ્રગતિ જુઓ →' : lang === 'mr' ? 'प्रगती तपासा →' : 'Track progress →'}
+              {lang === 'hi' ? 'प्रगति देखें →' : 'Track progress →'}
             </Text>
           </TouchableOpacity>
 
@@ -416,148 +378,121 @@ export default function WorkerHomeScreen({
             </View>
             <Text style={styles.statCount}>₹{Number(walletBalance || 0).toLocaleString('en-IN')}</Text>
             <Text style={styles.statTitle}>
-              {lang === 'hi' ? 'वॉलेट राशि' : lang === 'gu' ? 'વોલેટ કેશ' : lang === 'mr' ? 'वॉलेट रोख' : 'Wallet Cash'}
+              {lang === 'hi' ? 'वॉलेट राशि' : 'Wallet Balance'}
             </Text>
             <Text style={styles.statSub}>
-              {lang === 'hi' ? 'अभी निकालें →' : lang === 'gu' ? 'હમણા ઉપાડો →' : lang === 'mr' ? 'आता काढा →' : 'Withdraw now →'}
+              {lang === 'hi' ? 'अभी निकालें →' : 'Withdraw now →'}
             </Text>
           </TouchableOpacity>
         </View>
 
-        {/* 5. Mistri Academy - YouTube Tutorial Video Section */}
+        {/* 5. Mistri Academy - High-Quality Training Videos */}
         <View style={styles.tutorialsSection}>
           <View style={styles.sectionTitleRow}>
             <View>
-              <Text style={styles.sectionTitle}>Mistri Academy • Training Videos</Text>
-              <Text style={styles.sectionSubtitle}>यूट्यूब वीडियो से काम सीखें और ज्यादा कमाई करें</Text>
+              <Text style={styles.sectionTitle}>
+                {lang === 'hi' ? 'मिस्त्री अकादमी • ट्रेनिंग वीडियो' : 'Mistri Academy • Training Videos'}
+              </Text>
+              <Text style={styles.sectionSubtitle}>
+                {lang === 'hi'
+                  ? 'काम का हुनर सीखें, 5-स्टार रेटिंग पाएं और कमाई बढ़ाएं'
+                  : 'Master your trade, earn 5-star ratings & boost daily earnings'}
+              </Text>
             </View>
             <View style={styles.ytPill}>
-              <Play size={10} color="#DC2626" fill="#DC2626" />
+              <Play size={11} color="#DC2626" fill="#DC2626" />
               <Text style={styles.ytPillText}>YouTube</Text>
             </View>
           </View>
 
-          {(WORKER_TUTORIALS || []).map((video) => (
+          {/* Featured Hero Lesson */}
+          {WORKER_TUTORIALS.length > 0 && (
             <TouchableOpacity
-              key={video.id}
-              style={styles.videoCard}
-              onPress={() => handleOpenVideo(video)}
-              activeOpacity={0.85}
+              style={styles.featuredVideoCard}
+              onPress={() => handleOpenVideo(WORKER_TUTORIALS[0])}
+              activeOpacity={0.9}
             >
-              <View style={styles.videoThumbnailContainer}>
-                <Image source={{ uri: video.thumbnail }} style={styles.videoThumbnail} />
-                <View style={styles.playOverlay}>
-                  <View style={styles.playCircle}>
-                    <Play size={20} color="#FFFFFF" fill="#FFFFFF" style={{ marginLeft: 3 }} />
-                  </View>
+              <View style={styles.featuredThumbnailWrap}>
+                <Image
+                  source={{ uri: WORKER_TUTORIALS[0].thumbnail }}
+                  style={styles.featuredThumbnail}
+                  resizeMode="cover"
+                />
+                <View style={styles.featuredGradientOverlay} />
+                <View style={styles.featuredPlayCircle}>
+                  <Play size={24} color="#FFFFFF" fill="#FFFFFF" style={{ marginLeft: 3 }} />
                 </View>
-                <View style={styles.durationPill}>
-                  <Text style={styles.durationText}>{video.duration}</Text>
+                <View style={styles.featuredDurationPill}>
+                  <Clock size={11} color="#FFFFFF" style={{ marginRight: 4 }} />
+                  <Text style={styles.featuredDurationText}>{WORKER_TUTORIALS[0].duration}</Text>
+                </View>
+                <View style={styles.featuredTagPill}>
+                  <Text style={styles.featuredTagText}>⭐ Featured Lesson</Text>
                 </View>
               </View>
 
-              <View style={styles.videoContent}>
-                <View style={styles.videoTagRow}>
-                  <View style={styles.videoTag}>
-                    <Text style={styles.videoTagText}>{video.tag}</Text>
-                  </View>
-                  <Text style={styles.videoViews}>{video.views}</Text>
+              <View style={styles.featuredContent}>
+                <View style={styles.featuredMetaRow}>
+                  <Text style={styles.featuredViewsText}>{WORKER_TUTORIALS[0].views}</Text>
+                  <View style={styles.metaDot} />
+                  <Text style={styles.featuredChannelText}>{WORKER_TUTORIALS[0].channel}</Text>
                 </View>
-                <Text style={styles.videoMainTitle} numberOfLines={2}>
-                  {video.title}
+                <Text style={styles.featuredTitle}>
+                  {lang === 'hi' ? WORKER_TUTORIALS[0].hindiTitle : WORKER_TUTORIALS[0].title}
                 </Text>
-                <Text style={styles.videoHindiTitle} numberOfLines={1}>
-                  {video.hindiTitle}
-                </Text>
-
-                <View style={styles.watchRow}>
-                  <Text style={styles.watchNowText}>Watch on YouTube</Text>
-                  <ExternalLink size={12} color="#DC2626" />
+                <View style={styles.watchNowActionRow}>
+                  <Text style={styles.watchNowActionText}>
+                    {lang === 'hi' ? 'यूट्यूब पर वीडियो देखें →' : 'Watch Free Lesson on YouTube →'}
+                  </Text>
+                  <ExternalLink size={14} color="#DC2626" />
                 </View>
               </View>
             </TouchableOpacity>
-          ))}
-        </View>
-      </ScrollView>
+          )}
 
-      {/* ── Edit Price Modal ── */}
-      <Modal
-        visible={showPriceModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowPriceModal(false)}
-      >
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalSheet}>
-            <View style={styles.modalHeader}>
-              <View>
-                <Text style={styles.modalTitle}>Set Your Daily / Hourly Rate</Text>
-                <Text style={styles.modalSub}>अपनी मजदूरी या दर तय करें</Text>
-              </View>
+          {/* Additional Video Lessons */}
+          <View style={styles.videoList}>
+            {WORKER_TUTORIALS.slice(1).map((video) => (
               <TouchableOpacity
-                style={styles.modalCloseBtn}
-                onPress={() => setShowPriceModal(false)}
+                key={video.id}
+                style={styles.videoCard}
+                onPress={() => handleOpenVideo(video)}
+                activeOpacity={0.85}
               >
-                <X size={18} color="#64748B" />
+                <View style={styles.videoThumbnailContainer}>
+                  <Image source={{ uri: video.thumbnail }} style={styles.videoThumbnail} resizeMode="cover" />
+                  <View style={styles.playOverlay}>
+                    <View style={styles.playCircleSmall}>
+                      <Play size={14} color="#FFFFFF" fill="#FFFFFF" style={{ marginLeft: 2 }} />
+                    </View>
+                  </View>
+                  <View style={styles.durationPill}>
+                    <Text style={styles.durationText}>{video.duration}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.videoContent}>
+                  <View style={styles.videoTagRow}>
+                    <View style={styles.videoTag}>
+                      <Text style={styles.videoTagText}>{video.tag}</Text>
+                    </View>
+                    <Text style={styles.videoViews}>{video.views}</Text>
+                  </View>
+                  <Text style={styles.videoMainTitle} numberOfLines={2}>
+                    {lang === 'hi' ? video.hindiTitle : video.title}
+                  </Text>
+                  <View style={styles.watchRow}>
+                    <Text style={styles.watchNowText}>
+                      {lang === 'hi' ? 'यूट्यूब पर देखें' : 'Watch on YouTube'}
+                    </Text>
+                    <ExternalLink size={11} color="#DC2626" />
+                  </View>
+                </View>
               </TouchableOpacity>
-            </View>
-
-            {/* Rate Type Selector */}
-            <View style={styles.rateTypeRow}>
-              <TouchableOpacity
-                style={[styles.rateTypeBtn, editRateType === 'day' && styles.rateTypeBtnActive]}
-                onPress={() => setEditRateType('day')}
-              >
-                <Text style={[styles.rateTypeText, editRateType === 'day' && styles.rateTypeTextActive]}>
-                  Per Day (प्रति दिन)
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.rateTypeBtn, editRateType === 'hour' && styles.rateTypeBtnActive]}
-                onPress={() => setEditRateType('hour')}
-              >
-                <Text style={[styles.rateTypeText, editRateType === 'hour' && styles.rateTypeTextActive]}>
-                  Per Hour (प्रति घंटा)
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Price Input */}
-            <View style={styles.inputWrapper}>
-              <Text style={styles.inputCurrency}>₹</Text>
-              <TextInput
-                style={styles.priceInput}
-                keyboardType="numeric"
-                value={editPrice}
-                onChangeText={setEditPrice}
-                placeholder="950"
-                placeholderTextColor="#94A3B8"
-              />
-              <Text style={styles.inputSuffix}>/{editRateType}</Text>
-            </View>
-
-            {/* Recommended Rates */}
-            <Text style={styles.presetsLabel}>Common Rates in Rajasthan:</Text>
-            <View style={styles.presetsRow}>
-              {[700, 850, 950, 1100, 1400].map((val) => (
-                <TouchableOpacity
-                  key={val}
-                  style={styles.presetChip}
-                  onPress={() => setEditPrice(String(val))}
-                >
-                  <Text style={styles.presetChipText}>₹{val}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            {/* Save Button */}
-            <TouchableOpacity style={styles.savePriceBtn} onPress={handleSavePrice} activeOpacity={0.85}>
-              <CheckCircle2 size={18} color="#FFFFFF" />
-              <Text style={styles.savePriceBtnText}>Save & Update Price</Text>
-            </TouchableOpacity>
+            ))}
           </View>
         </View>
-      </Modal>
+      </ScrollView>
     </View>
   );
 }
@@ -799,64 +734,89 @@ const styles = StyleSheet.create({
     color: '#0F172A',
     marginTop: 1,
   },
-  priceDivider: {
+  skillTradeCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  skillCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  skillIconCircle: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#EEF2FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  skillTextCol: {
+    flex: 1,
+  },
+  skillCardLabel: {
+    fontFamily: 'Satoshi-Medium',
+    fontSize: 11,
+    color: '#64748B',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  skillCardTitle: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 16,
+    color: '#0F172A',
+    marginTop: 2,
+  },
+  verifiedSkillBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  verifiedSkillText: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 11,
+    color: '#15803D',
+  },
+  tradeDivider: {
     height: 1,
     backgroundColor: '#F1F5F9',
-    marginVertical: 14,
+    marginVertical: 12,
   },
-  priceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  priceLabel: {
-    fontFamily: 'Satoshi-Medium',
-    fontSize: 11,
-    color: '#64748B',
-  },
-  priceValueRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    marginTop: 2,
-  },
-  priceSymbol: {
-    fontFamily: 'Satoshi-Bold',
-    fontSize: 18,
-    color: '#4F46E5',
-    marginRight: 2,
-  },
-  priceAmount: {
-    fontFamily: 'Satoshi-Black',
-    fontSize: 26,
-    color: '#0F172A',
-  },
-  priceUnit: {
-    fontFamily: 'Satoshi-Medium',
-    fontSize: 13,
-    color: '#64748B',
-    marginLeft: 2,
-  },
-  priceHint: {
-    fontFamily: 'Satoshi-Regular',
-    fontSize: 11,
-    color: '#94A3B8',
-    marginTop: 2,
-  },
-  editPriceBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  pricingModelRow: {
     gap: 6,
-    backgroundColor: '#EEF2FF',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#C7D2FE',
   },
-  editPriceBtnText: {
+  pricingModelBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#F0FDF4',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+  },
+  pricingModelBadgeText: {
     fontFamily: 'Satoshi-Bold',
-    fontSize: 13,
-    color: '#4F46E5',
+    fontSize: 11,
+    color: '#166534',
+  },
+  pricingModelExplanation: {
+    fontFamily: 'Satoshi-Regular',
+    fontSize: 12,
+    color: '#475569',
+    lineHeight: 18,
   },
 
   /* Stats Grid */
@@ -883,7 +843,7 @@ const styles = StyleSheet.create({
   },
   statCount: {
     fontFamily: 'Satoshi-Bold',
-    fontSize: 15,
+    fontSize: 14,
     color: '#0F172A',
   },
   statTitle: {
@@ -899,19 +859,19 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
 
-  /* Tutorials Section */
+  /* Tutorials Section (Mistri Academy) */
   tutorialsSection: {
-    marginBottom: 20,
+    marginBottom: 24,
   },
   sectionTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: 14,
   },
   sectionTitle: {
     fontFamily: 'Satoshi-Bold',
-    fontSize: 15,
+    fontSize: 16,
     color: '#0F172A',
   },
   sectionSubtitle: {
@@ -925,56 +885,184 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
     backgroundColor: '#FEE2E2',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#FECACA',
   },
   ytPillText: {
     fontFamily: 'Satoshi-Bold',
     fontSize: 11,
     color: '#DC2626',
   },
+
+  /* Featured Lesson Card */
+  featuredVideoCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  featuredThumbnailWrap: {
+    width: '100%',
+    height: 180,
+    backgroundColor: '#0F172A',
+    position: 'relative',
+  },
+  featuredThumbnail: {
+    width: '100%',
+    height: '100%',
+  },
+  featuredGradientOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(15, 23, 42, 0.28)',
+  },
+  featuredPlayCircle: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: [{ translateX: -25 }, { translateY: -25 }],
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#DC2626',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  featuredDurationPill: {
+    position: 'absolute',
+    bottom: 10,
+    right: 10,
+    backgroundColor: 'rgba(15, 23, 42, 0.82)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  featuredDurationText: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 11,
+    color: '#FFFFFF',
+  },
+  featuredTagPill: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  featuredTagText: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 10,
+    color: '#FBBF24',
+  },
+  featuredContent: {
+    padding: 16,
+  },
+  featuredMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 6,
+  },
+  featuredViewsText: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 11,
+    color: '#DC2626',
+  },
+  metaDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: '#94A3B8',
+  },
+  featuredChannelText: {
+    fontFamily: 'Satoshi-Medium',
+    fontSize: 11,
+    color: '#64748B',
+  },
+  featuredTitle: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 15,
+    color: '#0F172A',
+    lineHeight: 20,
+    marginBottom: 10,
+  },
+  watchNowActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#FEF2F2',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    alignSelf: 'flex-start',
+  },
+  watchNowActionText: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 12,
+    color: '#DC2626',
+  },
+
+  /* Secondary Video List */
+  videoList: {
+    gap: 10,
+  },
   videoCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     overflow: 'hidden',
-    marginBottom: 12,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     flexDirection: 'row',
+    height: 96,
   },
   videoThumbnailContainer: {
     width: 120,
-    height: 100,
+    height: '100%',
     backgroundColor: '#0F172A',
     position: 'relative',
   },
   videoThumbnail: {
     width: '100%',
     height: '100%',
-    opacity: 0.88,
   },
   playOverlay: {
     ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
   },
-  playCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(220, 38, 38, 0.9)',
+  playCircleSmall: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: 'rgba(220, 38, 38, 0.95)',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
   },
   durationPill: {
     position: 'absolute',
-    bottom: 6,
-    right: 6,
+    bottom: 5,
+    right: 5,
     backgroundColor: 'rgba(0, 0, 0, 0.75)',
     paddingHorizontal: 5,
     paddingVertical: 2,
@@ -1013,161 +1101,18 @@ const styles = StyleSheet.create({
   },
   videoMainTitle: {
     fontFamily: 'Satoshi-Bold',
-    fontSize: 13,
+    fontSize: 12,
     color: '#0F172A',
-    marginTop: 4,
     lineHeight: 16,
-  },
-  videoHindiTitle: {
-    fontFamily: 'Satoshi-Medium',
-    fontSize: 11,
-    color: '#64748B',
-    marginTop: 2,
   },
   watchRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    marginTop: 6,
   },
   watchNowText: {
     fontFamily: 'Satoshi-Bold',
     fontSize: 11,
     color: '#DC2626',
-  },
-
-  /* Modal */
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.55)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  modalSheet: {
-    width: '100%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.2,
-    shadowRadius: 20,
-    elevation: 8,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 16,
-  },
-  modalTitle: {
-    fontFamily: 'Satoshi-Bold',
-    fontSize: 16,
-    color: '#0F172A',
-  },
-  modalSub: {
-    fontFamily: 'Satoshi-Regular',
-    fontSize: 12,
-    color: '#64748B',
-    marginTop: 2,
-  },
-  modalCloseBtn: {
-    padding: 4,
-  },
-  rateTypeRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 16,
-  },
-  rateTypeBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    backgroundColor: '#F8FAFC',
-    alignItems: 'center',
-  },
-  rateTypeBtnActive: {
-    borderColor: '#4F46E5',
-    backgroundColor: '#EEF2FF',
-  },
-  rateTypeText: {
-    fontFamily: 'Satoshi-Medium',
-    fontSize: 12,
-    color: '#64748B',
-  },
-  rateTypeTextActive: {
-    fontFamily: 'Satoshi-Bold',
-    color: '#4F46E5',
-  },
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#4F46E5',
-    borderRadius: 14,
-    paddingHorizontal: 16,
-    height: 56,
-    backgroundColor: '#F8FAFF',
-    marginBottom: 14,
-  },
-  inputCurrency: {
-    fontFamily: 'Satoshi-Bold',
-    fontSize: 24,
-    color: '#4F46E5',
-    marginRight: 6,
-  },
-  priceInput: {
-    flex: 1,
-    fontFamily: 'Satoshi-Black',
-    fontSize: 24,
-    color: '#0F172A',
-    padding: 0,
-  },
-  inputSuffix: {
-    fontFamily: 'Satoshi-Bold',
-    fontSize: 14,
-    color: '#64748B',
-  },
-  presetsLabel: {
-    fontFamily: 'Satoshi-Medium',
-    fontSize: 11,
-    color: '#64748B',
-    marginBottom: 8,
-  },
-  presetsRow: {
-    flexDirection: 'row',
-    gap: 6,
-    flexWrap: 'wrap',
-    marginBottom: 20,
-  },
-  presetChip: {
-    backgroundColor: '#F1F5F9',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  presetChipText: {
-    fontFamily: 'Satoshi-Bold',
-    fontSize: 12,
-    color: '#334155',
-  },
-  savePriceBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#4F46E5',
-    paddingVertical: 14,
-    borderRadius: 14,
-  },
-  savePriceBtnText: {
-    fontFamily: 'Satoshi-Bold',
-    fontSize: 14,
-    color: '#FFFFFF',
   },
 });

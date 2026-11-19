@@ -3711,6 +3711,7 @@ function MainApp() {
               workerProfile={workerProfile}
               onUpdateProfile={handleUpdateWorkerProfile}
               alertsCount={workerAlerts.length}
+              activeBookingsCount={workerBookings.filter((b) => b && (b.status === 'active' || b.status === 'confirmed' || b.status === 'in_progress' || b.status === 'reached_site')).length}
               walletBalance={workerWallet.availableBalance}
               onNavigateTab={(tab) => setActiveTab(tab)}
               onOpenNotifications={() => setShowNotifModal(true)}
@@ -4771,14 +4772,14 @@ function ProfileScreen({
             </Text>
           </View>
           <Text style={styles.profileNameText}>
-            {userName || (role === 'CUSTOMER' ? 'Valued Customer' : 'Skilled Mistri')}
+            {userName || (role === 'CUSTOMER' ? (lang === 'hi' ? 'सम्मानित ग्राहक' : 'Valued Customer') : (lang === 'hi' ? 'कुशल मिस्त्री' : 'Skilled Mistri'))}
           </Text>
           <Text style={styles.profileEmailSub}>
-            {userContact || (role === 'CUSTOMER' ? 'Customer Contact' : 'Worker Contact')}
+            {userContact || (role === 'CUSTOMER' ? (lang === 'hi' ? 'ग्राहक संपर्क' : 'Customer Contact') : (lang === 'hi' ? 'कारीगर संपर्क' : 'Worker Contact'))}
           </Text>
           <View style={styles.profilePersonaBadge}>
             <Text style={styles.profilePersonaBadgeText}>
-              {role === 'CUSTOMER' ? 'Client / Project Owner' : 'Verified Skilled Mistri'}
+              {role === 'CUSTOMER' ? (lang === 'hi' ? 'ग्राहक / साइट ओनर' : 'Client / Project Owner') : (lang === 'hi' ? 'सत्यापित कुशल मिस्त्री' : 'Verified Skilled Mistri')}
             </Text>
           </View>
 
@@ -4789,7 +4790,7 @@ function ProfileScreen({
             activeOpacity={0.8}
           >
             <Edit3 size={13} color="#4F46E5" />
-            <Text style={styles.editProfilePillText}>Edit Profile</Text>
+            <Text style={styles.editProfilePillText}>{lang === 'hi' ? 'प्रोफ़ाइल बदलें' : 'Edit Profile'}</Text>
           </TouchableOpacity>
         </View>
 
@@ -4854,11 +4855,11 @@ function ProfileScreen({
                   <ShieldCheck size={18} color="#15803D" />
                 </View>
                 <View style={styles.settingsRowTextCol}>
-                  <Text style={styles.settingsRowLabel}>{t.verifiedKYC}</Text>
-                  <Text style={styles.settingsRowSub}>Aadhaar & Bank Verified ✓</Text>
+                  <Text style={styles.settingsRowLabel}>{lang === 'hi' ? 'सत्यापित केवाईसी' : 'Verified KYC'}</Text>
+                  <Text style={styles.settingsRowSub}>{lang === 'hi' ? 'आधार एवं बैंक सत्यापित ✓' : 'Aadhaar & Bank Verified ✓'}</Text>
                 </View>
                 <View style={styles.verifiedGreenBadge}>
-                  <Text style={styles.verifiedGreenBadgeText}>Active</Text>
+                  <Text style={styles.verifiedGreenBadgeText}>{lang === 'hi' ? 'सक्रिय' : 'Active'}</Text>
                 </View>
               </View>
               <View style={styles.settingsRowDivider} />
@@ -4875,8 +4876,12 @@ function ProfileScreen({
               <FileText size={18} color="#D97706" />
             </View>
             <View style={styles.settingsRowTextCol}>
-              <Text style={styles.settingsRowLabel}>Tax Invoices & Receipts</Text>
-              <Text style={styles.settingsRowSub}>Download official GST PDF invoices</Text>
+              <Text style={styles.settingsRowLabel}>
+                {lang === 'hi' ? 'टैक्स इनवॉइस और रसीदें' : 'Tax Invoices & Receipts'}
+              </Text>
+              <Text style={styles.settingsRowSub}>
+                {lang === 'hi' ? 'आधिकारिक जीएसटी बिल डाउनलोड करें' : 'Download official GST PDF invoices'}
+              </Text>
             </View>
             <ChevronRight size={18} color="#94A3B8" />
           </TouchableOpacity>
@@ -4886,14 +4891,14 @@ function ProfileScreen({
           {/* 5. Notifications */}
           <TouchableOpacity
             style={styles.settingsRow}
-            onPress={() => Alert.alert('Notifications', 'Push notifications enabled.')}
+            onPress={() => Alert.alert(lang === 'hi' ? 'सूचनाएं' : 'Notifications', lang === 'hi' ? 'पुश सूचनाएं चालू हैं।' : 'Push notifications enabled.')}
             activeOpacity={0.7}
           >
             <View style={[styles.settingsRowIconWrap, { backgroundColor: '#F1F5F9' }]}>
               <Bell size={18} color="#475569" />
             </View>
             <View style={styles.settingsRowTextCol}>
-              <Text style={styles.settingsRowLabel}>{t.notifications}</Text>
+              <Text style={styles.settingsRowLabel}>{lang === 'hi' ? 'सूचनाएं' : 'Notifications'}</Text>
             </View>
             <ChevronRight size={18} color="#94A3B8" />
           </TouchableOpacity>
@@ -4903,14 +4908,14 @@ function ProfileScreen({
           {/* 6. Help Center & FAQ */}
           <TouchableOpacity
             style={styles.settingsRow}
-            onPress={() => Alert.alert('Help & Support', 'Call toll-free: 1800-MISTRI-PRO')}
+            onPress={() => Alert.alert(lang === 'hi' ? 'सहायता एवं संपर्क' : 'Help & Support', 'Call toll-free: 1800-MISTRI-PRO')}
             activeOpacity={0.7}
           >
             <View style={[styles.settingsRowIconWrap, { backgroundColor: '#F1F5F9' }]}>
               <HelpCircle size={18} color="#475569" />
             </View>
             <View style={styles.settingsRowTextCol}>
-              <Text style={styles.settingsRowLabel}>{t.faq}</Text>
+              <Text style={styles.settingsRowLabel}>{lang === 'hi' ? 'सहायता केंद्र' : 'Help Center & FAQ'}</Text>
             </View>
             <ChevronRight size={18} color="#94A3B8" />
           </TouchableOpacity>
@@ -4919,7 +4924,7 @@ function ProfileScreen({
         {/* Log Out Button (Prominent Red) */}
         <TouchableOpacity style={styles.logoutButton} onPress={onLogout} activeOpacity={0.8}>
           <LogOut size={18} color="#DC2626" />
-          <Text style={styles.logoutButtonText}>{t.logout}</Text>
+          <Text style={styles.logoutButtonText}>{lang === 'hi' ? 'लॉग आउट' : 'Log Out'}</Text>
         </TouchableOpacity>
 
         <Text style={styles.versionText}>MISTRI PRO • Build v2.4.0 (Enterprise Pro)</Text>
@@ -4934,8 +4939,12 @@ function ProfileScreen({
           <View style={[styles.modalCard, { maxHeight: '88%', paddingBottom: Math.max(insets.bottom + 16, 20) }]}>
             <View style={styles.modalHeader}>
               <View>
-                <Text style={styles.modalTitle}>Edit Profile Details</Text>
-                <Text style={styles.modalSubtitle}>Update your name, contact & location</Text>
+                <Text style={styles.modalTitle}>
+                  {lang === 'hi' ? 'प्रोफ़ाइल विवरण बदलें' : 'Edit Profile Details'}
+                </Text>
+                <Text style={styles.modalSubtitle}>
+                  {lang === 'hi' ? 'अपना नाम, संपर्क और शहर अपडेट करें' : 'Update your name, contact & location'}
+                </Text>
               </View>
               <TouchableOpacity onPress={() => setShowEditModal(false)} style={{ padding: 4 }}>
                 <X size={20} color="#0F172A" />
@@ -4949,18 +4958,18 @@ function ProfileScreen({
               showsVerticalScrollIndicator={false}
             >
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Full Name</Text>
+                <Text style={styles.inputLabel}>{lang === 'hi' ? 'पूरा नाम' : 'Full Name'}</Text>
                 <TextInput
                   style={styles.textInput}
                   value={editName}
                   onChangeText={setEditName}
-                  placeholder="Enter your full name"
+                  placeholder={lang === 'hi' ? 'अपना पूरा नाम दर्ज करें' : 'Enter your full name'}
                   placeholderTextColor="#94A3B8"
                 />
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Phone / Mobile Number</Text>
+                <Text style={styles.inputLabel}>{lang === 'hi' ? 'मोबाइल नंबर' : 'Phone / Mobile Number'}</Text>
                 <TextInput
                   style={styles.textInput}
                   value={editContact}
@@ -4972,12 +4981,12 @@ function ProfileScreen({
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>City / Location Address</Text>
+                <Text style={styles.inputLabel}>{lang === 'hi' ? 'शहर / पता' : 'City / Location Address'}</Text>
                 <TextInput
                   style={styles.textInput}
                   value={editAddress}
                   onChangeText={setEditAddress}
-                  placeholder="e.g. Sawai Madhopur, Rajasthan"
+                  placeholder={lang === 'hi' ? 'उदा. सवाई माधोपुर, राजस्थान' : 'e.g. Sawai Madhopur, Rajasthan'}
                   placeholderTextColor="#94A3B8"
                 />
               </View>
@@ -4987,7 +4996,7 @@ function ProfileScreen({
                 disabled={isSaving}
                 onPress={async () => {
                   if (!editName.trim()) {
-                    Alert.alert('Required', 'Please enter your name');
+                    Alert.alert(lang === 'hi' ? 'नाम आवश्यक' : 'Required', lang === 'hi' ? 'कृपया अपना नाम दर्ज करें' : 'Please enter your name');
                     return;
                   }
                   setIsSaving(true);
@@ -5006,7 +5015,7 @@ function ProfileScreen({
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
                   <Text style={[styles.primaryActionBtnText, { color: '#FFFFFF', fontWeight: 'bold' }]}>
-                    Save Changes & Sync
+                    {lang === 'hi' ? 'बदलाव सुरक्षित करें' : 'Save Changes & Sync'}
                   </Text>
                 )}
               </TouchableOpacity>

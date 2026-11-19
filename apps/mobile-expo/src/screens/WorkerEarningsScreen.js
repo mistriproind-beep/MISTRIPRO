@@ -36,8 +36,12 @@ export default function WorkerEarningsScreen({
   lang = 'en',
   t = {},
 }) {
-  const [balance, setBalance] = useState(walletData?.availableBalance || 4850);
-  const [transactions, setTransactions] = useState(walletData?.transactions || []);
+  const [balance, setBalance] = useState(
+    typeof walletData?.availableBalance === 'number' ? walletData.availableBalance : 0
+  );
+  const [transactions, setTransactions] = useState(
+    Array.isArray(walletData?.transactions) ? walletData.transactions : []
+  );
 
   useEffect(() => {
     if (walletData) {
@@ -67,15 +71,16 @@ export default function WorkerEarningsScreen({
   const [withdrawAmount, setWithdrawAmount] = useState('100');
   const [payoutMethod, setPayoutMethod] = useState('UPI'); // 'UPI' | 'BANK'
   
-  // UPI Form
-  const [upiId, setUpiId] = useState('9829012345@upi');
+  // Real worker details for payout defaults (Zero mock accounts)
+  const workerCleanPhone = workerProfile?.phone ? String(workerProfile.phone).replace(/[^0-9]/g, '') : '';
+  const [upiId, setUpiId] = useState(workerCleanPhone ? `${workerCleanPhone}@upi` : '');
 
   // Bank Form
-  const [accountNumber, setAccountNumber] = useState('38920194821');
-  const [confirmAccNumber, setConfirmAccNumber] = useState('38920194821');
-  const [ifscCode, setIfscCode] = useState('SBIN0001234');
-  const [holderName, setHolderName] = useState(workerProfile?.name || 'Ram Singh Mistri');
-  const [bankName, setBankName] = useState('State Bank of India');
+  const [accountNumber, setAccountNumber] = useState('');
+  const [confirmAccNumber, setConfirmAccNumber] = useState('');
+  const [ifscCode, setIfscCode] = useState('');
+  const [holderName, setHolderName] = useState(workerProfile?.name || '');
+  const [bankName, setBankName] = useState('');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -186,9 +191,13 @@ export default function WorkerEarningsScreen({
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerTitleRow}>
-          <Text style={styles.headerTitle}>Earnings & Wallet</Text>
+          <Text style={styles.headerTitle}>{lang === 'hi' ? 'कमाई और वॉलेट' : 'Earnings & Wallet'}</Text>
         </View>
-        <Text style={styles.headerSub}>काम की कुल कमाई, वॉलेट बैलेंस और सीधे बैंक/UPI निकासी</Text>
+        <Text style={styles.headerSub}>
+          {lang === 'hi'
+            ? 'काम की कुल कमाई, वॉलेट बैलेंस और सीधे बैंक/UPI निकासी'
+            : 'Track your real earnings, wallet balance & withdraw directly via UPI or Bank'}
+        </Text>
       </View>
 
       <ScrollView
@@ -199,7 +208,9 @@ export default function WorkerEarningsScreen({
         <View style={styles.walletCard}>
           <View style={styles.walletCardTop}>
             <View>
-              <Text style={styles.walletCardLabel}>Available Balance (निकासी के लिए तैयार)</Text>
+              <Text style={styles.walletCardLabel}>
+                {lang === 'hi' ? 'उपलब्ध शेष राशि (निकासी के लिए तैयार)' : 'Available Balance (Ready for Withdrawal)'}
+              </Text>
               <View style={styles.balanceRow}>
                 <Text style={styles.balanceCurrency}>₹</Text>
                 <Text style={styles.balanceAmount}>{balance.toLocaleString()}</Text>
@@ -214,18 +225,18 @@ export default function WorkerEarningsScreen({
           {/* Stats Bar Inside Card */}
           <View style={styles.walletStatsRow}>
             <View style={styles.walletStatItem}>
-              <Text style={styles.walletStatLabel}>This Week</Text>
-              <Text style={styles.walletStatValue}>₹{walletData?.thisWeekEarnings || '3,800'}</Text>
+              <Text style={styles.walletStatLabel}>{lang === 'hi' ? 'इस सप्ताह' : 'This Week'}</Text>
+              <Text style={styles.walletStatValue}>₹{Number(walletData?.thisWeekEarnings || 0).toLocaleString('en-IN')}</Text>
             </View>
             <View style={styles.walletStatDivider} />
             <View style={styles.walletStatItem}>
-              <Text style={styles.walletStatLabel}>Pending Jobs</Text>
-              <Text style={styles.walletStatValue}>₹{walletData?.escrowLocked || '0'}</Text>
+              <Text style={styles.walletStatLabel}>{lang === 'hi' ? 'लंबित कार्य' : 'Pending Jobs'}</Text>
+              <Text style={styles.walletStatValue}>₹{Number(walletData?.escrowLocked || 0).toLocaleString('en-IN')}</Text>
             </View>
             <View style={styles.walletStatDivider} />
             <View style={styles.walletStatItem}>
-              <Text style={styles.walletStatLabel}>Total Lifetime</Text>
-              <Text style={styles.walletStatValue}>₹{walletData?.totalLifetimeEarnings || '0'}</Text>
+              <Text style={styles.walletStatLabel}>{lang === 'hi' ? 'कुल लाइफटाइम' : 'Total Lifetime'}</Text>
+              <Text style={styles.walletStatValue}>₹{Number(walletData?.totalLifetimeEarnings || 0).toLocaleString('en-IN')}</Text>
             </View>
           </View>
 
@@ -237,7 +248,7 @@ export default function WorkerEarningsScreen({
           >
             <ArrowUpRight size={18} color="#0F172A" />
             <Text style={styles.withdrawBtnText}>
-              {lang === 'hi' ? 'पैसे निकालें (Withdraw)' : 'Withdraw Money'}
+              {lang === 'hi' ? 'पैसे निकालें' : 'Withdraw Money'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -301,10 +312,16 @@ export default function WorkerEarningsScreen({
           <View style={styles.milestoneProgressWrap}>
             <View style={styles.milestoneProgressHeader}>
               <Text style={styles.milestoneProgressLabel}>
-                प्रगति: <Text style={{ color: '#4F46E5', fontWeight: '800' }}>{currentTierCount} / {tierTarget}</Text> नए काम
+                {lang === 'hi' ? (
+                  <>प्रगति: <Text style={{ color: '#4F46E5', fontWeight: '800' }}>{currentTierCount} / {tierTarget}</Text> नए काम</>
+                ) : (
+                  <>Progress: <Text style={{ color: '#4F46E5', fontWeight: '800' }}>{currentTierCount} / {tierTarget}</Text> jobs completed</>
+                )}
               </Text>
               <Text style={styles.milestoneRemainingLabel}>
-                {tierJobsRemaining === 0 ? '🎉 बोनस तैयार है!' : tierJobsRemaining === 1 ? 'बस 1 काम बाकी!' : `${tierJobsRemaining} काम और बाकी`}
+                {lang === 'hi'
+                  ? (tierJobsRemaining === 0 ? '🎉 बोनस तैयार है!' : tierJobsRemaining === 1 ? 'बस 1 काम बाकी!' : `${tierJobsRemaining} काम और बाकी`)
+                  : (tierJobsRemaining === 0 ? '🎉 Reward Ready!' : tierJobsRemaining === 1 ? 'Just 1 more job!' : `${tierJobsRemaining} jobs to unlock`)}
               </Text>
             </View>
 
@@ -316,17 +333,17 @@ export default function WorkerEarningsScreen({
           {/* Milestone Stats Row */}
           <View style={styles.milestoneStatsRow}>
             <View style={styles.milestoneStatItem}>
-              <Text style={styles.milestoneStatLabel}>वर्तमान चरण</Text>
+              <Text style={styles.milestoneStatLabel}>{lang === 'hi' ? 'वर्तमान चरण' : 'Current Tier'}</Text>
               <Text style={styles.milestoneStatValue}>Tier {activeTier}</Text>
             </View>
             <View style={styles.milestoneStatDivider} />
             <View style={styles.milestoneStatItem}>
-              <Text style={styles.milestoneStatLabel}>कुल पूरा काम</Text>
+              <Text style={styles.milestoneStatLabel}>{lang === 'hi' ? 'कुल पूरा काम' : 'Completed Jobs'}</Text>
               <Text style={styles.milestoneStatValue}>{lifetimeCompletedJobs}</Text>
             </View>
             <View style={styles.milestoneStatDivider} />
             <View style={styles.milestoneStatItem}>
-              <Text style={styles.milestoneStatLabel}>कुल बोनस कमाई</Text>
+              <Text style={styles.milestoneStatLabel}>{lang === 'hi' ? 'कुल बोनस कमाई' : 'Milestone Bonus'}</Text>
               <Text style={[styles.milestoneStatValue, { color: '#15803D' }]}>₹{totalLifetimeMilestoneEarned}</Text>
             </View>
           </View>
@@ -336,9 +353,13 @@ export default function WorkerEarningsScreen({
         <View style={styles.securityBanner}>
           <ShieldCheck size={18} color="#15803D" />
           <View style={styles.securityTextCol}>
-            <Text style={styles.securityTitle}>100% Protected & Guaranteed Earnings</Text>
+            <Text style={styles.securityTitle}>
+              {lang === 'hi' ? '100% सुरक्षित और गारंटीशुदा कमाई' : '100% Protected & Guaranteed Earnings'}
+            </Text>
             <Text style={styles.securitySub}>
-              Customers pay via Razorpay upfront. Once you finish work, wages are directly credited to your account without delay.
+              {lang === 'hi'
+                ? 'ग्राहक बुकिंग शुल्क ऑनलाइन जमा करते हैं। साइट विजिट के बाद तय किया गया काम पूरा होने पर सीधे बैंक या यूपीआई में भुगतान प्राप्त करें।'
+                : 'Customers book your visit upfront. Once you complete the on-site work and verify OTP, earnings are instantly credited to your wallet.'}
             </Text>
           </View>
         </View>
@@ -348,12 +369,27 @@ export default function WorkerEarningsScreen({
           <View style={styles.historySectionHeader}>
             <View style={styles.historyTitleRow}>
               <History size={16} color="#0F172A" />
-              <Text style={styles.historyTitle}>Transaction & Payout History</Text>
+              <Text style={styles.historyTitle}>{lang === 'hi' ? 'लेन-देन और निकासी इतिहास' : 'Transaction & Payout History'}</Text>
             </View>
-            <Text style={styles.historySub}>Recent credits & withdrawals</Text>
+            <Text style={styles.historySub}>
+              {lang === 'hi' ? 'हाल के क्रेडिट और निकासी' : 'Recent credits & withdrawals'}
+            </Text>
           </View>
 
-          {transactions.map((txn) => {
+          {transactions.length === 0 ? (
+            <View style={styles.emptyTxnCard}>
+              <Wallet size={32} color="#94A3B8" />
+              <Text style={styles.emptyTxnTitle}>
+                {lang === 'hi' ? 'कोई लेन-देन नहीं मिला' : 'No Transactions Yet'}
+              </Text>
+              <Text style={styles.emptyTxnSub}>
+                {lang === 'hi'
+                  ? 'जब आप काम पूरा करेंगे और माइलस्टोन बोनस अर्जित करेंगे, तो यहां आपकी वास्तविक कमाई और भुगतान दिखाई देंगे।'
+                  : 'Your real earnings and payout requests will appear here as you complete bookings and earn milestone rewards.'}
+              </Text>
+            </View>
+          ) : (
+            transactions.map((txn) => {
             const isCredit = txn.type === 'CREDIT';
             const isPending = txn.status === 'PENDING';
 
@@ -406,7 +442,8 @@ export default function WorkerEarningsScreen({
                 </View>
               </View>
             );
-          })}
+          })
+        )}
         </View>
       </ScrollView>
 
@@ -782,6 +819,31 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     color: '#64748B',
     marginTop: 1,
+  },
+  emptyTxnCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 12,
+  },
+  emptyTxnTitle: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 15,
+    color: '#0F172A',
+    marginTop: 10,
+    marginBottom: 4,
+  },
+  emptyTxnSub: {
+    fontFamily: 'Satoshi-Regular',
+    fontSize: 12,
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 18,
+    paddingHorizontal: 12,
   },
   txnCard: {
     flexDirection: 'row',

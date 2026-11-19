@@ -147,7 +147,7 @@ export default function WorkerBookingsScreen({
   // Submit OTP Verification
   const handleSubmitOtp = async () => {
     if (!targetBooking || !inputOtp.trim()) {
-      setOtpError('कृपया 4-अंकीय OTP दर्ज करें (Please enter 4-digit OTP)');
+      setOtpError(lang === 'hi' ? 'कृपया 4-अंकीय OTP दर्ज करें' : 'Please enter 4-digit OTP');
       return;
     }
     setIsVerifying(true);
@@ -157,7 +157,7 @@ export default function WorkerBookingsScreen({
       if (otpType === 'ARRIVAL') {
         const res = await LiveBackend.verifyArrivalOtp(targetBooking, inputOtp);
         if (!res.success) {
-          setOtpError(res.error || 'अमान्य OTP! ग्राहक से आगमन OTP पूछें।');
+          setOtpError(res.error || (lang === 'hi' ? 'अमान्य OTP! ग्राहक से आगमन OTP पूछें।' : 'Invalid OTP! Ask customer for Arrival OTP.'));
           setIsVerifying(false);
           return;
         }
@@ -165,13 +165,15 @@ export default function WorkerBookingsScreen({
         DeviceFeedback?.triggerSuccessHaptics?.();
         setOtpModalVisible(false);
         Alert.alert(
-          'आगमन सत्यापित! 📍',
-          'आप सफलतापूर्वक साइट पर पहुंच चुके हैं। ग्राहक को सूचित कर दिया गया है। अब साइट देखकर काम का मूल्य तय करें।'
+          lang === 'hi' ? 'आगमन सत्यापित! 📍' : 'Arrival Verified! 📍',
+          lang === 'hi'
+            ? 'आप सफलतापूर्वक साइट पर पहुंच चुके हैं। ग्राहक को सूचित कर दिया गया है। अब साइट देखकर काम का मूल्य तय करें।'
+            : 'You have arrived at the work site. The customer has been notified. You can now inspect the work and agree on the final quote directly.'
         );
       } else if (otpType === 'COMPLETION') {
         const res = await LiveBackend.verifyCompletionOtp(targetBooking, inputOtp);
         if (!res.success) {
-          setOtpError(res.error || 'अमान्य OTP! ग्राहक से कार्य समापन OTP पूछें।');
+          setOtpError(res.error || (lang === 'hi' ? 'अमान्य OTP! ग्राहक से कार्य समापन OTP पूछें।' : 'Invalid OTP! Ask customer for Completion OTP.'));
           setIsVerifying(false);
           return;
         }
@@ -182,17 +184,19 @@ export default function WorkerBookingsScreen({
         DeviceFeedback?.triggerSuccessHaptics?.();
         setOtpModalVisible(false);
         Alert.alert(
-          'काम पूरा हुआ! 🎉',
-          'कार्य समापन सफलतापूर्वक दर्ज किया गया है। यह काम आपकी प्रोफाइल के 10-काम माइलस्टोन रिवॉर्ड में जोड़ दिया गया है!',
+          lang === 'hi' ? 'काम पूरा हुआ! 🎉' : 'Job Completed! 🎉',
+          lang === 'hi'
+            ? 'कार्य समापन सफलतापूर्वक दर्ज किया गया है। यह काम आपके माइलस्टोन रिवॉर्ड में जोड़ दिया गया है!'
+            : 'Job completion verified! This booking has been added to your Milestone Reward progress.',
           [
-            { text: 'View Earnings', onPress: () => onNavigateTab && onNavigateTab('EARNINGS') },
+            { text: lang === 'hi' ? 'कमाई देखें' : 'View Earnings', onPress: () => onNavigateTab && onNavigateTab('EARNINGS') },
             { text: 'OK' },
           ]
         );
       } else if (otpType === 'CANCELLATION') {
         const res = await LiveBackend.verifyCancellationOtp(targetBooking, inputOtp);
         if (!res.success) {
-          setOtpError(res.error || 'अमान्य Cancellation OTP! ग्राहक से रद्दीकरण कोड पूछें।');
+          setOtpError(res.error || (lang === 'hi' ? 'अमान्य Cancellation OTP! ग्राहक से रद्दीकरण कोड पूछें।' : 'Invalid Cancellation OTP! Ask customer for cancellation code.'));
           setIsVerifying(false);
           return;
         }
@@ -201,10 +205,15 @@ export default function WorkerBookingsScreen({
         );
         DeviceFeedback?.triggerAlertHaptics?.();
         setOtpModalVisible(false);
-        Alert.alert('साइट विजिट रद्द', 'ग्राहक के साथ आपसी OTP सत्यापन के बाद साइट विजिट रद्द कर दी गई है।');
+        Alert.alert(
+          lang === 'hi' ? 'साइट विजिट रद्द' : 'Site Visit Cancelled',
+          lang === 'hi'
+            ? 'ग्राहक के साथ आपसी OTP सत्यापन के बाद साइट विजिट रद्द कर दी गई है।'
+            : 'Site visit cancelled after mutual OTP verification with customer.'
+        );
       }
     } catch (e) {
-      setOtpError(e.message || 'OTP verification error');
+      setOtpError(e.message || (lang === 'hi' ? 'OTP सत्यापन में त्रुटि' : 'OTP verification error'));
     } finally {
       setIsVerifying(false);
     }
@@ -318,8 +327,8 @@ export default function WorkerBookingsScreen({
               const category = booking.category || booking.skill || 'General Mistri';
               const title = booking.title || `${category} Service`;
               const location = booking.location || booking.site_location || 'Sawai Madhopur, Rajasthan';
-              const rawAmt = booking.amount || '₹950';
-              const amount = String(rawAmt).startsWith('₹') ? rawAmt : `₹${rawAmt}`;
+              const rawAmt = booking.bookingFee || booking.booking_fee || 99;
+              const amount = `₹${rawAmt}`;
               const customerPhone = booking.customerPhone || booking.customer_phone || '';
               const bookingKey = booking.id || `active-${index}`;
 
@@ -348,7 +357,9 @@ export default function WorkerBookingsScreen({
 
                     <View style={styles.payoutBadge}>
                       <Text style={styles.payoutAmount}>{amount}</Text>
-                      <Text style={styles.payoutSub}>Payment Secured</Text>
+                      <Text style={styles.payoutSub}>
+                        {lang === 'hi' ? 'विजिट शुल्क • ऑन-साइट कोट' : 'Visit Fee • Quote On-Site'}
+                      </Text>
                     </View>
                   </View>
 
