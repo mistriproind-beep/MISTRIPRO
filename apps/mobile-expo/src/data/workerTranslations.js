@@ -82,10 +82,10 @@ export const WORKER_STRINGS = {
     mr: 'ऑन-साइट थेट कोटेशन मॉडेल',
   },
   directQuoteDesc: {
-    en: '₹99 customer booking charge covers your verified arrival. You inspect the work on site and agree on the total payment directly with the customer. 0% commission deducted.',
-    hi: '₹99 ग्राहक बुकिंग शुल्क आपकी विजिट सुरक्षित करता है। काम का कुल रेट आप ग्राहक से साइट देखकर सीधे तय करें। मिस्त्री से कोई कमीशन नहीं काटा जाता।',
-    gu: '₹99 ગ્રાહક બુકિંગ ફી તમારી મુલાકાત સુરક્ષિત કરે છે. કામનો સંપૂર્ણ દર તમે સાઇટ પર જઈને ગ્રાહક સાથે સીધો નક્કી કરો. કોઈ કમિશન કપાતું નથી.',
-    mr: '₹99 ग्राहक बुकिंग शुल्क तुमची भेट सुरक्षित करते. कामाचा पूर्ण दर साइट पाहून थेट ग्राहकाशी ठरवा. कोणतेही कमिशन कापले जात नाही.',
+    en: 'Inspect the work directly on-site and agree on your daily wage or project quote directly with the customer. The customer pays you directly in cash or UPI.',
+    hi: 'साइट पर जाकर काम देखें और ग्राहक से सीधे अपनी मजदूरी या ठेका तय करें। ग्राहक आपको सीधे नकद या UPI में भुगतान करेगा।',
+    gu: 'સાઇટ પર જઈને કામ જુઓ અને ગ્રાહક સાથે સીધી તમારી મજૂરી અથવા કામનો દર નક્કી કરો. ગ્રાહક તમને સીધી ચુકવણી કરશે.',
+    mr: 'साइटवर जाऊन काम पहा आणि ग्राहकाशी थेट तुमची मजुरी किंवा कामाचा दर ठरवा. ग्राहक तुम्हाला थेट रक्कम देईल.',
   },
 
   // Dashboard Stats

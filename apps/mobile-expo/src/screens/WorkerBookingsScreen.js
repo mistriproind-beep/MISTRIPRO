@@ -328,8 +328,9 @@ export default function WorkerBookingsScreen({
               const category = booking.category || booking.skill || 'General Mistri';
               const title = booking.title || `${category} Service`;
               const location = booking.location || booking.site_location || 'Sawai Madhopur, Rajasthan';
-              const rawAmt = booking.bookingFee || booking.booking_fee || 99;
-              const amount = `₹${rawAmt}`;
+              const amount = (booking.amount && !String(booking.amount).includes('99'))
+                ? (String(booking.amount).startsWith('₹') ? booking.amount : `₹${booking.amount}`)
+                : (lang === 'hi' ? 'सीधा भुगतान (ऑन-साइट)' : lang === 'gu' ? 'સીધી ચુકવણી' : lang === 'mr' ? 'थेट देयक' : 'Direct Customer Payment');
               const customerPhone = booking.customerPhone || booking.customer_phone || '';
               const bookingKey = booking.id || `active-${index}`;
 
@@ -546,7 +547,9 @@ export default function WorkerBookingsScreen({
               const location = item.location || item.site_location || 'Sawai Madhopur, Rajasthan';
               const title = item.title || 'Completed Service';
               const rawAmt = item.amount;
-              const amount = rawAmt ? (String(rawAmt).startsWith('₹') ? rawAmt : `₹${rawAmt}`) : (lang === 'hi' ? 'ऑन-साइट तय' : 'Direct Quote');
+              const amount = (rawAmt && !String(rawAmt).includes('99'))
+                ? (String(rawAmt).startsWith('₹') ? rawAmt : `₹${rawAmt}`)
+                : (lang === 'hi' ? 'सीधा भुगतान (ऑन-साइट)' : lang === 'gu' ? 'સીધી ચુકવણી' : lang === 'mr' ? 'थेट देयक' : 'Direct Customer Payment');
               const customerPhone = item.customerPhone || item.customer_phone || '';
 
               return (
@@ -595,7 +598,9 @@ export default function WorkerBookingsScreen({
                     </TouchableOpacity>
 
                     <View style={styles.paidPill}>
-                      <Text style={styles.paidLabel}>Earnings Credited:</Text>
+                      <Text style={styles.paidLabel}>
+                        {lang === 'hi' ? 'भुगतान:' : lang === 'gu' ? 'ચુકવણી:' : lang === 'mr' ? 'देयक:' : 'Payment:'}
+                      </Text>
                       <Text style={styles.paidAmount}>{amount}</Text>
                     </View>
                   </View>
