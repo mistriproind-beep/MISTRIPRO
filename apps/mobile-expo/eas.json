@@ -16,7 +16,7 @@
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://jmdijseowvqvldlhhwsp.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_I-_tRn1OpP7mijyP1kjtlA_DtyTGJej",
-        "EXPO_PUBLIC_RAZORPAY_KEY_ID": "rzp_test_Sx6IT09QMzFIAk",
+        "EXPO_PUBLIC_RAZORPAY_KEY_ID": "rzp_live_Sx6jXHOhaezr23",
         "EXPO_PUBLIC_RAZORPAY_KEY_SECRET": "MRnGqIxKR4JTNxH2M7EHeqWc"
       }
     },
@@ -27,7 +27,7 @@
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://jmdijseowvqvldlhhwsp.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_I-_tRn1OpP7mijyP1kjtlA_DtyTGJej",
-        "EXPO_PUBLIC_RAZORPAY_KEY_ID": "rzp_test_Sx6IT09QMzFIAk",
+        "EXPO_PUBLIC_RAZORPAY_KEY_ID": "rzp_live_Sx6jXHOhaezr23",
         "EXPO_PUBLIC_RAZORPAY_KEY_SECRET": "MRnGqIxKR4JTNxH2M7EHeqWc"
       }
     }

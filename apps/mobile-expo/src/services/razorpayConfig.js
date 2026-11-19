@@ -3,7 +3,7 @@ import { supabase } from './supabase';
 export const GATEWAY_CONFIG_PROFILE_ID = '00000000-0000-0000-0000-000000000099';
 
 export const DEFAULT_RAZORPAY_CONFIG = {
-  KEY_ID: process.env.EXPO_PUBLIC_RAZORPAY_KEY_ID || 'rzp_test_Sx6IT09QMzFIAk',
+  KEY_ID: process.env.EXPO_PUBLIC_RAZORPAY_KEY_ID || 'rzp_live_Sx6jXHOhaezr23',
   KEY_SECRET: process.env.EXPO_PUBLIC_RAZORPAY_KEY_SECRET || 'MRnGqIxKR4JTNxH2M7EHeqWc',
   MERCHANT_NAME: 'Mistri Pro Secured Payments',
   CURRENCY: 'INR',
