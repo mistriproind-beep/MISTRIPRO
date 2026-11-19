@@ -3239,7 +3239,8 @@ function MainApp() {
               t={t}
               onNavigateTab={(tab, category) => {
                 if (category) setFindInitialCategory(category);
-                setActiveTab(tab);
+                const normalizedTab = String(tab || '').trim().toUpperCase();
+                setActiveTab(normalizedTab);
               }}
               onBookWorker={(details) => handleCustomerBookWorker(details)}
               onOpenNotifications={() => setShowNotifModal(true)}

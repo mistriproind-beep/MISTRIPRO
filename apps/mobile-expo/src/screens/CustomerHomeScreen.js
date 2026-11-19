@@ -554,17 +554,25 @@ export default function CustomerHomeScreen({
         {/* ─── 1. Header Bar ─── */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
-            <TouchableOpacity style={styles.avatarCircle} activeOpacity={0.8} onPress={() => onNavigateTab && onNavigateTab('profile')}>
+            <TouchableOpacity
+              style={styles.avatarCircle}
+              activeOpacity={0.7}
+              onPress={() => onNavigateTab && onNavigateTab('PROFILE')}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
               <Text style={styles.avatarInitials}>{userInitials}</Text>
             </TouchableOpacity>
-            <View>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => onNavigateTab && onNavigateTab('PROFILE')}
+            >
               <Text style={styles.greetingSub}>
                 {lang === 'hi' ? 'शुभ प्रभात 👋' : lang === 'gu' ? 'શુભ સવાર 👋' : lang === 'mr' ? 'शुभ प्रभात 👋' : 'Good morning 👋'}
               </Text>
               <Text style={styles.greetingName}>
                 {lang === 'hi' ? `नमस्ते, ${userName || 'उपयोगकर्ता'}!` : lang === 'gu' ? `નમસ્તે, ${userName || 'વપરાશકર્તા'}!` : lang === 'mr' ? `नमस्कार, ${userName || 'वापरकर्ता'}!` : `Hello, ${userName || 'User'}!`}
               </Text>
-            </View>
+            </TouchableOpacity>
           </View>
           <TouchableOpacity
             style={styles.bellWrapper}

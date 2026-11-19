@@ -225,10 +225,19 @@ export default function WorkerHomeScreen({
         {/* 1. Header Profile Banner */}
         <View style={styles.headerRow}>
           <View style={styles.headerLeft}>
-            <View style={[styles.avatarBox, { backgroundColor: workerProfile?.color || '#4F46E5' }]}>
+            <TouchableOpacity
+              style={[styles.avatarBox, { backgroundColor: workerProfile?.color || '#4F46E5' }]}
+              onPress={() => onNavigateTab && onNavigateTab('PROFILE')}
+              activeOpacity={0.7}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
               <Text style={styles.avatarText}>{avatarText}</Text>
-            </View>
-            <View style={styles.headerTextCol}>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.headerTextCol}
+              onPress={() => onNavigateTab && onNavigateTab('PROFILE')}
+              activeOpacity={0.7}
+            >
               <View style={styles.nameRow}>
                 <Text style={styles.workerName} numberOfLines={1}>
                   {workerProfile?.name || 'Ram Singh Mistri'}
@@ -246,7 +255,7 @@ export default function WorkerHomeScreen({
                   {translateLocationName(workerProfile?.location || 'Sawai Madhopur, Rajasthan', lang)}
                 </Text>
               </View>
-            </View>
+            </TouchableOpacity>
           </View>
 
           <TouchableOpacity
