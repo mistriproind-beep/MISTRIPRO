@@ -347,16 +347,65 @@ export const LiveBackend = {
   },
 
   // 2. Lookup Existing Profile by Email or 10-digit Phone
-  getProfileByEmailOrPhone: async (identifier) => {
+  getProfileByEmailOrPhone: async (identifier, userId) => {
     try {
-      if (!identifier) return { found: false };
-      const cleanId = String(identifier).trim().toLowerCase();
+      if (!identifier && !userId) return { found: false };
+      const cleanId = identifier ? String(identifier).trim().toLowerCase() : '';
       const isEmail = cleanId.includes('@');
 
+      // 1. Direct ID lookup if userId is provided
+      if (userId) {
+        const { data: byId } = await supabase
+          .from('profiles')
+          .select('*, worker_profiles(*)')
+          .eq('id', userId)
+          .maybeSingle();
+        if (byId && byId.role && String(byId.role).trim().length > 0) {
+          return {
+            found: true,
+            profile: byId,
+            workerProfile: (byId.worker_profiles && byId.worker_profiles[0]) || null,
+          };
+        }
+      }
+
+      // 2. Direct lookup by email in alt_phone or phone
+      if (isEmail) {
+        const { data: byEmail } = await supabase
+          .from('profiles')
+          .select('*, worker_profiles(*)')
+          .ilike('alt_phone', cleanId)
+          .maybeSingle();
+        if (byEmail && byEmail.role && String(byEmail.role).trim().length > 0) {
+          return {
+            found: true,
+            profile: byEmail,
+            workerProfile: (byEmail.worker_profiles && byEmail.worker_profiles[0]) || null,
+          };
+        }
+      } else if (cleanId) {
+        const searchDigits = cleanId.replace(/[^0-9]/g, '').slice(-10);
+        if (searchDigits.length >= 10) {
+          const { data: byPhone } = await supabase
+            .from('profiles')
+            .select('*, worker_profiles(*)')
+            .ilike('phone', `%${searchDigits}%`)
+            .maybeSingle();
+          if (byPhone && byPhone.role && String(byPhone.role).trim().length > 0) {
+            return {
+              found: true,
+              profile: byPhone,
+              workerProfile: (byPhone.worker_profiles && byPhone.worker_profiles[0]) || null,
+            };
+          }
+        }
+      }
+
+      // 3. Fallback scan across all profiles
       const { data, error } = await supabase
         .from('profiles')
         .select('*, worker_profiles(*)')
-        .limit(50);
+        .limit(200);
 
       if (error || !data) return { found: false };
 
@@ -365,18 +414,18 @@ export const LiveBackend = {
         matched = data.find((p) => {
           const pEmail = (p.email || '').toLowerCase().trim();
           const pAlt = (p.alt_phone || '').toLowerCase().trim();
-          return pEmail === cleanId || pAlt === cleanId;
+          return (pEmail === cleanId || pAlt === cleanId) && p.role && String(p.role).trim().length > 0;
         });
       } else {
         const searchDigits = cleanId.replace(/[^0-9]/g, '').slice(-10);
         matched = data.find((p) => {
           const pDigits = (p.phone || '').replace(/[^0-9]/g, '').slice(-10);
           const altDigits = (p.alt_phone || '').replace(/[^0-9]/g, '').slice(-10);
-          return pDigits === searchDigits || (altDigits && altDigits === searchDigits);
+          return ((pDigits && pDigits === searchDigits) || (altDigits && altDigits === searchDigits)) && p.role && String(p.role).trim().length > 0;
         });
       }
 
-      if (matched) {
+      if (matched && matched.role && String(matched.role).trim().length > 0) {
         return {
           found: true,
           profile: matched,

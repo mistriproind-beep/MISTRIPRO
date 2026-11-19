@@ -3,12 +3,12 @@ import { supabase } from './supabase';
 export const GATEWAY_CONFIG_PROFILE_ID = '00000000-0000-0000-0000-000000000099';
 
 export const DEFAULT_RAZORPAY_CONFIG = {
-  KEY_ID: process.env.EXPO_PUBLIC_RAZORPAY_KEY_ID || 'rzp_live_Sx6jXHOhaezr23',
+  KEY_ID: process.env.EXPO_PUBLIC_RAZORPAY_KEY_ID || 'rzp_test_U1wTVQHlvrLyos',
   KEY_SECRET: process.env.EXPO_PUBLIC_RAZORPAY_KEY_SECRET || 'MRnGqIxKR4JTNxH2M7EHeqWc',
   MERCHANT_NAME: 'Mistri Pro Secured Payments',
   CURRENCY: 'INR',
   THEME_COLOR: '#4F46E5',
-  MODE: 'live',
+  MODE: 'test',
   ENABLED: true,
   COMPANY_PHONE: '+91 98290 12345',
   BOOKING_FEE: 99,

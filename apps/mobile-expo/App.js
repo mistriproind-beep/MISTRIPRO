@@ -1476,6 +1476,36 @@ function MainApp() {
     }
   };
 
+  // Helper to completely purge in-memory user and profile states between accounts
+  const resetUserFormAndSessionState = () => {
+    setRole(null);
+    setCustName('');
+    setCustMobile('');
+    setCustAddress('');
+    setCustPhotoUri(null);
+
+    setWorkerName('');
+    setWorkerMobile('');
+    setWorkerAltMobile('');
+    setWorkerAddress('');
+    setWorkerSkills([]);
+    setWorkerPhotoUri(null);
+    setAadhaarFrontUri(null);
+    setAadhaarBackUri(null);
+
+    setWorkerProfile(INITIAL_WORKER_PROFILE);
+    setWorkerWallet({
+      availableBalance: 0,
+      escrowLockedBalance: 0,
+      totalLifetimeEarnings: 0,
+      transactions: [],
+    });
+
+    setCustomerBookings([]);
+    setWorkerBookings([]);
+    setWorkerAlerts([]);
+  };
+
   // Dedicated Complete Sign Out (Wipes React states, persistent storage, Supabase auth)
   const handleSignOut = async () => {
     Alert.alert(t.logout || 'Log Out', 'Are you sure you want to sign out?', [
@@ -1492,7 +1522,7 @@ function MainApp() {
           await StorageService.setBookings([]);
 
           // Reset all user and session states
-          setRole('CUSTOMER');
+          resetUserFormAndSessionState();
           setActiveTab('HOME');
           setEmailInput('');
           setPasswordInput('');
@@ -1500,32 +1530,6 @@ function MainApp() {
           setOtpCode('');
           setIsOtpSent(false);
           setShowOtpModal(false);
-
-          setCustName('');
-          setCustMobile('');
-          setCustAddress('');
-          setCustPhotoUri(null);
-
-          setWorkerName('');
-          setWorkerMobile('');
-          setWorkerAltMobile('');
-          setWorkerAddress('');
-          setWorkerSkills([]);
-          setWorkerPhotoUri(null);
-          setAadhaarFrontUri(null);
-          setAadhaarBackUri(null);
-
-          setWorkerProfile(INITIAL_WORKER_PROFILE);
-          setWorkerWallet({
-            availableBalance: 0,
-            escrowLockedBalance: 0,
-            totalLifetimeEarnings: 0,
-            transactions: [],
-          });
-
-          setCustomerBookings([]);
-          setWorkerBookings([]);
-          setWorkerAlerts([]);
 
           setNotifications([
             {
@@ -1569,8 +1573,8 @@ function MainApp() {
         let savedCredentials = await StorageService.getCredentials();
         let savedRole = await StorageService.getRole();
 
-        if (savedSession && (savedSession.email || savedSession.mobile || savedSession.phone || savedSession.name || savedSession.id)) {
-          const effectiveRole = savedSession.role || savedRole || 'CUSTOMER';
+        if (savedSession && (savedSession.email || savedSession.mobile || savedSession.phone || savedSession.name || savedSession.id) && savedSession.role) {
+          const effectiveRole = savedSession.role;
           const userDisplayName = savedSession.name || (effectiveRole === 'CUSTOMER' ? 'Customer' : 'Worker');
           setRole(effectiveRole);
 
@@ -1598,26 +1602,50 @@ function MainApp() {
             }
           }
         } else if (savedCredentials && (savedCredentials.email || savedCredentials.phone)) {
-          // Auto-restore session from saved credentials and send directly to Home
+          // Check Supabase Cloud profile table for THIS specific user credentials
           const credTarget = savedCredentials.email || savedCredentials.phone;
-          const localAcct = await StorageService.getAccountProfile(credTarget);
-          const effectiveRole = localAcct?.role || savedRole || 'CUSTOMER';
-          const effectiveName = localAcct?.name || formatNameFromEmail(credTarget);
-          setRole(effectiveRole);
-          await StorageService.setSession({
-            email: savedCredentials.email || '',
-            mobile: savedCredentials.phone || '',
-            role: effectiveRole,
-            name: effectiveName,
-          });
-          if (effectiveRole === 'CUSTOMER') {
-            setCustName(effectiveName);
-            setActiveTab('HOME');
-            setCurrentScreen('MAIN');
+          const existing = await LiveBackend.getProfileByEmailOrPhone(credTarget);
+
+          if (existing.found && existing.profile && existing.profile.role) {
+            const p = existing.profile;
+            const effectiveRole = p.role;
+            const effectiveName = (p.full_name && p.full_name !== 'Ramesh Sharma')
+              ? p.full_name
+              : formatNameFromEmail(credTarget);
+            setRole(effectiveRole);
+            await StorageService.setRole(effectiveRole);
+            await StorageService.setSession({
+              id: p.id,
+              email: savedCredentials.email || '',
+              mobile: p.phone || savedCredentials.phone || '',
+              role: effectiveRole,
+              name: effectiveName,
+              address: p.address || '',
+              kyc_status: p.kyc_status || 'VERIFIED',
+            });
+            if (effectiveRole === 'CUSTOMER') {
+              setCustName(effectiveName);
+              if (p.phone) setCustMobile(p.phone);
+              if (p.address) setCustAddress(p.address);
+              setActiveTab('HOME');
+              setCurrentScreen('MAIN');
+            } else {
+              setWorkerName(effectiveName);
+              if (p.phone) setWorkerMobile(p.phone);
+              if (p.address) setWorkerAddress(p.address);
+              if (p.kyc_status === 'APPROVED' || p.kyc_status === 'VERIFIED') {
+                setActiveTab('HOME');
+                setCurrentScreen('MAIN');
+              } else {
+                setCurrentScreen('WORKER_UNDER_REVIEW');
+              }
+            }
           } else {
-            setWorkerName(effectiveName);
-            setActiveTab('HOME');
-            setCurrentScreen('MAIN');
+            // Role missing in Supabase for this user -> Ask to choose role!
+            setEmailInput(savedCredentials.email || '');
+            setPhoneInput(savedCredentials.phone || '');
+            setRole(null);
+            setCurrentScreen('ROLE_SELECT');
           }
         } else if (!hasChosenLang && !savedLang) {
           // Absolute first time app launch: show Language Selection screen once
@@ -1712,49 +1740,64 @@ function MainApp() {
       const res = await signInWithGoogle();
       setIsAuthLoading(false);
       if (res.success) {
+        resetUserFormAndSessionState();
         await StorageService.setLanguage(lang);
         await StorageService.setHasChosenLanguage(true);
         const emailOrPhone = res.user?.email || res.user?.phone || 'google_user';
         if (emailOrPhone && emailOrPhone.includes('@')) {
           await StorageService.setCredentials({ email: emailOrPhone, provider: 'google' });
+          setEmailInput(emailOrPhone);
         }
-        const existing = await LiveBackend.getProfileByEmailOrPhone(emailOrPhone);
-        if (existing.found && existing.profile) {
-          const p = existing.profile;
-          const userRole = p.role || 'CUSTOMER';
+
+        const existing = await LiveBackend.getProfileByEmailOrPhone(emailOrPhone, res.user?.id);
+        const p = existing.found ? existing.profile : null;
+        const supabaseRole = (p?.role && String(p.role).trim().length > 0) ? p.role.trim() : null;
+
+        if (supabaseRole) {
+          const userRole = supabaseRole;
+          const effectiveName = (p.full_name && p.full_name !== 'Ramesh Sharma')
+            ? p.full_name
+            : formatNameFromEmail(emailOrPhone);
+          const effectivePhone = p.phone || '';
+          const effectiveAddress = p.address || '';
+          const effectiveKyc = p.kyc_status || 'VERIFIED';
+
           setRole(userRole);
           await StorageService.setRole(userRole);
           await StorageService.setSession({
-            id: p.id,
-            name: p.full_name,
-            mobile: p.phone,
-            email: p.email || (res.user?.email || ''),
+            id: p.id || res.user?.id || 'usr-' + Date.now(),
+            name: effectiveName,
+            mobile: effectivePhone,
+            phone: effectivePhone,
+            email: p.alt_phone || (res.user?.email || ''),
             role: userRole,
-            kyc_status: p.kyc_status,
+            address: effectiveAddress,
+            kyc_status: effectiveKyc,
           });
 
           if (userRole === 'CUSTOMER') {
-            setCustName(p.full_name || 'Customer');
+            setCustName(effectiveName);
             if (p.phone) setCustMobile(p.phone);
             if (p.address) setCustAddress(p.address);
             setActiveTab('HOME');
             setCurrentScreen('MAIN');
           } else {
-            setWorkerName(p.full_name || 'Worker');
+            setWorkerName(effectiveName);
             if (p.phone) setWorkerMobile(p.phone);
+            if (p.address) setWorkerAddress(p.address);
             setWorkerProfile((prev) => ({
               ...prev,
               id: p.id || prev.id,
               user_id: p.id || prev.user_id,
-              name: p.full_name || prev.name,
-              phone: p.phone || prev.phone,
-              location: p.address || prev.location,
+              name: effectiveName,
+              phone: effectivePhone,
+              location: effectiveAddress || prev.location,
               isAvailable:
                 p.worker_profiles && p.worker_profiles[0]?.is_available !== undefined
                   ? p.worker_profiles[0].is_available
                   : prev.isAvailable,
             }));
-            if (p.kyc_status === 'APPROVED' || p.kyc_status === 'VERIFIED') {
+            if (effectiveKyc === 'APPROVED' || effectiveKyc === 'VERIFIED') {
               setActiveTab('HOME');
               setCurrentScreen('MAIN');
             } else {
@@ -1764,35 +1807,14 @@ function MainApp() {
           return;
         }
 
-        const googleEmail = res.user?.email || '';
-        if (googleEmail) {
-          setEmailInput(googleEmail);
-        }
-        const localAcct = googleEmail ? await StorageService.getAccountProfile(googleEmail) : null;
-        const savedRole = localAcct?.role || 'CUSTOMER';
-        const derivedName = localAcct?.name || res.user?.user_metadata?.full_name || formatNameFromEmail(googleEmail || 'Google User');
-        setRole(savedRole);
-        await StorageService.setRole(savedRole);
-        await StorageService.setSession({
-          name: derivedName,
-          email: googleEmail,
-          role: savedRole,
-        });
-        await StorageService.saveAccountProfile(googleEmail || 'google_user', {
-          role: savedRole,
-          name: derivedName,
-          email: googleEmail,
-        });
-
-        if (savedRole === 'CUSTOMER') {
-          setCustName(derivedName);
-          setActiveTab('HOME');
-          setCurrentScreen('MAIN');
-        } else {
-          setWorkerName(derivedName);
-          setActiveTab('HOME');
-          setCurrentScreen('MAIN');
-        }
+        // New Google User or role missing in Supabase -> Ask to choose role!
+        setEmailInput(emailOrPhone);
+        setCustName(formatNameFromEmail(emailOrPhone));
+        setWorkerName(formatNameFromEmail(emailOrPhone));
+        setRole(null);
+        await StorageService.setRole('');
+        setCurrentScreen('ROLE_SELECT');
+        return;
       } else if (
         res.error &&
         (res.error.toLowerCase().includes('oauth') ||
@@ -1810,6 +1832,7 @@ function MainApp() {
             {
               text: 'Continue as Google User',
               onPress: async () => {
+                resetUserFormAndSessionState();
                 await StorageService.setHasChosenLanguage(true);
                 const derivedName = 'Google User';
                 setRole(null);
@@ -1885,48 +1908,122 @@ function MainApp() {
       setIsAuthLoading(false);
       if (res.success || code === '123456') {
         setShowOtpModal(false);
+        resetUserFormAndSessionState();
         setCustMobile(phoneInput);
         setWorkerMobile(phoneInput);
         await StorageService.setLanguage(lang);
         await StorageService.setHasChosenLanguage(true);
         await StorageService.setCredentials({ phone: phoneInput, mobile: phoneInput });
 
-        // Check if user already exists in Supabase
+        // Check if user already exists in Supabase WITH a valid registered role
         const existing = await LiveBackend.getProfileByEmailOrPhone(phoneInput);
-        if (existing.found && existing.profile) {
-          const p = existing.profile;
-          const userRole = p.role || 'CUSTOMER';
+        const p = existing.found ? existing.profile : null;
+        const supabaseRole = (p?.role && String(p.role).trim().length > 0) ? p.role.trim() : null;
+
+        if (supabaseRole) {
+          const userRole = supabaseRole;
+          const effectiveName = (p.full_name && p.full_name !== 'Ramesh Sharma')
+            ? p.full_name
+            : `User ${phoneInput.slice(-4)}`;
+          const effectivePhone = p.phone || phoneInput;
+          const effectiveAddress = p.address || '';
+          const effectiveKyc = p.kyc_status || 'VERIFIED';
+
           setRole(userRole);
           await StorageService.setRole(userRole);
+          await StorageService.saveAccountProfile(phoneInput, {
+            role: userRole,
+            name: effectiveName,
+            phone: effectivePhone,
+            address: effectiveAddress,
+            kyc_status: effectiveKyc,
+          });
+
           await StorageService.setSession({
             id: p.id,
-            name: p.full_name,
-            mobile: p.phone || phoneInput,
+            name: effectiveName,
+            mobile: effectivePhone,
+            phone: effectivePhone,
             role: userRole,
-            kyc_status: p.kyc_status,
+            address: effectiveAddress,
+            kyc_status: effectiveKyc,
           });
 
           if (userRole === 'CUSTOMER') {
-            setCustName(p.full_name || 'Customer');
-            if (p.phone) setCustMobile(p.phone);
-            if (p.address) setCustAddress(p.address);
+            setCustName(effectiveName);
+            setCustMobile(effectivePhone);
+            if (effectiveAddress) setCustAddress(effectiveAddress);
             setActiveTab('HOME');
             setCurrentScreen('MAIN');
           } else {
-            setWorkerName(p.full_name || 'Worker');
-            if (p.phone) setWorkerMobile(p.phone);
+            setWorkerName(effectiveName);
+            setWorkerMobile(effectivePhone);
+            if (effectiveAddress) setWorkerAddress(effectiveAddress);
             setWorkerProfile((prev) => ({
               ...prev,
               id: p.id || prev.id,
               user_id: p.id || prev.user_id,
-              name: p.full_name || prev.name,
-              phone: p.phone || prev.phone,
-              location: p.address || prev.location,
+              name: effectiveName,
+              phone: effectivePhone,
+              location: effectiveAddress || prev.location,
               isAvailable:
                 p.worker_profiles && p.worker_profiles[0]?.is_available !== undefined
                   ? p.worker_profiles[0].is_available
                   : prev.isAvailable,
             }));
+            if (effectiveKyc === 'APPROVED' || effectiveKyc === 'VERIFIED') {
+              setActiveTab('HOME');
+              setCurrentScreen('MAIN');
+            } else {
+              setCurrentScreen('WORKER_UNDER_REVIEW');
+            }
+          }
+          return;
+        }
+
+        // Brand new phone number or missing role in Supabase -> Ask to choose role!
+        setPhoneInput(phoneInput);
+        setRole(null);
+        await StorageService.setRole('');
+        setCurrentScreen('ROLE_SELECT');
+        return;
+      } else {
+        Alert.alert('Invalid OTP', res.error || 'The verification code entered is incorrect.');
+      }
+    } catch (e) {
+      setIsAuthLoading(false);
+      if (code === '123456') {
+        setShowOtpModal(false);
+        resetUserFormAndSessionState();
+        await StorageService.setHasChosenLanguage(true);
+        const existing = await LiveBackend.getProfileByEmailOrPhone(phoneInput);
+        const p = existing.found ? existing.profile : null;
+        const supabaseRole = (p?.role && String(p.role).trim().length > 0) ? p.role.trim() : null;
+
+        if (supabaseRole) {
+          const userRole = supabaseRole;
+          const effectiveName = (p.full_name && p.full_name !== 'Ramesh Sharma')
+            ? p.full_name
+            : `User ${phoneInput.slice(-4)}`;
+          setRole(userRole);
+          await StorageService.setRole(userRole);
+          await StorageService.setSession({
+            id: p.id,
+            name: effectiveName,
+            mobile: p.phone || phoneInput,
+            role: userRole,
+            kyc_status: p.kyc_status,
+          });
+          if (userRole === 'CUSTOMER') {
+            setCustName(effectiveName);
+            setCustMobile(p.phone || phoneInput);
+            if (p.address) setCustAddress(p.address);
+            setActiveTab('HOME');
+            setCurrentScreen('MAIN');
+          } else {
+            setWorkerName(effectiveName);
+            setWorkerMobile(p.phone || phoneInput);
+            if (p.address) setWorkerAddress(p.address);
             if (p.kyc_status === 'APPROVED' || p.kyc_status === 'VERIFIED') {
               setActiveTab('HOME');
               setCurrentScreen('MAIN');
@@ -1937,110 +2034,11 @@ function MainApp() {
           return;
         }
 
-        // Check if this phone number already has a registered role or default to Customer:
-        const localAcct = await StorageService.getAccountProfile(phoneInput);
-        const effectiveRole = localAcct?.role || 'CUSTOMER';
-        const effectiveName = localAcct?.name || `User ${phoneInput.slice(-4)}`;
-        setRole(effectiveRole);
-        await StorageService.setRole(effectiveRole);
-        await StorageService.setSession({
-          mobile: phoneInput,
-          name: effectiveName,
-          role: effectiveRole,
-        });
-        await StorageService.saveAccountProfile(phoneInput, {
-          role: effectiveRole,
-          name: effectiveName,
-          phone: phoneInput,
-        });
-
-        if (effectiveRole === 'CUSTOMER') {
-          setCustName(effectiveName);
-          setCustMobile(phoneInput);
-          setActiveTab('HOME');
-          setCurrentScreen('MAIN');
-        } else {
-          setWorkerName(effectiveName);
-          setWorkerMobile(phoneInput);
-          setActiveTab('HOME');
-          setCurrentScreen('MAIN');
-        }
-      } else {
-        Alert.alert('Invalid OTP', res.error || 'The verification code entered is incorrect.');
-      }
-    } catch (e) {
-      setIsAuthLoading(false);
-      if (code === '123456') {
-        setShowOtpModal(false);
-        await StorageService.setHasChosenLanguage(true);
-        const existing = await LiveBackend.getProfileByEmailOrPhone(phoneInput);
-        if (existing.found && existing.profile) {
-          const p = existing.profile;
-          const userRole = p.role || 'CUSTOMER';
-          setRole(userRole);
-          await StorageService.setRole(userRole);
-          await StorageService.setSession({
-            id: p.id,
-            name: p.full_name,
-            mobile: p.phone || phoneInput,
-            role: userRole,
-            kyc_status: p.kyc_status,
-          });
-          if (userRole === 'CUSTOMER') {
-            setCustName(p.full_name || 'Customer');
-            if (p.phone) setCustMobile(p.phone);
-            if (p.address) setCustAddress(p.address);
-            setCurrentScreen('MAIN');
-          } else {
-            setWorkerName(p.full_name || 'Worker');
-            if (p.phone) setWorkerMobile(p.phone);
-            setWorkerProfile((prev) => ({
-              ...prev,
-              id: p.id || prev.id,
-              user_id: p.id || prev.user_id,
-              name: p.full_name || prev.name,
-              phone: p.phone || prev.phone,
-              location: p.address || prev.location,
-              isAvailable:
-                p.worker_profiles && p.worker_profiles[0]?.is_available !== undefined
-                  ? p.worker_profiles[0].is_available
-                  : prev.isAvailable,
-            }));
-            if (p.kyc_status === 'APPROVED' || p.kyc_status === 'VERIFIED') {
-              setCurrentScreen('MAIN');
-            } else {
-              setCurrentScreen('WORKER_UNDER_REVIEW');
-            }
-          }
-          return;
-        }
-        const localAcct = await StorageService.getAccountProfile(phoneInput);
-        const deviceSavedRole = await StorageService.getRole();
-        const effectiveRole = localAcct?.role || deviceSavedRole || 'CUSTOMER';
-        const effectiveName = localAcct?.name || `User ${phoneInput.slice(-4)}`;
-
-        setRole(effectiveRole);
-        await StorageService.setRole(effectiveRole);
-        await StorageService.setSession({
-          mobile: phoneInput,
-          name: effectiveName,
-          role: effectiveRole,
-        });
-        await StorageService.saveAccountProfile(phoneInput, {
-          role: effectiveRole,
-          name: effectiveName,
-          phone: phoneInput,
-        });
-
-        if (effectiveRole === 'CUSTOMER') {
-          setCustName(effectiveName);
-          setCustMobile(phoneInput);
-          setCurrentScreen('MAIN');
-        } else {
-          setWorkerName(effectiveName);
-          setWorkerMobile(phoneInput);
-          setCurrentScreen('WORKER_UNDER_REVIEW');
-        }
+        // New phone user -> choose role
+        setPhoneInput(phoneInput);
+        setRole(null);
+        await StorageService.setRole('');
+        setCurrentScreen('ROLE_SELECT');
       } else {
         Alert.alert('Verification Error', e.message);
       }
@@ -2083,66 +2081,92 @@ function MainApp() {
       setIsSubmittingAuth(false);
       if (res.success) {
         DeviceFeedback.triggerSuccessHaptics();
-        // Persistently save credentials, language, & session on device
+
+        // 1. Purge previous user state from memory so new login is completely clean and independent
+        resetUserFormAndSessionState();
+
+        // 2. Persistently save credentials & language for this specific email
         await StorageService.setCredentials({ email: cleanEmail, password: passwordInput });
         await StorageService.setLanguage(lang);
         await StorageService.setHasChosenLanguage(true);
 
-        // 1. Check local persistent account registry and Supabase for THIS specific email
-        const localAcct = await StorageService.getAccountProfile(cleanEmail);
-        const existing = await LiveBackend.getProfileByEmailOrPhone(cleanEmail);
+        // 3. Query Supabase profile table for THIS specific email/user ID
+        const existing = await LiveBackend.getProfileByEmailOrPhone(cleanEmail, res.user?.id);
         const p = existing.found ? existing.profile : null;
+        const supabaseRole = (p?.role && String(p.role).trim().length > 0) ? p.role.trim() : null;
 
-        const effectiveRole = p?.role || localAcct?.role || 'CUSTOMER';
-        const effectiveName = (p?.full_name && p.full_name !== 'Ramesh Sharma')
-          ? p.full_name
-          : ((localAcct?.name && localAcct.name !== 'Ramesh Sharma')
-            ? localAcct.name
-            : formatNameFromEmail(cleanEmail));
-        const effectivePhone = p?.phone || localAcct?.phone || '';
-        const effectiveAddress = p?.address || localAcct?.address || 'Sawai Madhopur, Rajasthan';
-        const effectiveKyc = p?.kyc_status || localAcct?.kyc_status || 'VERIFIED';
+        if (supabaseRole) {
+          // USER ALREADY HAS A REGISTERED ROLE IN SUPABASE -> DO NOT ASK AGAIN!
+          const effectiveRole = supabaseRole;
+          const effectiveName = (p.full_name && p.full_name !== 'Ramesh Sharma')
+            ? p.full_name
+            : formatNameFromEmail(cleanEmail);
+          const effectivePhone = p.phone || '';
+          const effectiveAddress = p.address || '';
+          const effectiveKyc = p.kyc_status || 'VERIFIED';
 
-        setRole(effectiveRole);
-        await StorageService.setRole(effectiveRole);
-        await StorageService.saveAccountProfile(cleanEmail, {
-          role: effectiveRole,
-          name: effectiveName,
-          phone: effectivePhone,
-          address: effectiveAddress,
-          email: cleanEmail,
-          kyc_status: effectiveKyc,
-        });
+          setRole(effectiveRole);
+          await StorageService.setRole(effectiveRole);
+          await StorageService.saveAccountProfile(cleanEmail, {
+            role: effectiveRole,
+            name: effectiveName,
+            phone: effectivePhone,
+            address: effectiveAddress,
+            email: cleanEmail,
+            kyc_status: effectiveKyc,
+          });
 
-        await StorageService.setSession({
-          id: p?.id || localAcct?.id || 'usr-' + Date.now(),
-          name: effectiveName,
-          mobile: effectivePhone,
-          phone: effectivePhone,
-          email: cleanEmail,
-          role: effectiveRole,
-          address: effectiveAddress,
-          kyc_status: effectiveKyc,
-        });
+          await StorageService.setSession({
+            id: p.id || res.user?.id || 'usr-' + Date.now(),
+            name: effectiveName,
+            mobile: effectivePhone,
+            phone: effectivePhone,
+            email: cleanEmail,
+            role: effectiveRole,
+            address: effectiveAddress,
+            kyc_status: effectiveKyc,
+          });
 
-        if (effectiveRole === 'WORKER') {
-          setWorkerName(effectiveName);
-          setWorkerMobile(effectivePhone);
-          setWorkerAddress(effectiveAddress);
-          if (effectiveKyc === 'APPROVED' || effectiveKyc === 'VERIFIED') {
+          if (effectiveRole === 'WORKER') {
+            setWorkerName(effectiveName);
+            setWorkerMobile(effectivePhone);
+            setWorkerAddress(effectiveAddress);
+            setWorkerProfile((prev) => ({
+              ...prev,
+              id: p.id || prev.id,
+              user_id: p.id || prev.user_id,
+              name: effectiveName,
+              phone: effectivePhone,
+              location: effectiveAddress || prev.location,
+              isAvailable:
+                p.worker_profiles && p.worker_profiles[0]?.is_available !== undefined
+                  ? p.worker_profiles[0].is_available
+                  : prev.isAvailable,
+            }));
+            if (effectiveKyc === 'APPROVED' || effectiveKyc === 'VERIFIED') {
+              setActiveTab('HOME');
+              setCurrentScreen('MAIN');
+            } else {
+              setCurrentScreen('WORKER_UNDER_REVIEW');
+            }
+          } else {
+            setCustName(effectiveName);
+            setCustMobile(effectivePhone);
+            setCustAddress(effectiveAddress);
             setActiveTab('HOME');
             setCurrentScreen('MAIN');
-          } else {
-            setCurrentScreen('WORKER_UNDER_REVIEW');
           }
+          return;
         } else {
-          setCustName(effectiveName);
-          setCustMobile(effectivePhone);
-          setCustAddress(effectiveAddress);
-          setActiveTab('HOME');
-          setCurrentScreen('MAIN');
+          // BRAND NEW EMAIL OR MISSING ROLE IN SUPABASE -> ASK TO CHOOSE ROLE!
+          setEmailInput(cleanEmail);
+          setCustName(formatNameFromEmail(cleanEmail));
+          setWorkerName(formatNameFromEmail(cleanEmail));
+          setRole(null);
+          await StorageService.setRole('');
+          setCurrentScreen('ROLE_SELECT');
+          return;
         }
-        return;
       } else {
         DeviceFeedback.triggerAlertHaptics();
         Alert.alert('Sign In Failed', res.error || 'Invalid email or password.');
@@ -2830,6 +2854,12 @@ function MainApp() {
                 const targetId = emailInput.trim() || phoneInput.trim();
                 if (targetId) {
                   await StorageService.saveAccountProfile(targetId, { role: 'CUSTOMER' });
+                  LiveBackend.syncProfile({
+                    email: emailInput.trim(),
+                    mobile: phoneInput.trim(),
+                    role: 'CUSTOMER',
+                    fullName: custName.trim() || formatNameFromEmail(emailInput.trim()) || 'Customer',
+                  }).catch(() => {});
                 }
                 setCurrentScreen('CUSTOMER_ONBOARDING');
               }}
@@ -2859,6 +2889,13 @@ function MainApp() {
                 const targetId = emailInput.trim() || phoneInput.trim();
                 if (targetId) {
                   await StorageService.saveAccountProfile(targetId, { role: 'WORKER' });
+                  LiveBackend.syncProfile({
+                    email: emailInput.trim(),
+                    mobile: phoneInput.trim(),
+                    role: 'WORKER',
+                    fullName: workerName.trim() || formatNameFromEmail(emailInput.trim()) || 'Worker',
+                    kycStatus: 'UNDER_REVIEW',
+                  }).catch(() => {});
                 }
                 setCurrentScreen('WORKER_ONBOARDING');
               }}
