@@ -286,43 +286,50 @@ export function getCategoryGroupLabel(group, lang = 'en') {
  */
 export function translateWorkerSkill(skill, lang = 'en') {
   if (!skill || typeof skill !== 'string') return '';
-  if (lang === 'en') return skill;
+  if (lang === 'en') {
+    // Strip any Devanagari / regional scripts so English mode is 100% pure English
+    const cleaned = skill
+      .replace(/\s*\([\u0900-\u097F\s/,-]+\)/g, '')
+      .replace(/[\u0900-\u097F]+/g, '')
+      .trim();
+    return cleaned || skill;
+  }
 
   const s = skill.toLowerCase();
   if (s.includes('mason helper') || s.includes('beldar')) {
     if (lang === 'hi') return 'मिस्त्री हेल्पर (बेलदार)';
     if (lang === 'gu') return 'મિસ્ત્રી હેલ્પર (બેલદાર)';
-    if (lang === 'mr') return 'मिस्त्री हेल्पर (बेलदार)';
+    if (lang === 'mr') return 'गवंडी मदतनीस (बेलदार)';
   }
   if (s.includes('mason') || s.includes('raj mistri')) {
-    if (lang === 'hi') return 'राजमिस्त्री (Mason)';
-    if (lang === 'gu') return 'કડિયાકામ (Mason)';
-    if (lang === 'mr') return 'गवंडी (Mason)';
+    if (lang === 'hi') return 'राजमिस्त्री';
+    if (lang === 'gu') return 'કડિયાકામ (મિસ્ત્રી)';
+    if (lang === 'mr') return 'गवंडी (कारागीर)';
   }
   if (s.includes('plumber')) {
-    if (lang === 'hi') return 'प्लंबर (Plumber)';
-    if (lang === 'gu') return 'પ્લમ્બર (Plumber)';
-    if (lang === 'mr') return 'प्लंबर (Plumber)';
+    if (lang === 'hi') return 'प्लंबर (नल मिस्त्री)';
+    if (lang === 'gu') return 'પ્લમ્બર (નળ કારીગર)';
+    if (lang === 'mr') return 'प्लंबर (नळ कारागीर)';
   }
   if (s.includes('electrician')) {
-    if (lang === 'hi') return 'इलेक्ट्रीशियन (Electrician)';
-    if (lang === 'gu') return 'ઇલેક્ટ્રિશિયન (Electrician)';
-    if (lang === 'mr') return 'इलेक्ट्रिशियन (Electrician)';
+    if (lang === 'hi') return 'इलेक्ट्रीशियन (बिजली मिस्त्री)';
+    if (lang === 'gu') return 'ઇલેક્ટ્રિશિયન (વીજળી કારીગર)';
+    if (lang === 'mr') return 'इलेक्ट्रिशियन (वीज कारागीर)';
   }
   if (s.includes('carpenter') || s.includes('shuttering')) {
-    if (lang === 'hi') return 'बढ़ई / सुथार (Carpenter)';
-    if (lang === 'gu') return 'સુથાર (Carpenter)';
-    if (lang === 'mr') return 'सुतार (Carpenter)';
+    if (lang === 'hi') return 'बढ़ई / सुथार';
+    if (lang === 'gu') return 'સુથાર કામદાર';
+    if (lang === 'mr') return 'सुतार कारागीर';
   }
   if (s.includes('painter') || s.includes('paint')) {
-    if (lang === 'hi') return 'पेंटर (Painter)';
-    if (lang === 'gu') return 'પેઇન્ટર (Painter)';
-    if (lang === 'mr') return 'पेंटर (Painter)';
+    if (lang === 'hi') return 'पेंटर (रंग-रोगन)';
+    if (lang === 'gu') return 'પેઇન્ટર (કલર કામ)';
+    if (lang === 'mr') return 'पेंटर (रंगकाम)';
   }
   if (s.includes('welder')) {
-    if (lang === 'hi') return 'वेल्डर (Welder)';
-    if (lang === 'gu') return 'વેલ્ડર (Welder)';
-    if (lang === 'mr') return 'वेल्डर (Welder)';
+    if (lang === 'hi') return 'वेल्डर (लोहा मिस्त्री)';
+    if (lang === 'gu') return 'વેલ્ડર (લોખંડ કામ)';
+    if (lang === 'mr') return 'वेल्डर (लोखंड काम)';
   }
   if (s.includes('tile') || s.includes('marble')) {
     if (lang === 'hi') return 'टाइल और मार्बल कारीगर';
@@ -330,14 +337,14 @@ export function translateWorkerSkill(skill, lang = 'en') {
     if (lang === 'mr') return 'टाइल आणि मार्बल कारागीर';
   }
   if (s.includes('labour') || s.includes('construction')) {
-    if (lang === 'hi') return 'निर्माण मजदूर (Labour)';
-    if (lang === 'gu') return 'બાંધકામ મજૂર (Labour)';
-    if (lang === 'mr') return 'बांधकाम मजूर (Labour)';
+    if (lang === 'hi') return 'निर्माण मजदूर';
+    if (lang === 'gu') return 'બાંધકામ મજૂર';
+    if (lang === 'mr') return 'बांधकाम मजूर';
   }
   if (s.includes('contractor') || s.includes('crew')) {
-    if (lang === 'hi') return 'ठेकेदार क्रू (Contractor)';
-    if (lang === 'gu') return 'કોન્ટ્રાક્ટર ક્રૂ (Contractor)';
-    if (lang === 'mr') return 'कंत्राटदार क्रू (Contractor)';
+    if (lang === 'hi') return 'ठेकेदार क्रू';
+    if (lang === 'gu') return 'કોન્ટ્રાક્ટર ક્રૂ';
+    if (lang === 'mr') return 'कंत्राटदार क्रू';
   }
   return skill;
 }

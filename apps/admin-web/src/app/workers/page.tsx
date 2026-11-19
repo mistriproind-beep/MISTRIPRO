@@ -23,6 +23,7 @@ import {
   Briefcase,
   IndianRupee,
   ZoomIn,
+  Upload,
 } from 'lucide-react';
 
 export default function WorkersPage() {
@@ -35,6 +36,34 @@ export default function WorkersPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [showRejectModal, setShowRejectModal] = useState(false);
+
+  const handleUploadAadhaarAdmin = async (side: 'front' | 'back', e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedWorker) return;
+
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const base64Data = reader.result as string;
+      try {
+        const updatePayload = side === 'front' ? { aadhaar_front_url: base64Data } : { aadhaar_back_url: base64Data };
+        await supabase.from('worker_profiles').update(updatePayload).eq('user_id', selectedWorker.id);
+        setSelectedWorker((prev: any) => ({
+          ...prev,
+          [side === 'front' ? 'aadhaarFront' : 'aadhaarBack']: base64Data,
+        }));
+        setWorkers((prev) =>
+          prev.map((w) =>
+            w.id === selectedWorker.id
+              ? { ...w, [side === 'front' ? 'aadhaarFront' : 'aadhaarBack']: base64Data }
+              : w
+          )
+        );
+      } catch (err: any) {
+        alert('Failed to save Aadhaar photo: ' + err?.message);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Fetch workers from Supabase profiles + worker_profiles
   const fetchWorkers = async () => {
@@ -488,6 +517,19 @@ export default function WorkersPage() {
                       </div>
                     )}
                   </div>
+
+                  <div className="pt-1">
+                    <label className="cursor-pointer text-[11px] font-medium text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-md transition inline-flex items-center gap-1 border border-indigo-200">
+                      <Upload className="w-3 h-3" />
+                      <span>{selectedWorker.aadhaarFront ? 'Replace Front Photo' : 'Upload Front Photo'}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => handleUploadAadhaarAdmin('front', e)}
+                      />
+                    </label>
+                  </div>
                 </div>
 
                 {/* Aadhaar Back */}
@@ -535,6 +577,19 @@ export default function WorkersPage() {
                         <p className="text-[11px]">No Back Photo Provided</p>
                       </div>
                     )}
+                  </div>
+
+                  <div className="pt-1">
+                    <label className="cursor-pointer text-[11px] font-medium text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-md transition inline-flex items-center gap-1 border border-indigo-200">
+                      <Upload className="w-3 h-3" />
+                      <span>{selectedWorker.aadhaarBack ? 'Replace Back Photo' : 'Upload Back Photo'}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => handleUploadAadhaarAdmin('back', e)}
+                      />
+                    </label>
                   </div>
                 </div>
               </div>

@@ -20,6 +20,7 @@ import {
   Info,
 } from 'lucide-react-native';
 import { DeviceFeedback } from '../services/deviceFeedback';
+import { tw } from '../data/workerTranslations';
 
 export default function WorkerAlertsScreen({
   insets,
@@ -150,24 +151,22 @@ export default function WorkerAlertsScreen({
       <View style={styles.header}>
         <View style={styles.headerTitleRow}>
           <Text style={styles.headerTitle}>
-            {lang === 'hi' ? 'जॉब अलर्ट और अनुरोध' : 'Job Alerts & Requests'}
+            {tw('jobAlertsTitle', lang)}
           </Text>
           <View style={styles.countBadge}>
-            <Text style={styles.countBadgeText}>{localAlerts.length} {lang === 'hi' ? 'नए' : 'New'}</Text>
+            <Text style={styles.countBadgeText}>{localAlerts.length} {tw('new', lang)}</Text>
           </View>
         </View>
         <Text style={styles.headerSub}>
-          {lang === 'hi'
-            ? 'ग्राहक के काम के अनुरोध स्वीकार या अस्वीकार करें'
-            : 'Accept or decline real-time work requests from nearby customers'}
+          {tw('jobAlertsDesc', lang)}
         </Text>
 
         {/* Filter Chips */}
         <View style={styles.filterRow}>
           {[
-            { key: 'ALL', label: lang === 'hi' ? `सभी अनुरोध (${localAlerts.length})` : `All Requests (${localAlerts.length})` },
-            { key: 'TODAY', label: lang === 'hi' ? 'आज के कार्य' : 'Immediate Today' },
-            { key: 'UPCOMING', label: lang === 'hi' ? 'आगामी कार्य' : 'Upcoming' },
+            { key: 'ALL', label: `${tw('allRequests', lang)} (${localAlerts.length})` },
+            { key: 'TODAY', label: tw('todayJobs', lang) },
+            { key: 'UPCOMING', label: tw('upcomingJobs', lang) },
           ].map((tab) => (
             <TouchableOpacity
               key={tab.key}
@@ -253,10 +252,10 @@ export default function WorkerAlertsScreen({
                   {/* Direct On-Site Agreement Pill */}
                   <View style={styles.ratePill}>
                     <Text style={[styles.ratePillAmount, { fontSize: 13, color: '#16A34A' }]}>
-                      {lang === 'hi' ? 'सीधा भुगतान' : 'Direct Pay'}
+                      {tw('directPay', lang)}
                     </Text>
                     <Text style={styles.ratePillUnit}>
-                      {lang === 'hi' ? 'ऑन-साइट तय करें' : 'Quote On-Site'}
+                      {tw('quoteOnSite', lang)}
                     </Text>
                   </View>
                 </View>
@@ -271,6 +270,10 @@ export default function WorkerAlertsScreen({
                   <Text style={{ fontSize: 11, color: '#059669', fontWeight: '700', marginTop: 3 }}>
                     {lang === 'hi'
                       ? '• वास्तविक काम का रेट आप साइट विजिट करके तय करेंगे'
+                      : lang === 'gu'
+                      ? '• કામનો વાસ્તવિક દર તમે સાઇટ પર જઈને નક્કી કરશો'
+                      : lang === 'mr'
+                      ? '• कामाचा प्रत्यक्ष दर तुम्ही साइट पाहून ठरवाल'
                       : '• Final work rate is decided directly by you upon site inspection'}
                   </Text>
                   {alertItem.description ? (
@@ -303,7 +306,7 @@ export default function WorkerAlertsScreen({
                   activeOpacity={0.7}
                 >
                   <X size={15} color="#DC2626" />
-                  <Text style={styles.rejectBtnText}>Decline</Text>
+                  <Text style={styles.rejectBtnText}>{tw('rejectJob', lang)}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -312,7 +315,7 @@ export default function WorkerAlertsScreen({
                   activeOpacity={0.85}
                 >
                   <Check size={16} color="#FFFFFF" />
-                  <Text style={styles.approveBtnText}>Approve & Accept</Text>
+                  <Text style={styles.approveBtnText}>{tw('acceptJob', lang)}</Text>
                 </TouchableOpacity>
               </View>
             </View>

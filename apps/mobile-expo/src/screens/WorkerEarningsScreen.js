@@ -27,6 +27,7 @@ import {
   Award,
 } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
+import { tw } from '../data/workerTranslations';
 
 export default function WorkerEarningsScreen({
   insets,
@@ -191,11 +192,15 @@ export default function WorkerEarningsScreen({
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerTitleRow}>
-          <Text style={styles.headerTitle}>{lang === 'hi' ? 'कमाई और वॉलेट' : 'Earnings & Wallet'}</Text>
+          <Text style={styles.headerTitle}>{tw('earningsWalletTitle', lang)}</Text>
         </View>
         <Text style={styles.headerSub}>
           {lang === 'hi'
             ? 'काम की कुल कमाई, वॉलेट बैलेंस और सीधे बैंक/UPI निकासी'
+            : lang === 'gu'
+            ? 'કામની કુલ કમાણી, વોલેટ બેલેન્સ અને સીધો બેંક/UPI ઉપાડ'
+            : lang === 'mr'
+            ? 'कामाची एकूण कमाई, वॉलेट शिल्लक आणि थेट बँक/UPI पैसे काढणे'
             : 'Track your real earnings, wallet balance & withdraw directly via UPI or Bank'}
         </Text>
       </View>
@@ -209,7 +214,7 @@ export default function WorkerEarningsScreen({
           <View style={styles.walletCardTop}>
             <View>
               <Text style={styles.walletCardLabel}>
-                {lang === 'hi' ? 'उपलब्ध शेष राशि (निकासी के लिए तैयार)' : 'Available Balance (Ready for Withdrawal)'}
+                {tw('availableBalance', lang)}
               </Text>
               <View style={styles.balanceRow}>
                 <Text style={styles.balanceCurrency}>₹</Text>
@@ -225,17 +230,17 @@ export default function WorkerEarningsScreen({
           {/* Stats Bar Inside Card */}
           <View style={styles.walletStatsRow}>
             <View style={styles.walletStatItem}>
-              <Text style={styles.walletStatLabel}>{lang === 'hi' ? 'इस सप्ताह' : 'This Week'}</Text>
+              <Text style={styles.walletStatLabel}>{tw('thisWeek', lang)}</Text>
               <Text style={styles.walletStatValue}>₹{Number(walletData?.thisWeekEarnings || 0).toLocaleString('en-IN')}</Text>
             </View>
             <View style={styles.walletStatDivider} />
             <View style={styles.walletStatItem}>
-              <Text style={styles.walletStatLabel}>{lang === 'hi' ? 'लंबित कार्य' : 'Pending Jobs'}</Text>
+              <Text style={styles.walletStatLabel}>{lang === 'hi' ? 'लंबित कार्य' : lang === 'gu' ? 'બાકી કામ' : lang === 'mr' ? 'प्रलंबित कामे' : 'Pending Jobs'}</Text>
               <Text style={styles.walletStatValue}>₹{Number(walletData?.escrowLocked || 0).toLocaleString('en-IN')}</Text>
             </View>
             <View style={styles.walletStatDivider} />
             <View style={styles.walletStatItem}>
-              <Text style={styles.walletStatLabel}>{lang === 'hi' ? 'कुल लाइफटाइम' : 'Total Lifetime'}</Text>
+              <Text style={styles.walletStatLabel}>{tw('totalLifetime', lang)}</Text>
               <Text style={styles.walletStatValue}>₹{Number(walletData?.totalLifetimeEarnings || 0).toLocaleString('en-IN')}</Text>
             </View>
           </View>
@@ -248,7 +253,7 @@ export default function WorkerEarningsScreen({
           >
             <ArrowUpRight size={18} color="#0F172A" />
             <Text style={styles.withdrawBtnText}>
-              {lang === 'hi' ? 'पैसे निकालें' : 'Withdraw Money'}
+              {tw('withdrawMoney', lang)}
             </Text>
           </TouchableOpacity>
         </View>

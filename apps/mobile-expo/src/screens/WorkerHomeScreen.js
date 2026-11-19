@@ -34,6 +34,7 @@ import { DeviceFeedback } from '../services/deviceFeedback';
 import { StorageService } from '../services/storage';
 import * as Location from 'expo-location';
 import { translateWorkerSkill, translateLocationName } from '../data/categories';
+import { tw } from '../data/workerTranslations';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -67,6 +68,7 @@ export default function WorkerHomeScreen({
   onNavigateTab,
   onOpenNotifications,
   notificationsCount,
+  trainingVideos = [],
 }) {
   const [isAvailable, setIsAvailable] = useState(() => {
     if (workerProfile?.isAvailable !== undefined) return Boolean(workerProfile.isAvailable);
@@ -262,15 +264,11 @@ export default function WorkerHomeScreen({
               <View style={styles.availStatusRow}>
                 <View style={[styles.statusDot, isAvailable ? styles.statusDotOn : styles.statusDotOff]} />
                 <Text style={[styles.availStatusTitle, isAvailable ? styles.availTitleOn : styles.availTitleOff]}>
-                  {isAvailable
-                    ? (lang === 'hi' ? 'आप काम के लिए ऑनलाइन हैं' : lang === 'gu' ? 'તમે કામ માટે ઓનલાઇન છો' : lang === 'mr' ? 'तुम्ही कामासाठी ऑनलाइन आहात' : 'You are ONLINE for Work')
-                    : (lang === 'hi' ? 'आप ऑफलाइन / व्यस्त हैं' : lang === 'gu' ? 'તમે ઑફલાઇન / વ્યસ્ત છો' : lang === 'mr' ? 'तुम्ही ऑफलाइन / व्यस्त आहात' : 'You are OFFLINE / Busy')}
+                  {isAvailable ? tw('onlineTitle', lang) : tw('offlineTitle', lang)}
                 </Text>
               </View>
               <Text style={styles.availSubText}>
-                {isAvailable
-                  ? (lang === 'hi' ? '15 किमी के दायरे में सक्रिय। आसपास के ग्राहक आपको देखकर तुरंत हायर कर सकते हैं।' : lang === 'gu' ? '15 કિમી વિસ્તારમાં સક્રિય. નજીકના ગ્રાહકો તમને તરત જ હાયર કરી શકે છે.' : lang === 'mr' ? '15 किमी परिघात सक्रिय. जवळपासचे ग्राहक तुम्हाला कामावर ठेवू शकतात.' : 'Active in 15 km radius. Customers near you can find & hire you now.')
-                  : (lang === 'hi' ? 'ग्राहक खोज से छिपा हुआ। काम लेने के लिए चालू करें।' : lang === 'gu' ? 'ગ્રાહક શોધમાંથી છુપાયેલું. કામ સ્વીકારવા માટે ચાલુ કરો.' : lang === 'mr' ? 'ग्राहक शोधातून लपविलेले. काम स्वीकारण्यासाठी सुरू करा.' : 'Hidden from customer search. Turn ON when ready to take jobs.')}
+                {isAvailable ? tw('onlineDesc', lang) : tw('offlineDesc', lang)}
               </Text>
             </View>
 
@@ -287,9 +285,7 @@ export default function WorkerHomeScreen({
           <View style={[styles.availBadgeRow, isAvailable ? styles.availBadgeOn : styles.availBadgeOff]}>
             <Radio size={12} color={isAvailable ? '#15803D' : '#64748B'} />
             <Text style={[styles.availBadgeText, isAvailable ? styles.badgeTextOn : styles.badgeTextOff]}>
-              {isAvailable
-                ? (lang === 'hi' ? 'ग्राहकों को लाइव जीपीएस लोकेशन शेयर हो रहा है' : lang === 'gu' ? 'ગ્રાહકો સાથે લાઈવ જીપીએસ શેર થઈ રહ્યું છે' : lang === 'mr' ? 'ग्राहकांना थेट जीपीएस लोकेशन शेअर होत आहे' : 'Broadcasting live GPS location to nearby clients')
-                : (lang === 'hi' ? 'प्रोफ़ाइल रोक दी गई है • कॉल नहीं आएंगे' : lang === 'gu' ? 'પ્રોફાઇલ પોઝ કરેલ છે • કોલ્સ આવશે નહીં' : lang === 'mr' ? 'प्रोफाइल थांबवली आहे • कॉल येणार नाहीत' : 'Profile paused • Not receiving calls')}
+              {isAvailable ? tw('gpsBroadcasting', lang) : tw('profilePaused', lang)}
             </Text>
           </View>
         </View>
@@ -302,18 +298,18 @@ export default function WorkerHomeScreen({
             </View>
             <View style={styles.skillTextCol}>
               <Text style={styles.skillCardLabel}>
-                {lang === 'hi' ? 'आपकी पंजीकृत कार्य श्रेणियां' : 'Your Registered Trades'}
+                {tw('registeredTrades', lang)}
               </Text>
               <Text style={styles.skillCardTitle}>
                 {Array.isArray(workerProfile?.skills) && workerProfile.skills.length > 0
-                  ? workerProfile.skills[0]
-                  : translateWorkerSkill(workerProfile?.skill || 'Mason (राजमिस्त्री)', lang)}
+                  ? translateWorkerSkill(workerProfile.skills[0], lang)
+                  : translateWorkerSkill(workerProfile?.skill || 'Mason', lang)}
               </Text>
             </View>
             <View style={styles.verifiedSkillBadge}>
               <ShieldCheck size={13} color="#15803D" />
               <Text style={styles.verifiedSkillText}>
-                {lang === 'hi' ? 'सत्यापित' : 'Verified'}
+                {tw('verified', lang)}
               </Text>
             </View>
           </View>
@@ -359,10 +355,10 @@ export default function WorkerHomeScreen({
             activeOpacity={0.7}
           >
             <Text style={{ fontSize: 11.5, fontFamily: 'Satoshi-Bold', color: '#4F46E5' }}>
-              {lang === 'hi' ? '⚙️ हुनर बदलें या नए हुनर जोड़ें →' : '⚙️ Manage or Add More Skills →'}
+              {tw('manageSkillsBtn', lang)}
             </Text>
             <Text style={{ fontSize: 11, fontFamily: 'Satoshi-Medium', color: '#64748B' }}>
-              {Array.isArray(workerProfile?.skills) ? `${workerProfile.skills.length} Active` : '1 Active'}
+              {Array.isArray(workerProfile?.skills) ? `${workerProfile.skills.length} ${tw('active', lang)}` : `1 ${tw('active', lang)}`}
             </Text>
           </TouchableOpacity>
 
@@ -371,13 +367,11 @@ export default function WorkerHomeScreen({
           <View style={styles.pricingModelRow}>
             <View style={styles.pricingModelBadge}>
               <Text style={styles.pricingModelBadgeText}>
-                {lang === 'hi' ? 'ऑन-साइट डायरेक्ट कोटेशन मॉडल' : 'Direct On-Site Quote Model'}
+                {tw('directQuoteModel', lang)}
               </Text>
             </View>
             <Text style={styles.pricingModelExplanation}>
-              {lang === 'hi'
-                ? 'कस्टमर आपको सीधे साइट पर बुलाते हैं। आप काम देखकर ग्राहक से सीधे अपना वास्तविक कार्य शुल्क (मजदूरी या ठेका) तय करते हैं।'
-                : 'Customers book your visit directly to their work site. You inspect the work and agree on your actual job charges directly with the customer.'}
+              {tw('directQuoteDesc', lang)}
             </Text>
           </View>
         </View>
@@ -394,10 +388,10 @@ export default function WorkerHomeScreen({
             </View>
             <Text style={styles.statCount}>{alertsCount}</Text>
             <Text style={styles.statTitle}>
-              {lang === 'hi' ? 'नए अलर्ट' : 'New Alerts'}
+              {tw('newAlerts', lang)}
             </Text>
             <Text style={styles.statSub}>
-              {lang === 'hi' ? 'देखने के लिए टैप करें →' : 'Tap to view →'}
+              {tw('tapToView', lang)}
             </Text>
           </TouchableOpacity>
 
@@ -409,12 +403,12 @@ export default function WorkerHomeScreen({
             <View style={[styles.statIconWrap, { backgroundColor: '#EEF2FF' }]}>
               <Briefcase size={16} color="#4F46E5" />
             </View>
-            <Text style={styles.statCount}>{activeBookingsCount} {lang === 'hi' ? 'सक्रिय' : 'Active'}</Text>
+            <Text style={styles.statCount}>{activeBookingsCount} {tw('active', lang)}</Text>
             <Text style={styles.statTitle}>
-              {lang === 'hi' ? 'चल रहे काम' : 'Ongoing Jobs'}
+              {tw('ongoingJobs', lang)}
             </Text>
             <Text style={styles.statSub}>
-              {lang === 'hi' ? 'प्रगति देखें →' : 'Track progress →'}
+              {tw('trackProgress', lang)}
             </Text>
           </TouchableOpacity>
 
@@ -428,120 +422,132 @@ export default function WorkerHomeScreen({
             </View>
             <Text style={styles.statCount}>₹{Number(walletBalance || 0).toLocaleString('en-IN')}</Text>
             <Text style={styles.statTitle}>
-              {lang === 'hi' ? 'वॉलेट राशि' : 'Wallet Balance'}
+              {tw('walletBalance', lang)}
             </Text>
             <Text style={styles.statSub}>
-              {lang === 'hi' ? 'अभी निकालें →' : 'Withdraw now →'}
+              {tw('withdrawNow', lang)}
             </Text>
           </TouchableOpacity>
         </View>
 
         {/* 5. Mistri Academy - High-Quality Training Videos */}
-        <View style={styles.tutorialsSection}>
-          <View style={styles.sectionTitleRow}>
-            <View>
-              <Text style={styles.sectionTitle}>
-                {lang === 'hi' ? 'मिस्त्री अकादमी • ट्रेनिंग वीडियो' : 'Mistri Academy • Training Videos'}
-              </Text>
-              <Text style={styles.sectionSubtitle}>
-                {lang === 'hi'
-                  ? 'काम का हुनर सीखें, 5-स्टार रेटिंग पाएं और कमाई बढ़ाएं'
-                  : 'Master your trade, earn 5-star ratings & boost daily earnings'}
-              </Text>
-            </View>
-            <View style={styles.ytPill}>
-              <Play size={11} color="#DC2626" fill="#DC2626" />
-              <Text style={styles.ytPillText}>YouTube</Text>
-            </View>
-          </View>
+        {(() => {
+          const activeVideos = Array.isArray(trainingVideos) && trainingVideos.length > 0
+            ? trainingVideos
+            : WORKER_TUTORIALS;
 
-          {/* Featured Hero Lesson */}
-          {WORKER_TUTORIALS.length > 0 && (
-            <TouchableOpacity
-              style={styles.featuredVideoCard}
-              onPress={() => handleOpenVideo(WORKER_TUTORIALS[0])}
-              activeOpacity={0.9}
-            >
-              <View style={styles.featuredThumbnailWrap}>
-                <Image
-                  source={{ uri: WORKER_TUTORIALS[0].thumbnail }}
-                  style={styles.featuredThumbnail}
-                  resizeMode="cover"
-                />
-                <View style={styles.featuredGradientOverlay} />
-                <View style={styles.featuredPlayCircle}>
-                  <Play size={24} color="#FFFFFF" fill="#FFFFFF" style={{ marginLeft: 3 }} />
+          return (
+            <View style={styles.tutorialsSection}>
+              <View style={styles.sectionTitleRow}>
+                <View>
+                  <Text style={styles.sectionTitle}>
+                    {tw('academyTitle', lang)}
+                  </Text>
+                  <Text style={styles.sectionSubtitle}>
+                    {tw('academyDesc', lang)}
+                  </Text>
                 </View>
-                <View style={styles.featuredDurationPill}>
-                  <Clock size={11} color="#FFFFFF" style={{ marginRight: 4 }} />
-                  <Text style={styles.featuredDurationText}>{WORKER_TUTORIALS[0].duration}</Text>
-                </View>
-                <View style={styles.featuredTagPill}>
-                  <Text style={styles.featuredTagText}>⭐ Featured Lesson</Text>
+                <View style={styles.ytPill}>
+                  <Play size={11} color="#DC2626" fill="#DC2626" />
+                  <Text style={styles.ytPillText}>YouTube</Text>
                 </View>
               </View>
 
-              <View style={styles.featuredContent}>
-                <View style={styles.featuredMetaRow}>
-                  <Text style={styles.featuredViewsText}>{WORKER_TUTORIALS[0].views}</Text>
-                  <View style={styles.metaDot} />
-                  <Text style={styles.featuredChannelText}>{WORKER_TUTORIALS[0].channel}</Text>
-                </View>
-                <Text style={styles.featuredTitle}>
-                  {lang === 'hi' ? WORKER_TUTORIALS[0].hindiTitle : WORKER_TUTORIALS[0].title}
-                </Text>
-                <View style={styles.watchNowActionRow}>
-                  <Text style={styles.watchNowActionText}>
-                    {lang === 'hi' ? 'यूट्यूब पर वीडियो देखें →' : 'Watch Free Lesson on YouTube →'}
-                  </Text>
-                  <ExternalLink size={14} color="#DC2626" />
-                </View>
-              </View>
-            </TouchableOpacity>
-          )}
-
-          {/* Additional Video Lessons */}
-          <View style={styles.videoList}>
-            {WORKER_TUTORIALS.slice(1).map((video) => (
-              <TouchableOpacity
-                key={video.id}
-                style={styles.videoCard}
-                onPress={() => handleOpenVideo(video)}
-                activeOpacity={0.85}
-              >
-                <View style={styles.videoThumbnailContainer}>
-                  <Image source={{ uri: video.thumbnail }} style={styles.videoThumbnail} resizeMode="cover" />
-                  <View style={styles.playOverlay}>
-                    <View style={styles.playCircleSmall}>
-                      <Play size={14} color="#FFFFFF" fill="#FFFFFF" style={{ marginLeft: 2 }} />
+              {/* Featured Hero Lesson */}
+              {activeVideos.length > 0 && (
+                <TouchableOpacity
+                  style={styles.featuredVideoCard}
+                  onPress={() => handleOpenVideo(activeVideos[0])}
+                  activeOpacity={0.9}
+                >
+                  <View style={styles.featuredThumbnailWrap}>
+                    <Image
+                      source={{ uri: activeVideos[0].thumbnail || 'https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=600&auto=format&fit=crop&q=80' }}
+                      style={styles.featuredThumbnail}
+                      resizeMode="cover"
+                    />
+                    <View style={styles.featuredGradientOverlay} />
+                    <View style={styles.featuredPlayCircle}>
+                      <Play size={24} color="#FFFFFF" fill="#FFFFFF" style={{ marginLeft: 3 }} />
+                    </View>
+                    <View style={styles.featuredDurationPill}>
+                      <Clock size={11} color="#FFFFFF" style={{ marginRight: 4 }} />
+                      <Text style={styles.featuredDurationText}>{activeVideos[0].duration || '4:20 min'}</Text>
+                    </View>
+                    <View style={styles.featuredTagPill}>
+                      <Text style={styles.featuredTagText}>⭐ {activeVideos[0].tag || 'Featured Lesson'}</Text>
                     </View>
                   </View>
-                  <View style={styles.durationPill}>
-                    <Text style={styles.durationText}>{video.duration}</Text>
-                  </View>
-                </View>
 
-                <View style={styles.videoContent}>
-                  <View style={styles.videoTagRow}>
-                    <View style={styles.videoTag}>
-                      <Text style={styles.videoTagText}>{video.tag}</Text>
+                  <View style={styles.featuredContent}>
+                    <View style={styles.featuredMetaRow}>
+                      <Text style={styles.featuredViewsText}>{activeVideos[0].views || '15K+ views'}</Text>
+                      <View style={styles.metaDot} />
+                      <Text style={styles.featuredChannelText}>{activeVideos[0].channel || 'MistriPro Academy'}</Text>
                     </View>
-                    <Text style={styles.videoViews}>{video.views}</Text>
-                  </View>
-                  <Text style={styles.videoMainTitle} numberOfLines={2}>
-                    {lang === 'hi' ? video.hindiTitle : video.title}
-                  </Text>
-                  <View style={styles.watchRow}>
-                    <Text style={styles.watchNowText}>
-                      {lang === 'hi' ? 'यूट्यूब पर देखें' : 'Watch on YouTube'}
+                    <Text style={styles.featuredTitle}>
+                      {lang === 'en' ? activeVideos[0].title : (activeVideos[0].hindiTitle || activeVideos[0].title)}
                     </Text>
-                    <ExternalLink size={11} color="#DC2626" />
+                    <View style={styles.watchNowActionRow}>
+                      <Text style={styles.watchNowActionText}>
+                        {tw('watchLesson', lang)}
+                      </Text>
+                      <ExternalLink size={14} color="#DC2626" />
+                    </View>
                   </View>
+                </TouchableOpacity>
+              )}
+
+              {/* Additional Video Lessons */}
+              {activeVideos.length > 1 && (
+                <View style={styles.videoList}>
+                  {activeVideos.slice(1).map((video) => (
+                    <TouchableOpacity
+                      key={video.id}
+                      style={styles.videoCard}
+                      onPress={() => handleOpenVideo(video)}
+                      activeOpacity={0.85}
+                    >
+                      <View style={styles.videoThumbnailContainer}>
+                        <Image
+                          source={{ uri: video.thumbnail || 'https://images.unsplash.com/photo-1581094794329-c8112a89af12?w=600&auto=format&fit=crop&q=80' }}
+                          style={styles.videoThumbnail}
+                          resizeMode="cover"
+                        />
+                        <View style={styles.playOverlay}>
+                          <View style={styles.playCircleSmall}>
+                            <Play size={14} color="#FFFFFF" fill="#FFFFFF" style={{ marginLeft: 2 }} />
+                          </View>
+                        </View>
+                        <View style={styles.durationPill}>
+                          <Text style={styles.durationText}>{video.duration || 'Video'}</Text>
+                        </View>
+                      </View>
+
+                      <View style={styles.videoContent}>
+                        <View style={styles.videoTagRow}>
+                          <View style={styles.videoTag}>
+                            <Text style={styles.videoTagText}>{video.tag || 'Academy'}</Text>
+                          </View>
+                          <Text style={styles.videoViews}>{video.views || 'Verified'}</Text>
+                        </View>
+                        <Text style={styles.videoMainTitle} numberOfLines={2}>
+                          {lang === 'en' ? video.title : (video.hindiTitle || video.title)}
+                        </Text>
+                        <View style={styles.watchRow}>
+                          <Text style={styles.watchNowText}>
+                            {tw('watchOnYoutube', lang)}
+                          </Text>
+                          <ExternalLink size={11} color="#DC2626" />
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
                 </View>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
+              )}
+            </View>
+          );
+        })()}
       </ScrollView>
     </View>
   );

@@ -23,9 +23,17 @@ import {
   EyeOff,
   ShieldCheck,
   Phone,
+  Mail,
+  Headphones,
+  Video,
+  Plus,
+  Trash2,
+  Edit2,
+  ExternalLink,
 } from 'lucide-react';
 
 const GATEWAY_CONFIG_PROFILE_ID = '00000000-0000-0000-0000-000000000099';
+const SUPPORT_CONFIG_PROFILE_ID = '00000000-0000-0000-0000-000000000088';
 
 export default function SettingsPage() {
   const { updatePassword, adminEmail } = useAuth();
@@ -66,6 +74,28 @@ export default function SettingsPage() {
   const [rzpSaving, setRzpSaving] = useState(false);
   const [rzpLastSynced, setRzpLastSynced] = useState<string | null>(null);
   const [rzpMsg, setRzpMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Help Center & Support Helpline State (Dynamic In-App Help Center)
+  const [supportPhone, setSupportPhone] = useState('+919057631403');
+  const [supportEmail, setSupportEmail] = useState('mistripro.ind@gmail.com');
+  const [supportSaving, setSupportSaving] = useState(false);
+  const [supportMsg, setSupportMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Worker Training Academy Videos State (Dynamic Video Manager)
+  const [trainingVideos, setTrainingVideos] = useState<any[]>([
+    {
+      id: 'tut-1',
+      title: 'How to Get 5-Star Ratings on Mistri Pro',
+      hindiTitle: 'मिस्त्री प्रो पर 5-स्टार रेटिंग और ज्यादा काम कैसे पाएं',
+      duration: '4:20 min',
+      channel: 'Mistri Pro Academy',
+      url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+      thumbnail: 'https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=600&auto=format&fit=crop&q=80',
+      tag: 'Tips & Growth',
+    },
+  ]);
+  const [editingVideo, setEditingVideo] = useState<any | null>(null);
+  const [showVideoModal, setShowVideoModal] = useState(false);
 
   // Password Change Form State
   const [oldPassword, setOldPassword] = useState('');
@@ -120,6 +150,30 @@ export default function SettingsPage() {
         }
       } catch (err: any) {
         console.log('platform_settings note:', err.message);
+      }
+
+      // 3. Fetch Help Center Support & Training Videos from Supabase
+      try {
+        const { data: supportData } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', SUPPORT_CONFIG_PROFILE_ID)
+          .maybeSingle();
+
+        if (supportData?.address) {
+          try {
+            const parsed = JSON.parse(supportData.address);
+            if (parsed.support_phone) setSupportPhone(parsed.support_phone);
+            if (parsed.support_email) setSupportEmail(parsed.support_email);
+            if (Array.isArray(parsed.training_videos) && parsed.training_videos.length > 0) {
+              setTrainingVideos(parsed.training_videos);
+            }
+          } catch (e) {
+            console.log('Error parsing support config JSON:', e);
+          }
+        }
+      } catch (sErr: any) {
+        console.log('Support config fetch notice:', sErr?.message);
       }
     } catch (err: any) {
       console.log('Error reading settings:', err.message);
@@ -176,6 +230,72 @@ export default function SettingsPage() {
     } finally {
       setRzpSaving(false);
     }
+  };
+
+  // Save Support Helpline & Training Videos to Supabase Cloud
+  const handleSaveSupportAndVideos = async (customVideos?: any[]) => {
+    setSupportSaving(true);
+    setSupportMsg(null);
+    try {
+      const videosToSave = customVideos || trainingVideos;
+      const payload = {
+        support_phone: supportPhone.trim(),
+        support_email: supportEmail.trim(),
+        training_videos: videosToSave,
+      };
+
+      const { error } = await supabase.from('profiles').upsert([
+        {
+          id: SUPPORT_CONFIG_PROFILE_ID,
+          role: 'ADMIN',
+          full_name: 'MistriPro Support & Training Video Config',
+          phone: payload.support_phone,
+          alt_phone: payload.support_email,
+          address: JSON.stringify(payload),
+          city: 'CONFIG',
+          state: 'ACTIVE',
+          kyc_status: 'VERIFIED',
+          updated_at: new Date().toISOString(),
+        },
+      ]);
+
+      if (error) throw error;
+      setSupportMsg({
+        type: 'success',
+        text: 'Support Helpline and Training Videos saved to Supabase! Mobile apps update dynamically.',
+      });
+    } catch (err: any) {
+      setSupportMsg({ type: 'error', text: 'Failed to save support settings: ' + err.message });
+    } finally {
+      setSupportSaving(false);
+    }
+  };
+
+  const handleDeleteVideo = (id: string) => {
+    if (!confirm('Are you sure you want to delete this video?')) return;
+    const updated = trainingVideos.filter((v) => v.id !== id);
+    setTrainingVideos(updated);
+    handleSaveSupportAndVideos(updated);
+  };
+
+  const handleSaveVideoModal = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingVideo) return;
+    let updated: any[];
+    if (editingVideo.isNew) {
+      const newV = {
+        ...editingVideo,
+        id: `vid-${Date.now()}`,
+      };
+      delete newV.isNew;
+      updated = [...trainingVideos, newV];
+    } else {
+      updated = trainingVideos.map((v) => (v.id === editingVideo.id ? editingVideo : v));
+    }
+    setTrainingVideos(updated);
+    setShowVideoModal(false);
+    setEditingVideo(null);
+    handleSaveSupportAndVideos(updated);
   };
 
   // Save Platform Rates to Supabase
@@ -524,6 +644,338 @@ export default function SettingsPage() {
           </div>
         </form>
       </div>
+
+      {/* Support Helpline & Help Center Contact Settings */}
+      <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-card space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-800 flex items-center justify-center">
+              <Headphones className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <span>In-App Help Center Contact & Helpline</span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800">
+                  Direct 1-Tap Dial & Email
+                </span>
+              </h3>
+              <p className="text-xs text-slate-500">
+                When customers or workers tap &quot;Help Center & FAQ&quot;, this phone and email open with 1 tap.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {supportMsg && (
+          <div
+            className={`p-3.5 rounded-xl text-xs font-semibold flex items-center gap-2.5 ${
+              supportMsg.type === 'success'
+                ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                : 'bg-red-50 text-red-800 border border-red-200'
+            }`}
+          >
+            {supportMsg.type === 'success' ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            ) : (
+              <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+            )}
+            <span>{supportMsg.text}</span>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <div>
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+              <Phone className="w-3.5 h-3.5 text-purple-600" />
+              <span>Support Phone Number</span>
+            </label>
+            <input
+              type="text"
+              value={supportPhone}
+              onChange={(e) => setSupportPhone(e.target.value)}
+              placeholder="+919057631403"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 font-mono focus:outline-none focus:border-purple-600 focus:bg-white transition"
+            />
+            <p className="text-[10px] text-slate-400 mt-1">
+              Triggers instant phone dialer (<span className="font-mono">tel:{supportPhone}</span>) in mobile app.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+              <Mail className="w-3.5 h-3.5 text-purple-600" />
+              <span>Support Email Address</span>
+            </label>
+            <input
+              type="email"
+              value={supportEmail}
+              onChange={(e) => setSupportEmail(e.target.value)}
+              placeholder="mistripro.ind@gmail.com"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 font-mono focus:outline-none focus:border-purple-600 focus:bg-white transition"
+            />
+            <p className="text-[10px] text-slate-400 mt-1">
+              Triggers default email app (<span className="font-mono">mailto:{supportEmail}</span>) in mobile app.
+            </p>
+          </div>
+        </div>
+
+        <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+          <p className="text-[11px] text-slate-400">
+            Saved under Supabase cloud config ID <span className="font-mono text-slate-600 font-bold">...0088</span>
+          </p>
+          <button
+            type="button"
+            onClick={() => handleSaveSupportAndVideos()}
+            disabled={supportSaving}
+            className="px-6 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold shadow-md shadow-purple-600/20 transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
+          >
+            <Save className="w-3.5 h-3.5" />
+            <span>{supportSaving ? 'Saving to Supabase...' : 'Save Support Contact'}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Worker Training Academy Videos Manager */}
+      <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-card space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-red-100 text-red-800 flex items-center justify-center">
+              <Video className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <span>Worker Training Academy Videos</span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-800">
+                  {trainingVideos.length} Videos Active
+                </span>
+              </h3>
+              <p className="text-xs text-slate-500">
+                Update URLs, thumbnails, and regional titles of tutorials shown on Worker HomeScreen.
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              setEditingVideo({
+                isNew: true,
+                title: '',
+                hindiTitle: '',
+                url: '',
+                thumbnail: '',
+                duration: '4:00 min',
+                channel: 'MistriPro Academy',
+                tag: 'General',
+              });
+              setShowVideoModal(true);
+            }}
+            className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold shadow-md shadow-red-600/20 transition flex items-center gap-1.5 cursor-pointer"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Add Training Video</span>
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {trainingVideos.map((video) => (
+            <div
+              key={video.id}
+              className="border border-slate-200 rounded-xl overflow-hidden bg-slate-50 flex flex-col justify-between"
+            >
+              <div>
+                <div className="relative aspect-video bg-slate-200">
+                  {video.thumbnail ? (
+                    <img
+                      src={video.thumbnail}
+                      alt={video.title}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-slate-400">
+                      <Video className="w-8 h-8" />
+                    </div>
+                  )}
+                  <span className="absolute bottom-2 right-2 bg-slate-900/80 text-white text-[10px] font-bold px-2 py-0.5 rounded">
+                    {video.duration || 'Video'}
+                  </span>
+                  <span className="absolute top-2 left-2 bg-red-600 text-white text-[10px] font-bold px-2 py-0.5 rounded">
+                    {video.tag || 'Tutorial'}
+                  </span>
+                </div>
+
+                <div className="p-3 space-y-1">
+                  <h4 className="text-xs font-bold text-slate-900 line-clamp-2">{video.title}</h4>
+                  {video.hindiTitle && (
+                    <p className="text-[11px] text-slate-500 line-clamp-1">{video.hindiTitle}</p>
+                  )}
+                  <p className="text-[10px] text-slate-400">{video.channel || 'MistriPro'}</p>
+                </div>
+              </div>
+
+              <div className="p-3 pt-0 border-t border-slate-200/60 mt-2 flex items-center justify-between">
+                <a
+                  href={video.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-[11px] text-indigo-600 hover:underline flex items-center gap-1 font-semibold"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  <span>Preview</span>
+                </a>
+
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingVideo({ ...video, isNew: false });
+                      setShowVideoModal(true);
+                    }}
+                    className="p-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-200 transition"
+                    title="Edit Video"
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteVideo(video.id)}
+                    className="p-1.5 rounded-lg text-red-600 hover:bg-red-100 transition"
+                    title="Delete Video"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Video Add / Edit Modal */}
+      {showVideoModal && editingVideo && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h3 className="text-base font-bold text-slate-900">
+                {editingVideo.isNew ? 'Add Training Video' : 'Edit Training Video'}
+              </h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowVideoModal(false);
+                  setEditingVideo(null);
+                }}
+                className="text-slate-400 hover:text-slate-700"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveVideoModal} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Video Title (English) *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editingVideo.title || ''}
+                  onChange={(e) => setEditingVideo({ ...editingVideo, title: e.target.value })}
+                  placeholder="e.g. How to Greet Customers & Verify OTP"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-red-600"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Regional / Hindi Title (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={editingVideo.hindiTitle || ''}
+                  onChange={(e) => setEditingVideo({ ...editingVideo, hindiTitle: e.target.value })}
+                  placeholder="उदा. ग्राहक की साइट पर व्यवहार व OTP प्रक्रिया"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-red-600"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  YouTube / Video URL *
+                </label>
+                <input
+                  type="url"
+                  required
+                  value={editingVideo.url || ''}
+                  onChange={(e) => setEditingVideo({ ...editingVideo, url: e.target.value })}
+                  placeholder="https://www.youtube.com/watch?v=..."
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-mono focus:outline-none focus:border-red-600"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Thumbnail Image URL (Optional)
+                </label>
+                <input
+                  type="url"
+                  value={editingVideo.thumbnail || ''}
+                  onChange={(e) => setEditingVideo({ ...editingVideo, thumbnail: e.target.value })}
+                  placeholder="https://images.unsplash.com/... or img.youtube.com/vi/..."
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-mono focus:outline-none focus:border-red-600"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Duration (e.g. 4:20 min)
+                  </label>
+                  <input
+                    type="text"
+                    value={editingVideo.duration || ''}
+                    onChange={(e) => setEditingVideo({ ...editingVideo, duration: e.target.value })}
+                    placeholder="4:20 min"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-red-600"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Tag / Category
+                  </label>
+                  <input
+                    type="text"
+                    value={editingVideo.tag || ''}
+                    onChange={(e) => setEditingVideo({ ...editingVideo, tag: e.target.value })}
+                    placeholder="Safety / Earnings"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-red-600"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowVideoModal(false);
+                    setEditingVideo(null);
+                  }}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold shadow-md shadow-red-600/20"
+                >
+                  Save Video
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* Left Column (7 cols): Platform Rates & Wage Matrix */}

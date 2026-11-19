@@ -31,6 +31,7 @@ import {
 } from 'lucide-react-native';
 import { DeviceFeedback } from '../services/deviceFeedback';
 import { LiveBackend } from '../services/liveBackend';
+import { tw } from '../data/workerTranslations';
 
 const STEPS = [
   { step: 1, title: 'Approved', hindi: 'स्वीकृत' },

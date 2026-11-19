@@ -581,9 +581,10 @@ export const LiveBackend = {
     }
   },
 
-  // Upload Image to Supabase Storage (Aadhaar KYC)
+  // Upload Image to Supabase Storage or Base64 Cloud Persistence (Aadhaar KYC)
   uploadDocumentToStorage: async (uri, fileName) => {
     if (!uri) return null;
+    if (uri.startsWith('data:image')) return uri;
     try {
       const response = await fetch(uri);
       const blob = await response.blob();
@@ -597,8 +598,13 @@ export const LiveBackend = {
         });
 
       if (error) {
-        console.log('Supabase storage upload error:', error.message);
-        return uri;
+        // Fallback: Convert blob to Base64 data URI so Admin Web can view photo from anywhere
+        return new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.onerror = () => resolve(uri);
+          reader.readAsDataURL(blob);
+        });
       }
 
       const { data: publicData } = supabase.storage
@@ -607,8 +613,18 @@ export const LiveBackend = {
 
       return publicData?.publicUrl || uri;
     } catch (err) {
-      console.log('Upload fallback to local URI:', err.message);
-      return uri;
+      try {
+        const resp = await fetch(uri);
+        const b = await resp.blob();
+        return new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.onerror = () => resolve(uri);
+          reader.readAsDataURL(b);
+        });
+      } catch (e2) {
+        return uri;
+      }
     }
   },
 

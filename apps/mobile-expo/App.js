@@ -107,6 +107,7 @@ import { DeviceFeedback } from './src/services/deviceFeedback';
 import NotificationCenterModal from './src/components/NotificationCenterModal';
 import WorkerManageSkillsModal from './src/components/WorkerManageSkillsModal';
 import EditProfileModal from './src/components/EditProfileModal';
+import HelpCenterModal from './src/components/HelpCenterModal';
 
 const { width } = Dimensions.get('window');
 
@@ -626,6 +627,24 @@ export default function App() {
 function MainApp() {
   const insets = useSafeAreaInsets();
 
+  // Convert local file URI to Base64 data URI so photos persist reliably across mobile and admin web
+  const convertUriToBase64 = async (uri) => {
+    if (!uri) return null;
+    if (uri.startsWith('data:image')) return uri;
+    try {
+      const resp = await fetch(uri);
+      const blob = await resp.blob();
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.onerror = () => resolve(uri);
+        reader.readAsDataURL(blob);
+      });
+    } catch (e) {
+      return uri;
+    }
+  };
+
   // Instant Image Picker (Gallery Selection with graceful permissions + Base64 conversion)
   const pickImage = async (setImageUri) => {
     try {
@@ -637,9 +656,12 @@ function MainApp() {
       });
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const asset = result.assets[0];
-        const finalData = asset.base64
+        let finalData = asset.base64
           ? `data:image/jpeg;base64,${asset.base64}`
           : asset.uri;
+        if (!finalData.startsWith('data:image')) {
+          finalData = await convertUriToBase64(finalData);
+        }
         setImageUri(finalData);
       }
     } catch (err) {
@@ -654,9 +676,12 @@ function MainApp() {
           });
           if (!res.canceled && res.assets && res.assets.length > 0) {
             const asset = res.assets[0];
-            const finalData = asset.base64
+            let finalData = asset.base64
               ? `data:image/jpeg;base64,${asset.base64}`
               : asset.uri;
+            if (!finalData.startsWith('data:image')) {
+              finalData = await convertUriToBase64(finalData);
+            }
             setImageUri(finalData);
           }
         } else {
@@ -683,9 +708,12 @@ function MainApp() {
       });
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const asset = result.assets[0];
-        const finalData = asset.base64
+        let finalData = asset.base64
           ? `data:image/jpeg;base64,${asset.base64}`
           : asset.uri;
+        if (!finalData.startsWith('data:image')) {
+          finalData = await convertUriToBase64(finalData);
+        }
         setImageUri(finalData);
       }
     } catch (err) {
@@ -777,6 +805,11 @@ function MainApp() {
   const [aadhaarFrontUri, setAadhaarFrontUri] = useState(null);
   const [aadhaarBackUri, setAadhaarBackUri] = useState(null);
 
+  // Dynamic Support Helpline & Worker Academy Videos State (Loaded from Supabase)
+  const [supportPhone, setSupportPhone] = useState('+919057631403');
+  const [supportEmail, setSupportEmail] = useState('mistripro.ind@gmail.com');
+  const [trainingVideos, setTrainingVideos] = useState([]);
+
   // Live GPS Fetch for Worker Profile
   const fetchWorkerLiveLocation = async () => {
     setIsFetchingWorkerLocation(true);
@@ -866,6 +899,28 @@ function MainApp() {
       } catch (e) {}
     };
     loadWalletAndMilestones();
+  }, []);
+
+  // Fetch dynamic Support Helpline & Training Videos from Supabase Config
+  useEffect(() => {
+    const fetchSupportConfig = async () => {
+      try {
+        const { data } = await supabase
+          .from('profiles')
+          .select('address')
+          .eq('id', '00000000-0000-0000-0000-000000000088')
+          .maybeSingle();
+        if (data?.address) {
+          const cfg = JSON.parse(data.address);
+          if (cfg.support_phone) setSupportPhone(cfg.support_phone);
+          if (cfg.support_email) setSupportEmail(cfg.support_email);
+          if (Array.isArray(cfg.training_videos) && cfg.training_videos.length > 0) {
+            setTrainingVideos(cfg.training_videos);
+          }
+        }
+      } catch (e) {}
+    };
+    fetchSupportConfig();
   }, []);
 
   // Auto-poll worker approval status from Supabase when waiting on review screen
@@ -4122,6 +4177,8 @@ function MainApp() {
               userContact={custMobile}
               userAddress={custAddress}
               customerWalletBalance={customerWalletBalance}
+              supportPhone={supportPhone}
+              supportEmail={supportEmail}
               onSaveProfile={handleSaveProfile}
               onSelectLang={handleSelectLanguage}
               onOpenInvoices={() => setShowInvoicesModal(true)}
@@ -4144,6 +4201,7 @@ function MainApp() {
               onNavigateTab={(tab) => setActiveTab(tab)}
               onOpenNotifications={() => setShowNotifModal(true)}
               notificationsCount={notifications.length}
+              trainingVideos={trainingVideos}
             />
           )}
 
@@ -4194,6 +4252,8 @@ function MainApp() {
               workerSkills={workerSkills}
               onUpdateWorkerSkills={handleUpdateWorkerSkills}
               workerExperienceYears={workerExperienceYears}
+              supportPhone={supportPhone}
+              supportEmail={supportEmail}
               onSaveProfile={handleSaveProfile}
               onSelectLang={handleSelectLanguage}
               onOpenInvoices={() => setShowInvoicesModal(true)}
@@ -5149,6 +5209,8 @@ function ProfileScreen({
   workerSkills = [],
   onUpdateWorkerSkills,
   workerExperienceYears = '5',
+  supportPhone = '+919057631403',
+  supportEmail = 'mistripro.ind@gmail.com',
   onSaveProfile,
   onSelectLang,
   onSwitchLang,
@@ -5158,6 +5220,7 @@ function ProfileScreen({
   const [showEditModal, setShowEditModal] = useState(false);
   const [showSkillsModal, setShowSkillsModal] = useState(false);
   const [showLangModal, setShowLangModal] = useState(false);
+  const [showHelpModal, setShowHelpModal] = useState(false);
 
   const languages = [
     { code: 'en', label: 'English', native: 'English', char: 'A' },
@@ -5401,14 +5464,16 @@ function ProfileScreen({
           {/* 6. Help Center & FAQ */}
           <TouchableOpacity
             style={styles.settingsRow}
-            onPress={() => Alert.alert(lang === 'hi' ? 'सहायता एवं संपर्क' : 'Help & Support', 'Call toll-free: 1800-MISTRI-PRO')}
+            onPress={() => setShowHelpModal(true)}
             activeOpacity={0.7}
           >
-            <View style={[styles.settingsRowIconWrap, { backgroundColor: '#F1F5F9' }]}>
-              <HelpCircle size={18} color="#475569" />
+            <View style={[styles.settingsRowIconWrap, { backgroundColor: '#EEF2FF' }]}>
+              <HelpCircle size={18} color="#4F46E5" />
             </View>
             <View style={styles.settingsRowTextCol}>
-              <Text style={styles.settingsRowLabel}>{lang === 'hi' ? 'सहायता केंद्र' : 'Help Center & FAQ'}</Text>
+              <Text style={styles.settingsRowLabel}>
+                {lang === 'hi' ? 'सहायता केंद्र एवं संपर्क' : lang === 'gu' ? 'મદદ કેન્દ્ર અને સંપર્ક' : lang === 'mr' ? 'मदत केंद्र आणि संपर्क' : 'Help Center & Support'}
+              </Text>
             </View>
             <ChevronRight size={18} color="#94A3B8" />
           </TouchableOpacity>
@@ -5422,6 +5487,16 @@ function ProfileScreen({
 
         <Text style={styles.versionText}>MISTRI PRO • Build v2.4.0 (Enterprise Pro)</Text>
       </ScrollView>
+
+      {/* 2-TAP HELP CENTER MODAL (PHONE & EMAIL 1-TAP DIALER) */}
+      <HelpCenterModal
+        visible={showHelpModal}
+        onClose={() => setShowHelpModal(false)}
+        supportPhone={supportPhone}
+        supportEmail={supportEmail}
+        lang={lang}
+        insets={insets}
+      />
 
       {/* FULL-SCREEN BEAUTIFUL BOXED EDIT PROFILE MODAL */}
       <EditProfileModal
