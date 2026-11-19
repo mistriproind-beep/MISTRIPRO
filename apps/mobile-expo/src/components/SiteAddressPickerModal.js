@@ -129,12 +129,17 @@ export default function SiteAddressPickerModal({
             <View style={styles.mapWrap}>
               <WebView
                 originWhitelist={['*']}
-                source={{ html: mapHtml }}
+                source={{ html: mapHtml, baseUrl: 'https://tile.openstreetmap.org' }}
                 style={styles.mapWebview}
                 onMessage={handleMessage}
-                javaScriptEnabled
-                domStorageEnabled
+                javaScriptEnabled={true}
+                domStorageEnabled={true}
                 scrollEnabled={false}
+                mixedContentMode="always"
+                allowsInlineMediaPlayback={true}
+                startInLoadingState={true}
+                allowFileAccessFromFileURLs={true}
+                allowUniversalAccessFromFileURLs={true}
               />
             </View>
             <View style={styles.mapFooterRow}>

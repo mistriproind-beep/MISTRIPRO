@@ -31,13 +31,13 @@ export const StorageService = {
       await AsyncStorage.setItem(KEYS.CREDENTIALS, JSON.stringify(creds));
     } catch (e) {}
   },
-  // 1. Language Preferences (Ask once, remember forever)
+  // 1. Language Preferences (Ask once on first launch, remember forever)
   getLanguage: async () => {
     try {
       const saved = await AsyncStorage.getItem(KEYS.LANG);
-      return saved || 'en';
+      return saved || null;
     } catch (e) {
-      return 'en';
+      return null;
     }
   },
   getHasChosenLanguage: async () => {
@@ -57,8 +57,10 @@ export const StorageService = {
   },
   setLanguage: async (langCode) => {
     try {
-      await AsyncStorage.setItem(KEYS.LANG, langCode);
-      await AsyncStorage.setItem(KEYS.HAS_CHOSEN_LANG, 'true');
+      if (langCode) {
+        await AsyncStorage.setItem(KEYS.LANG, langCode);
+        await AsyncStorage.setItem(KEYS.HAS_CHOSEN_LANG, 'true');
+      }
     } catch (e) {}
   },
 
@@ -85,6 +87,7 @@ export const StorageService = {
       // Clear active runtime session while preserving saved login credentials, account profiles & language preferences
       await AsyncStorage.multiRemove([
         KEYS.USER_SESSION,
+        KEYS.ROLE,
         KEYS.IS_DEV,
         KEYS.ONBOARDING_COMPLETED,
       ]);

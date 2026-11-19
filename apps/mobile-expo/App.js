@@ -101,6 +101,7 @@ import {
 import { MOCK_BOOKINGS, MOCK_WORKERS } from './src/data/mockWorkers';
 
 import { StorageService } from './src/services/storage';
+import { AuthService } from './src/services/authService';
 import { LiveBackend } from './src/services/liveBackend';
 import { InvoiceService } from './src/services/invoiceService';
 import { DeviceFeedback } from './src/services/deviceFeedback';
@@ -1817,122 +1818,69 @@ function MainApp() {
           if (w && isMounted) setRealWorkers(w);
         }).catch(() => {});
 
-        // 3. Language Check (If chosen once, remember permanently)
+        // 3. Centralized Language & First-Launch Check
         const hasChosenLang = await StorageService.getHasChosenLanguage();
         const savedLang = await StorageService.getLanguage();
+
+        if (!hasChosenLang || !savedLang) {
+          // Absolute first time app launch: show Language Selection screen ONCE
+          if (isMounted) {
+            setCurrentScreen('LANGUAGE');
+          }
+          return;
+        }
+
         if (savedLang && isMounted) {
           setLang(savedLang);
         }
 
-        // 4. Session Check & Auto-login (If already logged in, send directly to Home)
-        let savedSession = await StorageService.getSession();
-        let savedCredentials = await StorageService.getCredentials();
-        let savedRole = await StorageService.getRole();
+        // 4. Session Check & Auto-login via Centralized AuthService
+        const authResult = await AuthService.checkInitialAuthState();
 
-        // Always preload input fields with saved credentials so user NEVER re-types
-        if (savedCredentials?.email && isMounted) {
-          setEmailInput(savedCredentials.email);
-        }
-        if (savedCredentials?.password && isMounted) {
-          setPasswordInput(savedCredentials.password);
-        }
-        if (savedCredentials?.phone && isMounted) {
-          setPhoneInput(savedCredentials.phone);
-        }
-
-        const credTarget =
-          savedSession?.email ||
-          savedSession?.mobile ||
-          savedSession?.phone ||
-          savedCredentials?.email ||
-          savedCredentials?.phone;
-        const localAcct = credTarget ? await StorageService.getAccountProfile(credTarget) : null;
-        const effectiveRole = savedSession?.role || savedRole || localAcct?.role;
-
-        if (effectiveRole && (savedSession || savedCredentials)) {
+        if (authResult.state === 'AUTHENTICATED') {
+          const { role: effectiveRole, profile, user } = authResult;
           const userDisplayName =
-            savedSession?.name ||
-            localAcct?.name ||
-            (credTarget ? formatNameFromEmail(credTarget) : (effectiveRole === 'CUSTOMER' ? 'Customer' : 'Worker'));
-          const userPhone =
-            savedSession?.mobile ||
-            savedSession?.phone ||
-            localAcct?.phone ||
-            savedCredentials?.phone ||
-            '';
-          const userAddr = savedSession?.address || localAcct?.address || '';
-          let userKyc = savedSession?.kyc_status || localAcct?.kyc_status || 'VERIFIED';
+            profile?.full_name ||
+            profile?.name ||
+            (profile?.email ? formatNameFromEmail(profile.email) : (effectiveRole === 'WORKER' ? 'Worker' : 'Customer'));
+          const userPhone = profile?.phone || profile?.mobile || user?.phone || '';
+          const userAddr = profile?.address || '';
+          let userKyc = profile?.kyc_status || 'VERIFIED';
 
-          let liveWorkerSkills = [];
-          let liveWorkerExp = 5;
-
-          // Check live Supabase Cloud KYC approval status for worker
-          if (effectiveRole === 'WORKER') {
-            try {
-              const liveStatus = await LiveBackend.checkWorkerApprovalStatus(userPhone, savedSession?.id);
-              if (liveStatus && (liveStatus.approved || liveStatus.status === 'APPROVED' || liveStatus.status === 'VERIFIED')) {
-                userKyc = 'APPROVED';
-              } else if (liveStatus && liveStatus.status) {
-                userKyc = liveStatus.status;
-              }
-              if (liveStatus?.skills && liveStatus.skills.length > 0) {
-                liveWorkerSkills = liveStatus.skills;
-              }
-              if (liveStatus?.workerProfile?.experience_years) {
-                liveWorkerExp = liveStatus.workerProfile.experience_years;
-              }
-            } catch (kErr) {
-              console.log('Live worker status check notice:', kErr);
-            }
-          }
+          let liveWorkerSkills = profile?.worker_profiles?.[0]?.skills || profile?.skills || [];
+          let liveWorkerExp = profile?.worker_profiles?.[0]?.experience_years || 5;
 
           setRole(effectiveRole);
-          await StorageService.setRole(effectiveRole);
-
-          const resolvedSkills = (liveWorkerSkills && liveWorkerSkills.length > 0)
-            ? liveWorkerSkills
-            : (savedSession?.skills && savedSession.skills.length > 0)
-            ? savedSession.skills
-            : (localAcct?.skills && localAcct.skills.length > 0)
-            ? localAcct.skills
-            : [];
-          const resolvedExp = liveWorkerExp || savedSession?.experienceYears || localAcct?.experienceYears || 5;
-
-          await StorageService.setSession({
-            id: savedSession?.id || localAcct?.id || 'usr-' + Date.now(),
-            name: userDisplayName,
-            mobile: userPhone,
-            phone: userPhone,
-            email: savedSession?.email || savedCredentials?.email || '',
-            role: effectiveRole,
-            address: userAddr,
-            kyc_status: userKyc,
-            skills: resolvedSkills,
-            experienceYears: resolvedExp,
-          });
 
           if (isMounted) {
             if (effectiveRole === 'WORKER') {
               setWorkerName(userDisplayName);
               setWorkerMobile(userPhone);
               if (userAddr) setWorkerAddress(userAddr);
-              if (resolvedSkills.length > 0) {
-                setWorkerSkills(resolvedSkills);
-              }
-              setWorkerExperienceYears(String(resolvedExp));
+              if (liveWorkerSkills.length > 0) setWorkerSkills(liveWorkerSkills);
+              setWorkerExperienceYears(String(liveWorkerExp));
 
               setWorkerProfile((prev) => ({
                 ...prev,
-                id: savedSession?.id || prev.id,
-                user_id: savedSession?.id || prev.user_id,
+                id: profile?.id || prev.id,
+                user_id: profile?.id || prev.user_id,
                 name: userDisplayName || prev.name,
                 phone: userPhone || prev.phone,
                 location: userAddr || prev.location,
                 kycStatus: userKyc,
-                skills: resolvedSkills.length > 0 ? resolvedSkills : prev.skills,
-                skill: resolvedSkills.length > 0 ? resolvedSkills.join(' • ') : prev.skill,
-                experienceYears: resolvedExp,
+                skills: liveWorkerSkills.length > 0 ? liveWorkerSkills : prev.skills,
+                skill: liveWorkerSkills.length > 0 ? liveWorkerSkills.join(' • ') : prev.skill,
+                experienceYears: liveWorkerExp,
               }));
+
+              if (userPhone || user?.id) {
+                LiveBackend.checkWorkerApprovalStatus(userPhone, user?.id || profile?.id).then((liveStatus) => {
+                  if (liveStatus && (liveStatus.approved || liveStatus.status === 'APPROVED' || liveStatus.status === 'VERIFIED')) {
+                    if (isMounted) setCurrentScreen('MAIN');
+                  }
+                }).catch(() => {});
+              }
+
               if (userKyc === 'APPROVED' || userKyc === 'VERIFIED') {
                 setActiveTab('HOME');
                 setCurrentScreen('MAIN');
@@ -1947,62 +1895,26 @@ function MainApp() {
               setCurrentScreen('MAIN');
             }
           }
-        } else if (savedCredentials && (savedCredentials.email || savedCredentials.phone)) {
-          // Check Supabase Cloud profile table for THIS specific user credentials
-          const existing = await LiveBackend.getProfileByEmailOrPhone(credTarget);
+          return;
+        }
 
-          if (existing.found && existing.profile && existing.profile.role) {
-            const p = existing.profile;
-            const pRole = p.role;
-            const pName = (p.full_name && p.full_name !== 'Ramesh Sharma')
-              ? p.full_name
-              : formatNameFromEmail(credTarget);
-            setRole(pRole);
-            await StorageService.setRole(pRole);
-            await StorageService.setSession({
-              id: p.id,
-              email: savedCredentials.email || '',
-              mobile: p.phone || savedCredentials.phone || '',
-              role: pRole,
-              name: pName,
-              address: p.address || '',
-              kyc_status: p.kyc_status || 'VERIFIED',
-            });
-            if (pRole === 'CUSTOMER') {
-              setCustName(pName);
-              if (p.phone) setCustMobile(p.phone);
-              if (p.address) setCustAddress(p.address);
-              setActiveTab('HOME');
-              setCurrentScreen('MAIN');
-            } else {
-              setWorkerName(pName);
-              if (p.phone) setWorkerMobile(p.phone);
-              if (p.address) setWorkerAddress(p.address);
-              if (p.kyc_status === 'APPROVED' || p.kyc_status === 'VERIFIED') {
-                setActiveTab('HOME');
-                setCurrentScreen('MAIN');
-              } else {
-                setCurrentScreen('WORKER_UNDER_REVIEW');
-              }
-            }
-          } else {
-            // Role missing in Supabase for this user -> Ask to choose role!
-            setEmailInput(savedCredentials.email || '');
-            setPhoneInput(savedCredentials.phone || '');
-            setRole(null);
+        if (authResult.state === 'ROLE_REQUIRED') {
+          if (isMounted) {
+            if (authResult.user?.email) setEmailInput(authResult.user.email);
+            if (authResult.user?.phone) setPhoneInput(authResult.user.phone);
             setCurrentScreen('ROLE_SELECT');
           }
-        } else if (!hasChosenLang && !savedLang) {
-          // Absolute first time app launch: show Language Selection screen once
-          if (isMounted) {
-            setCurrentScreen('LANGUAGE');
-          }
           return;
-        } else {
-          // NO ACTIVE LOGGED IN SESSION: Show clean sign in screen
-          if (isMounted) {
-            setCurrentScreen('SIGN_IN');
-          }
+        }
+
+        // Preload input fields with saved credentials if any exist
+        const savedCredentials = await StorageService.getCredentials();
+        if (savedCredentials?.email && isMounted) setEmailInput(savedCredentials.email);
+        if (savedCredentials?.phone && isMounted) setPhoneInput(savedCredentials.phone);
+
+        // No active authenticated session -> show clean Sign In screen
+        if (isMounted) {
+          setCurrentScreen('SIGN_IN');
         }
 
         // 5. Restore & purge legacy mock bookings from device cache
@@ -2096,25 +2008,46 @@ function MainApp() {
 
         const existing = await LiveBackend.getProfileByEmailOrPhone(emailOrPhone, res.user?.id);
         const p = existing.found ? existing.profile : null;
-        const supabaseRole = (p?.role && String(p.role).trim().length > 0) ? p.role.trim() : null;
+        const localAccount = await StorageService.getAccountProfile(emailOrPhone);
+        const rawRole = p?.role || localAccount?.role;
+        const supabaseRole = (rawRole && String(rawRole).trim().length > 0) ? String(rawRole).trim().toUpperCase() : null;
 
         if (supabaseRole) {
-          const userRole = supabaseRole;
-          const effectiveName = (p.full_name && p.full_name !== 'Ramesh Sharma')
+          const userRole = supabaseRole.includes('WORKER') ? 'WORKER' : 'CUSTOMER';
+          const effectiveName = (p?.full_name && p.full_name !== 'Ramesh Sharma')
             ? p.full_name
-            : formatNameFromEmail(emailOrPhone);
-          const effectivePhone = p.phone || '';
-          const effectiveAddress = p.address || '';
-          const effectiveKyc = p.kyc_status || 'VERIFIED';
+            : localAccount?.name || formatNameFromEmail(emailOrPhone);
+          const effectivePhone = p?.phone || localAccount?.phone || '';
+          const effectiveAddress = p?.address || localAccount?.address || '';
+          const effectiveKyc = p?.kyc_status || localAccount?.kyc_status || 'VERIFIED';
 
           setRole(userRole);
           await StorageService.setRole(userRole);
+          await StorageService.saveAccountProfile(emailOrPhone, {
+            role: userRole,
+            name: effectiveName,
+            phone: effectivePhone,
+            address: effectiveAddress,
+            email: emailOrPhone,
+            kyc_status: effectiveKyc,
+          });
+
+          // Sync role to Supabase with user ID
+          if (res.user?.id) {
+            await AuthService.setRole(res.user.id, userRole, {
+              fullName: effectiveName,
+              phone: effectivePhone,
+              email: emailOrPhone,
+              address: effectiveAddress,
+            });
+          }
+
           await StorageService.setSession({
-            id: p.id || res.user?.id || 'usr-' + Date.now(),
+            id: p?.id || res.user?.id || 'usr-' + Date.now(),
             name: effectiveName,
             mobile: effectivePhone,
             phone: effectivePhone,
-            email: p.alt_phone || (res.user?.email || ''),
+            email: p?.alt_phone || (res.user?.email || ''),
             role: userRole,
             address: effectiveAddress,
             kyc_status: effectiveKyc,
@@ -2261,18 +2194,20 @@ function MainApp() {
         await StorageService.setCredentials({ phone: phoneInput, mobile: phoneInput });
 
         // Check if user already exists in Supabase WITH a valid registered role
-        const existing = await LiveBackend.getProfileByEmailOrPhone(phoneInput);
+        const existing = await LiveBackend.getProfileByEmailOrPhone(phoneInput, res.user?.id);
         const p = existing.found ? existing.profile : null;
-        const supabaseRole = (p?.role && String(p.role).trim().length > 0) ? p.role.trim() : null;
+        const localAccount = await StorageService.getAccountProfile(phoneInput);
+        const rawRole = p?.role || localAccount?.role;
+        const supabaseRole = (rawRole && String(rawRole).trim().length > 0) ? String(rawRole).trim().toUpperCase() : null;
 
         if (supabaseRole) {
-          const userRole = supabaseRole;
-          const effectiveName = (p.full_name && p.full_name !== 'Ramesh Sharma')
+          const userRole = supabaseRole.includes('WORKER') ? 'WORKER' : 'CUSTOMER';
+          const effectiveName = (p?.full_name && p.full_name !== 'Ramesh Sharma')
             ? p.full_name
-            : `User ${phoneInput.slice(-4)}`;
-          const effectivePhone = p.phone || phoneInput;
-          const effectiveAddress = p.address || '';
-          const effectiveKyc = p.kyc_status || 'VERIFIED';
+            : localAccount?.name || `User ${phoneInput.slice(-4)}`;
+          const effectivePhone = p?.phone || phoneInput;
+          const effectiveAddress = p?.address || localAccount?.address || '';
+          const effectiveKyc = p?.kyc_status || localAccount?.kyc_status || 'VERIFIED';
 
           setRole(userRole);
           await StorageService.setRole(userRole);
@@ -2284,8 +2219,17 @@ function MainApp() {
             kyc_status: effectiveKyc,
           });
 
+          // Sync role to Supabase with user ID
+          if (res.user?.id) {
+            await AuthService.setRole(res.user.id, userRole, {
+              fullName: effectiveName,
+              phone: effectivePhone,
+              address: effectiveAddress,
+            });
+          }
+
           await StorageService.setSession({
-            id: p.id,
+            id: p?.id || res.user?.id || 'usr-' + Date.now(),
             name: effectiveName,
             mobile: effectivePhone,
             phone: effectivePhone,
@@ -2449,17 +2393,19 @@ function MainApp() {
         // 3. Query Supabase profile table for THIS specific email/user ID
         const existing = await LiveBackend.getProfileByEmailOrPhone(cleanEmail, res.user?.id);
         const p = existing.found ? existing.profile : null;
-        const supabaseRole = (p?.role && String(p.role).trim().length > 0) ? p.role.trim() : null;
+        const localAccount = await StorageService.getAccountProfile(cleanEmail);
+        const rawRole = p?.role || localAccount?.role;
+        const supabaseRole = (rawRole && String(rawRole).trim().length > 0) ? String(rawRole).trim().toUpperCase() : null;
 
         if (supabaseRole) {
-          // USER ALREADY HAS A REGISTERED ROLE IN SUPABASE -> DO NOT ASK AGAIN!
-          const effectiveRole = supabaseRole;
-          const effectiveName = (p.full_name && p.full_name !== 'Ramesh Sharma')
+          // USER ALREADY HAS A REGISTERED ROLE -> DO NOT ASK AGAIN!
+          const effectiveRole = supabaseRole.includes('WORKER') ? 'WORKER' : 'CUSTOMER';
+          const effectiveName = (p?.full_name && p.full_name !== 'Ramesh Sharma')
             ? p.full_name
-            : formatNameFromEmail(cleanEmail);
-          const effectivePhone = p.phone || '';
-          const effectiveAddress = p.address || '';
-          const effectiveKyc = p.kyc_status || 'VERIFIED';
+            : localAccount?.name || formatNameFromEmail(cleanEmail);
+          const effectivePhone = p?.phone || localAccount?.phone || '';
+          const effectiveAddress = p?.address || localAccount?.address || '';
+          const effectiveKyc = p?.kyc_status || localAccount?.kyc_status || 'VERIFIED';
 
           setRole(effectiveRole);
           await StorageService.setRole(effectiveRole);
@@ -2472,8 +2418,18 @@ function MainApp() {
             kyc_status: effectiveKyc,
           });
 
+          // Sync role to Supabase with user ID
+          if (res.user?.id) {
+            await AuthService.setRole(res.user.id, effectiveRole, {
+              fullName: effectiveName,
+              phone: effectivePhone,
+              email: cleanEmail,
+              address: effectiveAddress,
+            });
+          }
+
           await StorageService.setSession({
-            id: p.id || res.user?.id || 'usr-' + Date.now(),
+            id: p?.id || res.user?.id || 'usr-' + Date.now(),
             name: effectiveName,
             mobile: effectivePhone,
             phone: effectivePhone,
@@ -3207,16 +3163,21 @@ function MainApp() {
               onPress={async () => {
                 setRole('CUSTOMER');
                 await StorageService.setRole('CUSTOMER');
-                const targetId = emailInput.trim() || phoneInput.trim();
+                let authUserId = null;
+                try {
+                  const { data: sess } = await supabase.auth.getSession();
+                  authUserId = sess?.session?.user?.id;
+                } catch (_) {}
+
+                const targetId = authUserId || emailInput.trim() || phoneInput.trim();
                 if (targetId) {
                   await StorageService.saveAccountProfile(targetId, { role: 'CUSTOMER' });
-                  LiveBackend.syncProfile({
-                    email: emailInput.trim(),
-                    mobile: phoneInput.trim(),
-                    role: 'CUSTOMER',
-                    fullName: custName.trim() || formatNameFromEmail(emailInput.trim()) || 'Customer',
-                  }).catch(() => {});
                 }
+                await AuthService.setRole(authUserId, 'CUSTOMER', {
+                  fullName: custName.trim() || formatNameFromEmail(emailInput.trim()) || 'Customer',
+                  email: emailInput.trim(),
+                  phone: phoneInput.trim() || custMobile.trim(),
+                });
                 setCurrentScreen('CUSTOMER_ONBOARDING');
               }}
               activeOpacity={0.85}
@@ -3242,17 +3203,21 @@ function MainApp() {
               onPress={async () => {
                 setRole('WORKER');
                 await StorageService.setRole('WORKER');
-                const targetId = emailInput.trim() || phoneInput.trim();
+                let authUserId = null;
+                try {
+                  const { data: sess } = await supabase.auth.getSession();
+                  authUserId = sess?.session?.user?.id;
+                } catch (_) {}
+
+                const targetId = authUserId || emailInput.trim() || phoneInput.trim();
                 if (targetId) {
                   await StorageService.saveAccountProfile(targetId, { role: 'WORKER' });
-                  LiveBackend.syncProfile({
-                    email: emailInput.trim(),
-                    mobile: phoneInput.trim(),
-                    role: 'WORKER',
-                    fullName: workerName.trim() || formatNameFromEmail(emailInput.trim()) || 'Worker',
-                    kycStatus: 'UNDER_REVIEW',
-                  }).catch(() => {});
                 }
+                await AuthService.setRole(authUserId, 'WORKER', {
+                  fullName: workerName.trim() || formatNameFromEmail(emailInput.trim()) || 'Worker',
+                  email: emailInput.trim(),
+                  phone: phoneInput.trim() || workerMobile.trim(),
+                });
                 setCurrentScreen('WORKER_ONBOARDING');
               }}
               activeOpacity={0.85}

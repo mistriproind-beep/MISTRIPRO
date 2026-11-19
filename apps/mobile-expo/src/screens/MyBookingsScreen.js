@@ -63,6 +63,7 @@ export default function MyBookingsScreen({
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewText, setReviewText] = useState('');
 
+  const safeLang = lang || 'en'; // guard: ensure lang is always defined in scope
   const safeBookings = Array.isArray(bookings) ? bookings : [];
 
   // Filter bookings based on active tab
@@ -380,7 +381,7 @@ export default function MyBookingsScreen({
                           <View style={styles.otpBadgeTitleWrap}>
                             <MapPin size={14} color="#4F46E5" />
                             <Text style={styles.otpBoxTitle}>
-                              {lang === 'hi' ? 'मिस्त्री आगमन OTP' : 'Arrival Verification OTP'}
+                              {safeLang === 'hi' ? 'मिस्त्री आगमन OTP' : 'Arrival Verification OTP'}
                             </Text>
                           </View>
                           <View style={styles.otpValueBadge}>
@@ -390,7 +391,7 @@ export default function MyBookingsScreen({
                           </View>
                         </View>
                         <Text style={styles.otpExplainerText}>
-                          {lang === 'hi'
+                          {safeLang === 'hi'
                             ? '📍 जब मिस्त्री आपकी साइट पर पहुंचे, तो उन्हें यह 4-अंकीय कोड दें ताकि वे उपस्थिति दर्ज कर सकें।'
                             : '📍 Give this 4-digit code to the mistri when they reach your site to verify their arrival.'}
                         </Text>
@@ -400,14 +401,14 @@ export default function MyBookingsScreen({
                           style={styles.cancelPreArrivalBtn}
                           onPress={() => {
                             Alert.alert(
-                              lang === 'hi' ? 'बुकिंग रद्द करें?' : 'Cancel Booking?',
-                              lang === 'hi'
+                              safeLang === 'hi' ? 'बुकिंग रद्द करें?' : 'Cancel Booking?',
+                              safeLang === 'hi'
                                 ? 'कारीगर के साइट पर पहुंचने से पहले रद्द करने पर आपका ₹99 बुकिंग शुल्क आपके MistriPro वर्चुअल वॉलेट में तुरंत रिफंड कर दिया जाएगा।\n\nइस वॉलेट बैलेंस का उपयोग आप अगली किसी भी बुकिंग के लिए कर सकते हैं। (निकासी उपलब्ध नहीं)'
                                 : 'Cancelling before the worker arrives will instantly refund your ₹99 booking charge to your MistriPro Virtual Wallet.\n\nYou can use this balance for any future booking (non-withdrawable).',
                               [
-                                { text: lang === 'hi' ? 'वापस जाएं' : 'Back', style: 'cancel' },
+                                { text: safeLang === 'hi' ? 'वापस जाएं' : 'Back', style: 'cancel' },
                                 {
-                                  text: lang === 'hi' ? 'हाँ, रद्द करें और ₹99 रिफंड पाएं' : 'Yes, Cancel & Refund ₹99',
+                                  text: safeLang === 'hi' ? 'हाँ, रद्द करें और ₹99 रिफंड पाएं' : 'Yes, Cancel & Refund ₹99',
                                   style: 'destructive',
                                   onPress: () => {
                                     if (onCancelPreVisit) {
@@ -422,7 +423,7 @@ export default function MyBookingsScreen({
                         >
                           <XCircle size={13} color="#DC2626" />
                           <Text style={styles.cancelPreArrivalText}>
-                            {lang === 'hi'
+                            {safeLang === 'hi'
                               ? 'रद्द करें और ₹99 वॉलेट रिफंड पाएं (Instant ₹99 Wallet Refund)'
                               : 'Cancel & Get Instant ₹99 Wallet Refund'}
                           </Text>
@@ -435,7 +436,7 @@ export default function MyBookingsScreen({
                           <View style={styles.otpBadgeTitleWrap}>
                             <CheckCircle2 size={14} color="#15803D" />
                             <Text style={[styles.otpBoxTitle, { color: '#15803D' }]}>
-                              {lang === 'hi' ? 'कार्य समापन OTP' : 'Work Completion OTP'}
+                              {safeLang === 'hi' ? 'कार्य समापन OTP' : 'Work Completion OTP'}
                             </Text>
                           </View>
                           <View style={[styles.otpValueBadge, { backgroundColor: '#DCFCE7', borderColor: '#86EFAC' }]}>
@@ -445,7 +446,7 @@ export default function MyBookingsScreen({
                           </View>
                         </View>
                         <Text style={styles.otpExplainerText}>
-                          {lang === 'hi'
+                          {safeLang === 'hi'
                             ? '🔒 यह कोड मिस्त्री को केवल तभी दें जब काम पूरी तरह समाप्त और संतोषजनक हो जाए।'
                             : '🔒 Share this code with the mistri only after the work is completely finished to your satisfaction.'}
                         </Text>
@@ -458,18 +459,18 @@ export default function MyBookingsScreen({
                         style={styles.cancelVisitRow}
                         onPress={() => {
                           Alert.alert(
-                            lang === 'hi' ? 'विजिट रद्द करना चाहते हैं?' : 'Need to Cancel Visit?',
-                            lang === 'hi'
+                            safeLang === 'hi' ? 'विजिट रद्द करना चाहते हैं?' : 'Need to Cancel Visit?',
+                            safeLang === 'hi'
                               ? `यदि साइट देखने के बाद काम नहीं कराना है, तो मिस्त्री को यह Cancellation OTP दें:\n\n🔑 ${booking.cancellation_otp || booking.cancellationOtp || '1592'}\n\nमिस्त्री अपने ऐप में यह कोड डालकर साइट विजिट रद्द कर देंगे।`
                               : `If you decide not to proceed after site inspection, provide this Cancellation OTP to the mistri:\n\n🔑 ${booking.cancellation_otp || booking.cancellationOtp || '1592'}\n\nThe mistri will enter this code to cancel the on-site visit.`,
-                            [{ text: lang === 'hi' ? 'समझ गया' : 'Got it' }]
+                            [{ text: safeLang === 'hi' ? 'समझ गया' : 'Got it' }]
                           );
                         }}
                         activeOpacity={0.8}
                       >
                         <AlertCircle size={13} color="#DC2626" />
                         <Text style={styles.cancelVisitLink}>
-                          {lang === 'hi'
+                          {safeLang === 'hi'
                             ? `साइट विजिट रद्द करने का OTP (Cancel OTP: ${booking.cancellation_otp || booking.cancellationOtp || '1592'})`
                             : `On-Site Cancellation OTP: ${booking.cancellation_otp || booking.cancellationOtp || '1592'}`}
                         </Text>
@@ -482,9 +483,9 @@ export default function MyBookingsScreen({
                 <View style={styles.cardFooter}>
                   <View>
                     <Text style={styles.amountLabel}>
-                      {lang === 'hi' ? 'बुकिंग शुल्क' : 'Paid Booking Charge'}
+                      {safeLang === 'hi' ? 'बुकिंग शुल्क' : 'Paid Booking Charge'}
                     </Text>
-                    <Text style={styles.amountValue}>₹99 <Text style={{ fontSize: 11, color: '#059669', fontWeight: '600' }}>({lang === 'hi' ? 'काम का रेट साइट पर' : 'Quote On-Site'})</Text></Text>
+                    <Text style={styles.amountValue}>₹99 <Text style={{ fontSize: 11, color: '#059669', fontWeight: '600' }}>({safeLang === 'hi' ? 'काम का रेट साइट पर' : 'Quote On-Site'})</Text></Text>
                   </View>
 
                   <View style={styles.actionsGroup}>

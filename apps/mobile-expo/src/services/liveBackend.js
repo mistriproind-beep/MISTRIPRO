@@ -369,13 +369,16 @@ export const LiveBackend = {
         }
       }
 
-      // 2. Direct lookup by email in alt_phone or phone
+      // 2. Direct lookup by email in email column or alt_phone
       if (isEmail) {
+        // Try direct alt_phone or email match
         const { data: byEmail } = await supabase
           .from('profiles')
           .select('*, worker_profiles(*)')
-          .ilike('alt_phone', cleanId)
+          .or(`alt_phone.ilike.${cleanId},phone.ilike.${cleanId}`)
+          .limit(1)
           .maybeSingle();
+
         if (byEmail && byEmail.role && String(byEmail.role).trim().length > 0) {
           return {
             found: true,
@@ -390,6 +393,7 @@ export const LiveBackend = {
             .from('profiles')
             .select('*, worker_profiles(*)')
             .ilike('phone', `%${searchDigits}%`)
+            .limit(1)
             .maybeSingle();
           if (byPhone && byPhone.role && String(byPhone.role).trim().length > 0) {
             return {
@@ -405,7 +409,7 @@ export const LiveBackend = {
       const { data, error } = await supabase
         .from('profiles')
         .select('*, worker_profiles(*)')
-        .limit(200);
+        .limit(300);
 
       if (error || !data) return { found: false };
 
@@ -414,7 +418,8 @@ export const LiveBackend = {
         matched = data.find((p) => {
           const pEmail = (p.email || '').toLowerCase().trim();
           const pAlt = (p.alt_phone || '').toLowerCase().trim();
-          return (pEmail === cleanId || pAlt === cleanId) && p.role && String(p.role).trim().length > 0;
+          const pPhone = (p.phone || '').toLowerCase().trim();
+          return (pEmail === cleanId || pAlt === cleanId || pPhone === cleanId) && p.role && String(p.role).trim().length > 0;
         });
       } else {
         const searchDigits = cleanId.replace(/[^0-9]/g, '').slice(-10);
@@ -527,44 +532,69 @@ export const LiveBackend = {
     try {
       const cleanDigits = (profile.phone || profile.mobile || '').replace(/[^0-9]/g, '').slice(-10);
       const emailTarget = (profile.email || '').trim().toLowerCase();
+      let targetId = profile.id || profile.userId || null;
+
+      if (!targetId) {
+        try {
+          const { data: sess } = await supabase.auth.getSession();
+          if (sess?.session?.user?.id) {
+            targetId = sess.session.user.id;
+          }
+        } catch (_) {}
+      }
+
       const { data: existing } = await supabase
         .from('profiles')
-        .select('id, phone, alt_phone, full_name')
+        .select('id, phone, alt_phone, email, full_name')
         .limit(100);
 
       const found = (existing || []).find((p) => {
+        if (targetId && p.id === targetId) return true;
         const pClean = (p.phone || '').replace(/[^0-9]/g, '').slice(-10);
         const aClean = (p.alt_phone || '').replace(/[^0-9]/g, '').slice(-10);
         const aLower = (p.alt_phone || '').toLowerCase();
+        const eLower = (p.email || '').toLowerCase();
         const pName = (p.full_name || '').toLowerCase().trim();
         const profName = (profile.fullName || profile.name || '').toLowerCase().trim();
         return (
           (cleanDigits && (pClean === cleanDigits || aClean === cleanDigits)) ||
-          (emailTarget && aLower === emailTarget) ||
+          (emailTarget && (eLower === emailTarget || aLower === emailTarget)) ||
           (profName && profName.length > 2 && pName === profName)
         );
       });
 
+      const effectiveId = targetId || found?.id;
       const payload = {
-        phone: profile.phone || profile.mobile || '',
-        full_name: profile.fullName || profile.name || 'MistriPro User',
-        role: profile.role || 'CUSTOMER',
+        ...(effectiveId ? { id: effectiveId } : {}),
+        phone: profile.phone || profile.mobile || found?.phone || '',
+        full_name: profile.fullName || profile.name || found?.full_name || 'MistriPro User',
+        role: profile.role || found?.role || 'CUSTOMER',
         alt_phone: profile.email || profile.altPhone || (found?.alt_phone ?? null),
-        address: profile.address || '',
-        city: profile.city || 'Sawai Madhopur',
-        state: profile.state || 'Rajasthan',
-        kyc_status: profile.kycStatus || 'VERIFIED',
+        email: emailTarget || found?.email || null,
+        address: profile.address || found?.address || '',
+        city: profile.city || found?.city || 'Sawai Madhopur',
+        state: profile.state || found?.state || 'Rajasthan',
+        kyc_status: profile.kycStatus || found?.kyc_status || 'VERIFIED',
         updated_at: new Date().toISOString(),
       };
 
-      if (found) {
+      if (effectiveId) {
         const { data, error } = await supabase
           .from('profiles')
-          .update(payload)
-          .eq('id', found.id)
+          .upsert([payload], { onConflict: 'id' })
           .select()
-          .single();
-        if (error) throw error;
+          .maybeSingle();
+
+        if (error) {
+          const { data: updData, error: updErr } = await supabase
+            .from('profiles')
+            .update(payload)
+            .eq('id', effectiveId)
+            .select()
+            .maybeSingle();
+          if (updErr) throw updErr;
+          return { success: true, data: updData };
+        }
         return { success: true, data };
       } else {
         const { data, error } = await supabase
