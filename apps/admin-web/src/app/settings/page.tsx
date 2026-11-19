@@ -22,6 +22,7 @@ import {
   Eye,
   EyeOff,
   ShieldCheck,
+  Phone,
 } from 'lucide-react';
 
 const GATEWAY_CONFIG_PROFILE_ID = '00000000-0000-0000-0000-000000000099';
@@ -48,6 +49,11 @@ export default function SettingsPage() {
     labour: 600,
     tile: 950,
   });
+
+  // Platform Phone & Direct Pricing Settings
+  const [companyPhone, setCompanyPhone] = useState('+91 98290 12345');
+  const [bookingFee, setBookingFee] = useState(99);
+  const [milestoneBonus, setMilestoneBonus] = useState(200);
 
   // Razorpay Gateway Credentials State
   const [rzpKeyId, setRzpKeyId] = useState('rzp_test_Sx6IT09QMzFIAk');
@@ -88,6 +94,9 @@ export default function SettingsPage() {
           if (parsed.merchant_name) setRzpMerchantName(parsed.merchant_name);
           if (parsed.webhook_secret !== undefined) setRzpWebhookSecret(parsed.webhook_secret);
           if (parsed.enabled !== undefined) setRzpEnabled(parsed.enabled);
+          if (parsed.company_phone) setCompanyPhone(parsed.company_phone);
+          if (parsed.booking_fee !== undefined) setBookingFee(Number(parsed.booking_fee));
+          if (parsed.milestone_bonus !== undefined) setMilestoneBonus(Number(parsed.milestone_bonus));
           if (gwData.updated_at) setRzpLastSynced(new Date(gwData.updated_at).toLocaleTimeString());
         } catch (e) {
           console.log('Error parsing razorpay json:', e);
@@ -136,14 +145,17 @@ export default function SettingsPage() {
         merchant_name: rzpMerchantName.trim() || 'Mistri Pro Secured Payments',
         webhook_secret: rzpWebhookSecret.trim(),
         enabled: rzpEnabled,
+        company_phone: companyPhone.trim() || '+91 98290 12345',
+        booking_fee: Number(bookingFee) || 99,
+        milestone_bonus: Number(milestoneBonus) || 200,
       };
 
       const { error } = await supabase.from('profiles').upsert([
         {
           id: GATEWAY_CONFIG_PROFILE_ID,
           role: 'ADMIN_GATEWAY',
-          full_name: 'Razorpay Gateway Settings',
-          phone: '0000000000',
+          full_name: 'Razorpay Gateway & Helpline Settings',
+          phone: payload.company_phone,
           address: JSON.stringify(payload),
           city: payload.mode,
           state: payload.enabled ? 'ACTIVE' : 'DISABLED',
@@ -419,6 +431,60 @@ export default function SettingsPage() {
                 placeholder="Webhook secret for payment verification callbacks"
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-mono text-slate-900 focus:outline-none focus:border-indigo-600 focus:bg-white transition"
               />
+            </div>
+
+            {/* Company Dispatch Helpline Phone */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
+                <Phone className="w-3.5 h-3.5 text-indigo-600" />
+                <span>Company Dispatch Helpline Phone (Mask Worker Numbers)</span>
+              </label>
+              <input
+                type="text"
+                value={companyPhone}
+                onChange={(e) => setCompanyPhone(e.target.value)}
+                placeholder="+91 98290 12345"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-indigo-600 focus:bg-white transition"
+              />
+              <p className="text-[10px] text-slate-400 mt-1">
+                Customers call this company number instead of worker personal phone numbers.
+              </p>
+            </div>
+
+            {/* Customer Site Visit & Booking Fee */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
+                <IndianRupee className="w-3.5 h-3.5 text-indigo-600" />
+                <span>Site Visit & Inspection Fee (₹)</span>
+              </label>
+              <input
+                type="number"
+                value={bookingFee}
+                onChange={(e) => setBookingFee(Number(e.target.value))}
+                placeholder="99"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-indigo-600 focus:bg-white transition"
+              />
+              <p className="text-[10px] text-slate-400 mt-1">
+                Fixed nominal charge customer pays to book mistri site visit. Work price is quoted on-site.
+              </p>
+            </div>
+
+            {/* Worker 10-Job Milestone Reward */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                <span>Worker 10-Job Milestone Reward Bonus (₹)</span>
+              </label>
+              <input
+                type="number"
+                value={milestoneBonus}
+                onChange={(e) => setMilestoneBonus(Number(e.target.value))}
+                placeholder="200"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-indigo-600 focus:bg-white transition"
+              />
+              <p className="text-[10px] text-slate-400 mt-1">
+                Cash bonus automatically credited to worker wallet for every 10 completed jobs.
+              </p>
             </div>
 
             {/* Gateway Active Toggle */}

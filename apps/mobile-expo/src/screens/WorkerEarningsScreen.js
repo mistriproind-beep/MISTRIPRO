@@ -24,6 +24,7 @@ import {
   X,
   CreditCard,
   History,
+  Award,
 } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
 
@@ -46,6 +47,22 @@ export default function WorkerEarningsScreen({
       }
     }
   }, [walletData]);
+
+  // 10-Job Milestone Reward Calculations (₹200 bonus for every 10 completed jobs)
+  const completedJobsCount = Number(
+    walletData?.completedJobsCount ??
+    workerProfile?.completed_jobs ??
+    workerProfile?.completedJobs ??
+    (transactions ? transactions.filter((t) => t.type === 'CREDIT').length : 0)
+  );
+  const milestoneTarget = 10;
+  const milestoneBonusAmount = 200;
+  const milestonesCompleted = Math.floor(completedJobsCount / milestoneTarget);
+  const totalMilestoneBonusEarned = milestonesCompleted * milestoneBonusAmount;
+  const currentProgress = completedJobsCount % milestoneTarget;
+  const jobsRemaining = milestoneTarget - currentProgress;
+  const progressPercent = Math.round((currentProgress / milestoneTarget) * 100);
+
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState('1000');
   const [payoutMethod, setPayoutMethod] = useState('UPI'); // 'UPI' | 'BANK'
@@ -218,6 +235,60 @@ export default function WorkerEarningsScreen({
             <ArrowUpRight size={18} color="#0F172A" />
             <Text style={styles.withdrawBtnText}>Withdraw Money (पैसे निकालें)</Text>
           </TouchableOpacity>
+        </View>
+
+        {/* 1b. Worker 10-Job Milestone Reward Card (₹200 Platform Bonus) */}
+        <View style={styles.milestoneCard}>
+          <View style={styles.milestoneTopRow}>
+            <View style={styles.milestoneBadge}>
+              <Award size={16} color="#D97706" />
+              <Text style={styles.milestoneBadgeText}>10-Jobs Milestone Bonus</Text>
+            </View>
+            <View style={styles.milestoneBonusBadge}>
+              <Text style={styles.milestoneBonusBadgeText}>+₹200 Reward</Text>
+            </View>
+          </View>
+
+          <Text style={styles.milestoneTitle}>
+            हर 10 काम पूरा करने पर ₹200 इनाम (Earn ₹200 for 10 Jobs)
+          </Text>
+          <Text style={styles.milestoneSub}>
+            MistriPro पर प्रत्येक 10 काम सफलतापूर्वक पूरा करने पर ₹200 का कैश कमीशन/बोनस इनाम सीधे आपके वॉलेट में क्रेडिट होगा।
+          </Text>
+
+          {/* Progress Track */}
+          <View style={styles.milestoneProgressWrap}>
+            <View style={styles.milestoneProgressHeader}>
+              <Text style={styles.milestoneProgressLabel}>
+                प्रगति: <Text style={{ color: '#4F46E5', fontWeight: '800' }}>{currentProgress} / 10</Text> काम पूरे हुए
+              </Text>
+              <Text style={styles.milestoneRemainingLabel}>
+                {jobsRemaining === 1 ? 'बस 1 काम बाकी!' : `${jobsRemaining} काम और बाकी`}
+              </Text>
+            </View>
+
+            <View style={styles.milestoneTrack}>
+              <View style={[styles.milestoneFill, { width: `${Math.max(progressPercent, 6)}%` }]} />
+            </View>
+          </View>
+
+          {/* Milestone Stats Row */}
+          <View style={styles.milestoneStatsRow}>
+            <View style={styles.milestoneStatItem}>
+              <Text style={styles.milestoneStatLabel}>कुल पूरा काम</Text>
+              <Text style={styles.milestoneStatValue}>{completedJobsCount}</Text>
+            </View>
+            <View style={styles.milestoneStatDivider} />
+            <View style={styles.milestoneStatItem}>
+              <Text style={styles.milestoneStatLabel}>अनलॉक बोनस</Text>
+              <Text style={styles.milestoneStatValue}>{milestonesCompleted} बार</Text>
+            </View>
+            <View style={styles.milestoneStatDivider} />
+            <View style={styles.milestoneStatItem}>
+              <Text style={styles.milestoneStatLabel}>कुल बोनस कमाई</Text>
+              <Text style={[styles.milestoneStatValue, { color: '#15803D' }]}>₹{totalMilestoneBonusEarned}</Text>
+            </View>
+          </View>
         </View>
 
         {/* 2. Security & Payment Guarantee Note */}
@@ -935,5 +1006,131 @@ const styles = StyleSheet.create({
     fontFamily: 'Satoshi-Bold',
     fontSize: 14,
     color: '#FFFFFF',
+  },
+
+  /* Milestone Reward Styles */
+  milestoneCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1.5,
+    borderColor: '#FDE68A',
+    shadowColor: '#D97706',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  milestoneTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  milestoneBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  milestoneBadgeText: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 11,
+    color: '#B45309',
+  },
+  milestoneBonusBadge: {
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#86EFAC',
+  },
+  milestoneBonusBadgeText: {
+    fontFamily: 'Satoshi-Black',
+    fontSize: 12,
+    color: '#15803D',
+  },
+  milestoneTitle: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 15,
+    color: '#0F172A',
+    marginBottom: 4,
+  },
+  milestoneSub: {
+    fontFamily: 'Satoshi-Regular',
+    fontSize: 11.5,
+    color: '#64748B',
+    lineHeight: 16,
+    marginBottom: 12,
+  },
+  milestoneProgressWrap: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  milestoneProgressHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  milestoneProgressLabel: {
+    fontFamily: 'Satoshi-Medium',
+    fontSize: 12,
+    color: '#334155',
+  },
+  milestoneRemainingLabel: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 11,
+    color: '#D97706',
+  },
+  milestoneTrack: {
+    height: 8,
+    backgroundColor: '#E2E8F0',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  milestoneFill: {
+    height: '100%',
+    backgroundColor: '#4F46E5',
+    borderRadius: 4,
+  },
+  milestoneStatsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  milestoneStatItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  milestoneStatLabel: {
+    fontFamily: 'Satoshi-Regular',
+    fontSize: 10,
+    color: '#64748B',
+    marginBottom: 2,
+    textAlign: 'center',
+  },
+  milestoneStatValue: {
+    fontFamily: 'Satoshi-Black',
+    fontSize: 14,
+    color: '#0F172A',
+    textAlign: 'center',
+  },
+  milestoneStatDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: '#E2E8F0',
   },
 });

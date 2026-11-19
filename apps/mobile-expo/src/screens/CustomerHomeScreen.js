@@ -396,27 +396,27 @@ export default function CustomerHomeScreen({
   const handleConfirmBooking = () => {
     if (!checkoutWorker) return;
     const worker = checkoutWorker;
-    const workerFee = Number(worker.rate || 950);
-    const platformFee = 99;
-    const txnFee = Math.round(workerFee * 0.05);
-    const totalAmount = workerFee + platformFee + txnFee;
+    const bookingFee = 99;
+    const totalAmount = bookingFee;
 
     const bookingDetails = {
       workerId: worker.id,
       workerName: worker.name,
       workerAvatar: worker.avatar,
       workerColor: worker.color,
-      workerPhone: worker.phone,
+      workerPhone: '+91 98290 12345', // Protected: customer reaches Company Helpline
       workerSkill: worker.skill,
       category: worker.category || worker.skill,
-      title: `${worker.skill} Service`,
+      title: `${worker.skill} Site Inspection`,
       siteLocation: locationText,
       scheduledDate: 'Today, Immediate',
-      duration: '1 Day',
-      workerFee,
-      platformFee,
-      txnFee,
+      duration: 'Site Inspection & On-site Quote',
+      bookingFee,
+      workerFee: 0,
+      platformFee: bookingFee,
+      txnFee: 0,
       totalAmount,
+      pricingModel: 'ON_SITE_QUOTE',
     };
 
     setCheckoutWorker(null);
@@ -504,10 +504,13 @@ export default function CustomerHomeScreen({
           <View style={styles.workerMeta}>
             <Star size={13} color="#F59E0B" fill="#F59E0B" />
             <Text style={styles.workerRating}>{item?.rating || '5.0'}</Text>
-            <Text style={styles.workerReviews}>({item?.reviews ?? 0} {lang === 'hi' ? 'समीक्षाएं' : lang === 'gu' ? 'રિવ્યુઝ' : lang === 'mr' ? 'अभिप्राय' : 'reviews'})</Text>
+            <Text style={styles.workerReviews}>({item?.reviews ?? 0})</Text>
             <View style={styles.metaDot} />
-            <Text style={styles.workerRate}>₹{item?.rate || 800}/{lang === 'hi' ? 'दिन' : lang === 'gu' ? 'દિવસ' : lang === 'mr' ? 'दिवस' : (item?.rateType || 'day')}</Text>
+            <Text style={styles.workerRate}>₹{item?.bookingFee || 99} <Text style={{ fontSize: 11, color: '#64748B', fontWeight: '500' }}>{lang === 'hi' ? 'विजिट' : 'Visit'}</Text></Text>
           </View>
+          <Text style={{ fontSize: 10, color: '#059669', fontWeight: '600', marginTop: 2 }}>
+            • {lang === 'hi' ? 'काम का रेट साइट विजिट पर तय होगा' : lang === 'gu' ? 'કામનો દર સાઇટ મુલાકાત પર નક્કી થશે' : lang === 'mr' ? 'कामाचा दर साइट भेटीवर ठरेल' : 'Work price decided on-site'}
+          </Text>
         </View>
 
         {/* Right side */}
@@ -698,7 +701,7 @@ export default function CustomerHomeScreen({
                           {w.name || 'Worker'} • <Text style={{ color: w.available ? '#15803D' : '#64748B' }}>{w.available ? '● Online' : '○ Offline'}</Text>
                         </Text>
                         <Text style={styles.suggestionSub} numberOfLines={1}>
-                          {w.skill || 'Labour'} • ₹{w.rate || 800}/day • {w.distance ? `${w.distance} km away` : 'Nearby'}
+                          {w.skill || 'Labour'} • ₹{w.bookingFee || 99} {lang === 'hi' ? 'विजिट शुल्क' : 'Visit Fee'} • {w.distance ? `${w.distance} km away` : 'Nearby'}
                         </Text>
                       </View>
                       <View style={styles.suggestionActionBadge}>
@@ -943,8 +946,8 @@ export default function CustomerHomeScreen({
 
             <View style={styles.modalFooterRow}>
               <View>
-                <Text style={styles.modalRateLabel}>{lang === 'hi' ? 'दैनिक मजदूरी' : lang === 'gu' ? 'દૈનિક વેતન' : lang === 'mr' ? 'दैनिक मजुरी' : 'Daily Wage'}</Text>
-                <Text style={styles.modalRateVal}>₹{selectedWorker?.rate} <Text style={{ fontSize: 13, color: '#64748B' }}>/{lang === 'hi' ? 'दिन' : lang === 'gu' ? 'દિવસ' : lang === 'mr' ? 'दिवस' : 'day'}</Text></Text>
+                <Text style={styles.modalRateLabel}>{lang === 'hi' ? 'साइट विजिट शुल्क' : lang === 'gu' ? 'મુલાકાત શુલ્ક' : lang === 'mr' ? 'भेट शुल्क' : 'Site Visit Fee'}</Text>
+                <Text style={styles.modalRateVal}>₹{selectedWorker?.bookingFee || 99} <Text style={{ fontSize: 12, color: '#059669', fontWeight: '600' }}>• {lang === 'hi' ? 'काम का रेट साइट पर' : 'Quote On-Site'}</Text></Text>
               </View>
 
               {selectedWorker?.available ? (
@@ -990,30 +993,24 @@ export default function CustomerHomeScreen({
 
             <View style={styles.billBox}>
               <View style={styles.billRow}>
-                <Text style={styles.billItem}>{lang === 'hi' ? 'कारीगर शुल्क (1 दिन)' : lang === 'gu' ? 'કારીગર શુલ્ક (1 દિવસ)' : lang === 'mr' ? 'कामगार शुल्क (1 दिवस)' : 'Worker Fee (1 Day)'}</Text>
-                <Text style={styles.billVal}>₹{Number(checkoutWorker?.rate) || 950}</Text>
-              </View>
-              <View style={styles.billRow}>
-                <Text style={styles.billItem}>{lang === 'hi' ? 'मिस्त्री प्रो प्लेटफॉर्म शुल्क' : lang === 'gu' ? 'મિસ્ત્રી પ્રો પ્લેટફોર્મ ફી' : lang === 'mr' ? 'मिस्त्री प्रो प्लॅटफॉर्म फी' : 'Mistri Pro Platform Fee'}</Text>
+                <Text style={styles.billItem}>{lang === 'hi' ? 'साइट विजिट व निरीक्षण शुल्क' : lang === 'gu' ? 'સાઇટ મુલાકાત અને નિરીક્ષણ શુલ્ક' : lang === 'mr' ? 'साइट भेट व तपासणी शुल्क' : 'Site Visit & Inspection Fee'}</Text>
                 <Text style={styles.billVal}>₹99</Text>
               </View>
               <View style={styles.billRow}>
-                <Text style={styles.billItem}>{lang === 'hi' ? 'गेटवे और प्रोसेसिंग शुल्क (5%)' : lang === 'gu' ? 'ગેટવે અને પ્રોસેસિંગ ફી (5%)' : lang === 'mr' ? 'गेटવે आणि प्रोसेसिंग फी (5%)' : 'Gateway & Service Processing (5%)'}</Text>
-                <Text style={styles.billVal}>₹{Math.round((Number(checkoutWorker?.rate) || 950) * 0.05)}</Text>
+                <Text style={styles.billItem}>{lang === 'hi' ? 'काम का वास्तविक खर्च' : lang === 'gu' ? 'કામનો વાસ્તવિક ખર્ચ' : lang === 'mr' ? 'कामाचा प्रत्यक्ष खर्च' : 'Actual Work Price'}</Text>
+                <Text style={[styles.billVal, { color: '#059669', fontWeight: '700' }]}>{lang === 'hi' ? 'साइट देखकर तय होगा' : lang === 'gu' ? 'સાઇટ જોઈને નક્કી થશે' : lang === 'mr' ? 'साइट पाहून ठरवले जाईल' : 'Decided On-Site'}</Text>
               </View>
               <View style={styles.billDivider} />
               <View style={styles.billRowGrand}>
-                <Text style={styles.billTotalLabel}>{lang === 'hi' ? 'कुल देय राशि' : lang === 'gu' ? 'કુલ ચૂકવવાપાત્ર રકમ' : lang === 'mr' ? 'एकूण देय रक्कम' : 'Total to Pay'}</Text>
-                <Text style={styles.billTotalVal}>
-                  ₹{(Number(checkoutWorker?.rate) || 950) + 99 + Math.round((Number(checkoutWorker?.rate) || 950) * 0.05)}
-                </Text>
+                <Text style={styles.billTotalLabel}>{lang === 'hi' ? 'अभी देय बुकिंग राशि' : lang === 'gu' ? 'હાલ ચૂકવવાપાત્ર બુકિંગ રકમ' : lang === 'mr' ? 'आता देय बुकिंग रक्कम' : 'Total to Pay Now'}</Text>
+                <Text style={styles.billTotalVal}>₹99</Text>
               </View>
             </View>
 
             <View style={styles.escrowNotice}>
               <ShieldCheck size={16} color="#15803D" />
               <Text style={styles.escrowNoticeText}>
-                {lang === 'hi' ? '100% सुरक्षित भुगतान: रेज़रपे द्वारा सुरक्षित। जब आप काम पूरा होने की पुष्टि करेंगे तभी मिस्त्री को भुगतान जारी होगा।' : lang === 'gu' ? '100% સુરક્ષિત ચુકવણી: રેઝરપે દ્વારા સુરક્ષિત. તમે કામ પૂર્ણ થયાની પુષ્ટિ કરશો ત્યારે જ મિસ્ત્રીને પૈસા ટ્રાન્સફર થશે.' : lang === 'mr' ? '100% सुरक्षित पेमेंट: रेझरपे द्वारे सुरक्षित. आपण काम पूर्ण झाल्याची पुष्टी केल्यावरच मिस्त्रीला पैसे दिले जातील.' : '100% Protected Payment: Processed securely via Razorpay. Money is transferred to mistri only after you confirm work completion.'}
+                {lang === 'hi' ? '100% सुरक्षित: आप अभी केवल ₹99 विजिट शुल्क दे रहे हैं। मिस्त्री आपकी साइट पर आकर काम देखकर उचित रेट तय करेंगे।' : lang === 'gu' ? '100% સુરક્ષિત: તમે અત્યારે ફક્ત ₹99 વિઝિટ ફી ચૂકવી રહ્યા છો. મિસ્ત્રી સાઇટ જોઈને યોગ્ય ભાવ નક્કી કરશે.' : lang === 'mr' ? '100% सुरक्षित: आपण सध्या फक्त ₹99 भेट शुल्क देत आहात. मिस्त्री जागेवर येऊन कामाचा योग्य दर ठरवतील.' : '100% Protected: You only pay ₹99 inspection booking fee. The mistri visits your site and quotes work price directly.'}
               </Text>
             </View>
 

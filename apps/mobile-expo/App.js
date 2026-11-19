@@ -856,15 +856,26 @@ function MainApp() {
 
   const handleCustomerBookWorker = async (bookingDetails) => {
     try {
+      const bookingCharge = 99;
+      const arrivalOtp = String(bookingDetails.arrivalOtp || Math.floor(1000 + Math.random() * 9000));
+      const completionOtp = String(bookingDetails.completionOtp || Math.floor(1000 + Math.random() * 9000));
+      const cancellationOtp = String(bookingDetails.cancellationOtp || Math.floor(1000 + Math.random() * 9000));
+      const companyPhone = '+91 98290 12345'; // Protected Company Helpline Number
+
       const savedBooking = await LiveBackend.createBooking({
         ...bookingDetails,
         customerName: custName || 'Customer',
         customerPhone: custMobile || '',
         siteLocation: 'Sawai Madhopur, Rajasthan',
         status: 'WAITING_CONFIRMATION',
+        arrivalOtp,
+        completionOtp,
+        cancellationOtp,
+        companyPhone,
+        bookingFee: bookingCharge,
       });
 
-      const newBookingId = savedBooking?.id || `B-${Date.now().toString().slice(-4)}`;
+      const newBookingId = savedBooking?.booking?.id || savedBooking?.id || `B-${Date.now().toString().slice(-4)}`;
 
       // 1. Add to Customer Bookings List
       const isSpecific = bookingDetails.workerName && !bookingDetails.workerName.includes('Searching');
@@ -875,20 +886,31 @@ function MainApp() {
         requestedWorkerName: bookingDetails.workerName,
         workerAvatar: isSpecific ? (bookingDetails.workerAvatar || bookingDetails.workerName.slice(0, 2).toUpperCase()) : '⏳',
         workerColor: bookingDetails.workerColor || '#4F46E5',
-        workerPhone: '',
+        workerPhone: companyPhone, // Mask worker personal phone: show Company Helpline to customer
+        worker_phone: companyPhone,
+        company_phone: companyPhone,
         worker_skill: bookingDetails.workerSkill,
         category: bookingDetails.workerSkill,
-        title: `${bookingDetails.workerSkill} Service Request`,
+        title: `${bookingDetails.workerSkill} Site Inspection`,
         location: bookingDetails.siteLocation || 'Civil Lines, Sawai Madhopur',
         site_location: bookingDetails.siteLocation || 'Civil Lines, Sawai Madhopur',
         date: 'Today, Immediate',
         scheduled_date: 'Today, Immediate',
-        duration: '1 Day',
-        total_amount: bookingDetails.totalAmount,
-        amount: `₹${bookingDetails.totalAmount}`,
+        duration: 'On-site Quote',
+        booking_charge: bookingCharge,
+        bookingFee: bookingCharge,
+        total_amount: bookingCharge,
+        amount: `₹${bookingCharge}`,
         status: 'waiting_confirmation',
         progress_step: 1,
-        razorpay_payment_id: bookingDetails.paymentId || `pay_test_${Date.now().toString().slice(-8)}`,
+        arrival_otp: arrivalOtp,
+        arrivalOtp,
+        completion_otp: completionOtp,
+        completionOtp,
+        cancellation_otp: cancellationOtp,
+        cancellationOtp,
+        pricingModel: 'ON_SITE_QUOTE',
+        razorpay_payment_id: bookingDetails.paymentId || `pay_live_${Date.now().toString().slice(-8)}`,
       };
 
       setCustomerBookings((prev) => [newCustBooking, ...prev]);
@@ -904,15 +926,18 @@ function MainApp() {
         customerColor: '#4F46E5',
         customerPhone: custMobile || '',
         category: bookingDetails.workerSkill,
-        title: `${bookingDetails.workerSkill} Service Request`,
+        title: `${bookingDetails.workerSkill} Site Inspection Request`,
         location: 'Sawai Madhopur, Rajasthan',
         distance: '1.2 km',
         date: 'Today, Immediate',
-        timing: '9:00 AM – 5:00 PM',
-        offeredRate: `₹${bookingDetails.workerFee || 950}`,
-        platformFee: 99,
+        timing: 'Immediate Site Visit',
+        offeredRate: '₹99 Visit Fee (Quote On-Site)',
+        platformFee: bookingCharge,
         paymentLocked: true,
         timestamp: 'Just now',
+        arrivalOtp,
+        completionOtp,
+        cancellationOtp,
       };
       setWorkerAlerts((prev) => [newAlert, ...prev]);
 
@@ -924,15 +949,22 @@ function MainApp() {
         customerColor: '#4F46E5',
         customerPhone: custMobile || '',
         category: bookingDetails.workerSkill,
-        title: `${bookingDetails.workerSkill} Service Request`,
+        title: `${bookingDetails.workerSkill} Site Inspection`,
         location: 'Sawai Madhopur, Rajasthan',
         distance: '1.2 km',
         date: 'Today, Immediate',
-        timing: '9:00 AM – 5:00 PM',
-        amount: `₹${bookingDetails.workerFee || 950}`,
-        duration: '1 Day',
+        timing: 'Immediate Site Visit',
+        amount: '₹99 Visit Fee (Quote On-Site)',
+        duration: 'On-site Quote',
         status: 'waiting_confirmation',
         step: 1,
+        progress_step: 1,
+        arrival_otp: arrivalOtp,
+        arrivalOtp,
+        completion_otp: completionOtp,
+        completionOtp,
+        cancellation_otp: cancellationOtp,
+        cancellationOtp,
         paymentStatus: 'PAID_VIA_RAZORPAY',
       };
       setWorkerBookings((prev) => [newWorkerBooking, ...prev]);
@@ -941,8 +973,8 @@ function MainApp() {
       setNotifications((prev) => [
         {
           id: `NOTIF-${Date.now()}`,
-          title: 'Booking Sent & Payment Secured',
-          message: `Booking request sent to ${bookingDetails.workerName}. Payment ₹${bookingDetails.totalAmount} secured via Razorpay Escrow Protection.`,
+          title: 'Booking Sent & Inspection Fee Paid',
+          message: `Site visit request sent to ${bookingDetails.workerName}. Inspection fee ₹${bookingCharge} secured via Razorpay. Your Arrival OTP is ${arrivalOtp}.`,
           time: 'Just now',
           type: 'booking',
         },
@@ -1063,32 +1095,62 @@ function MainApp() {
   };
 
   const handleCompleteWorkerBooking = (booking) => {
-    const numericAmount = parseInt(String(booking.amount).replace(/[^0-9]/g, ''), 10) || 950;
+    // 1. Mark booking completed in worker's bookings
     setWorkerBookings((prev) =>
       prev.map((b) =>
         b.id === booking.id
-          ? { ...b, status: 'completed', step: 4, payoutStatus: 'PAID_TO_WALLET' }
+          ? { ...b, status: 'completed', step: 4, progress_step: 4, payoutStatus: 'PAID_TO_WALLET' }
           : b
       )
     );
-    setWorkerWallet((prev) => ({
-      ...prev,
-      availableBalance: prev.availableBalance + numericAmount,
-      totalLifetimeEarnings: prev.totalLifetimeEarnings + numericAmount,
-      transactions: [
-        {
-          id: `TXN-${Date.now().toString().slice(-4)}`,
-          title: `Job Payout: ${booking.title}`,
-          customer: booking.customerName,
+
+    // 2. Also update in customer's bookings list
+    setCustomerBookings((prev) =>
+      prev.map((b) =>
+        b.id === booking.id
+          ? { ...b, status: 'completed', step: 4, progress_step: 4 }
+          : b
+      )
+    );
+
+    // 3. Increment completed jobs count & check 10-Jobs Milestone Bonus (₹200)
+    setWorkerWallet((prev) => {
+      const currentCompletedCount = (prev?.completedJobsCount || 0) + 1;
+      const isMilestoneReached = currentCompletedCount % 10 === 0;
+      const bonusEarned = isMilestoneReached ? 200 : 0;
+      const newBalance = (prev?.availableBalance || 0) + bonusEarned;
+
+      const newTransactions = [...(prev?.transactions || [])];
+      if (isMilestoneReached) {
+        newTransactions.unshift({
+          id: `BONUS-${Date.now().toString().slice(-4)}`,
+          title: `🏆 10-Jobs Milestone Bonus (${currentCompletedCount}th Job Milestone)`,
+          customer: 'MistriPro Platform Reward',
           type: 'CREDIT',
-          amount: numericAmount,
-          date: 'Today',
+          amount: 200,
+          date: 'Today, Just now',
           status: 'COMPLETED',
-          method: 'Direct Payment Payout',
-        },
-        ...prev.transactions,
-      ],
-    }));
+          method: 'Platform Milestone Cash Bonus',
+        });
+      }
+
+      if (isMilestoneReached) {
+        setTimeout(() => {
+          Alert.alert(
+            'बधाई हो! 🏆 10 काम पूरे होने पर ₹200 बोनस',
+            `शानदार उपलब्धि! आपने MistriPro पर ${currentCompletedCount} काम सफलतापूर्वक पूरे कर लिए हैं।\n\n₹200 का कैश कमीशन/बोनस इनाम आपके वॉलेट में तुरंत जोड़ दिया गया है!`
+          );
+        }, 300);
+      }
+
+      return {
+        ...prev,
+        completedJobsCount: currentCompletedCount,
+        availableBalance: newBalance,
+        totalLifetimeEarnings: (prev?.totalLifetimeEarnings || 0) + bonusEarned,
+        transactions: newTransactions,
+      };
+    });
   };
 
   const handleSaveProfile = async ({ name, contact, address }) => {

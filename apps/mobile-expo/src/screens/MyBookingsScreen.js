@@ -95,34 +95,24 @@ export default function MyBookingsScreen({
 
   const counts = getStatusCounts();
 
-  // Call worker (only when booking is confirmed)
+  // Call Company Helpline (Worker personal phone is masked for privacy & platform safety)
   const handleCall = (booking) => {
-    if (!booking) {
-      Alert.alert('Call Mistri', 'Booking information is not available.');
-      return;
-    }
-    const s = (booking.status || '').toLowerCase();
-    if (s === 'waiting_confirmation') {
-      Alert.alert(
-        'Waiting for Confirmation',
-        'Direct phone number will unlock as soon as the mistri accepts your booking request.'
-      );
-      return;
-    }
-    const rawPhone = booking.worker_phone || booking.workerPhone;
-    const workerName = booking.worker_name || booking.workerName || 'Mistri';
-    if (!rawPhone || !String(rawPhone).trim()) {
-      Alert.alert('Calling Mistri', `Connecting you to ${workerName} via Mistri Pro secure dialer...`);
-      return;
-    }
-    const cleaned = String(rawPhone).replace(/[^0-9+]/g, '');
-    if (!cleaned || cleaned.replace(/[^0-9]/g, '').length < 5) {
-      Alert.alert('Calling Mistri', `Connecting you to ${workerName} via Mistri Pro secure dialer...`);
-      return;
-    }
-    Linking.openURL(`tel:${cleaned}`).catch(() => {
-      Alert.alert('Call Mistri', `Calling ${workerName} at ${rawPhone}`);
-    });
+    const companyPhone = '+91 98290 12345';
+    Alert.alert(
+      'MistriPro Support Helpline 📞',
+      `Connecting to MistriPro Official Helpline (${companyPhone}) for booking assistance.\n\nWorker personal numbers are kept private for security and quality assurance.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Call Helpline',
+          onPress: () => {
+            Linking.openURL('tel:+919829012345').catch(() => {
+              Alert.alert('MistriPro Helpline', `Calling MistriPro Helpline at ${companyPhone}`);
+            });
+          },
+        },
+      ]
+    );
   };
 
   // Submit Rating & Review
@@ -377,11 +367,74 @@ export default function MyBookingsScreen({
                   </View>
                 </View>
 
+                {/* OTP Verification Cards for Customer */}
+                {!isCompleted && !isRejected && rawStatus !== 'cancelled' && (
+                  <View style={styles.otpSectionWrap}>
+                    {/* Arrival OTP: Show when worker is on the way (step < 2) */}
+                    {currentStep < 2 ? (
+                      <View style={styles.otpBoxArrival}>
+                        <View style={styles.otpTopRow}>
+                          <View style={styles.otpBadgeTitleWrap}>
+                            <MapPin size={14} color="#4F46E5" />
+                            <Text style={styles.otpBoxTitle}>मिस्त्री आगमन OTP (Arrival Code)</Text>
+                          </View>
+                          <View style={styles.otpValueBadge}>
+                            <Text style={styles.otpValueText}>
+                              {booking.arrival_otp || booking.arrivalOtp || '4821'}
+                            </Text>
+                          </View>
+                        </View>
+                        <Text style={styles.otpExplainerText}>
+                          📍 जब मिस्त्री आपकी साइट पर पहुंचे, तो उन्हें यह 4-अंकीय कोड दें ताकि वे उपस्थिति दर्ज कर सकें।
+                        </Text>
+                      </View>
+                    ) : (
+                      /* Completion OTP: Show once worker is at site (step >= 2) */
+                      <View style={styles.otpBoxCompletion}>
+                        <View style={styles.otpTopRow}>
+                          <View style={styles.otpBadgeTitleWrap}>
+                            <CheckCircle2 size={14} color="#15803D" />
+                            <Text style={[styles.otpBoxTitle, { color: '#15803D' }]}>कार्य समापन OTP (Completion Code)</Text>
+                          </View>
+                          <View style={[styles.otpValueBadge, { backgroundColor: '#DCFCE7', borderColor: '#86EFAC' }]}>
+                            <Text style={[styles.otpValueText, { color: '#15803D' }]}>
+                              {booking.completion_otp || booking.completionOtp || '7934'}
+                            </Text>
+                          </View>
+                        </View>
+                        <Text style={styles.otpExplainerText}>
+                          🔒 यह कोड मिस्त्री को केवल तभी दें जब काम पूरी तरह समाप्त और संतोषजनक हो जाए।
+                        </Text>
+                      </View>
+                    )}
+
+                    {/* On-Site Visit Cancellation Option */}
+                    {currentStep >= 2 && (
+                      <TouchableOpacity
+                        style={styles.cancelVisitRow}
+                        onPress={() => {
+                          Alert.alert(
+                            'विजिट रद्द करना चाहते हैं? (Cancel Visit)',
+                            `यदि साइट देखने के बाद काम नहीं कराना है, तो मिस्त्री को यह Cancellation OTP दें:\n\n🔑 ${booking.cancellation_otp || booking.cancellationOtp || '1592'}\n\nमिस्त्री अपने ऐप में यह कोड डालकर साइट विजिट रद्द कर देंगे।`,
+                            [{ text: 'समझ गया (OK)' }]
+                          );
+                        }}
+                        activeOpacity={0.8}
+                      >
+                        <AlertCircle size={13} color="#DC2626" />
+                        <Text style={styles.cancelVisitLink}>
+                          साइट विजिट रद्द करने का OTP (Cancel OTP: {booking.cancellation_otp || booking.cancellationOtp || '1592'})
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )}
+
                 {/* Price & Actions Row */}
                 <View style={styles.cardFooter}>
                   <View>
-                    <Text style={styles.amountLabel}>Total Amount Paid</Text>
-                    <Text style={styles.amountValue}>{amount}</Text>
+                    <Text style={styles.amountLabel}>Paid Booking Fee</Text>
+                    <Text style={styles.amountValue}>₹99 <Text style={{ fontSize: 11, color: '#059669', fontWeight: '600' }}>(Quote On-Site)</Text></Text>
                   </View>
 
                   <View style={styles.actionsGroup}>
@@ -962,6 +1015,83 @@ const styles = StyleSheet.create({
     fontFamily: 'Satoshi-Bold',
     fontSize: 10,
     color: '#4F46E5',
+  },
+  otpSectionWrap: {
+    marginBottom: 12,
+    gap: 8,
+  },
+  otpBoxArrival: {
+    backgroundColor: '#EEF2FF',
+    borderWidth: 1.5,
+    borderColor: '#C7D2FE',
+    borderRadius: 14,
+    padding: 12,
+  },
+  otpBoxCompletion: {
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1.5,
+    borderColor: '#BBF7D0',
+    borderRadius: 14,
+    padding: 12,
+  },
+  otpTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  otpBadgeTitleWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  otpBoxTitle: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 13,
+    color: '#3730A3',
+  },
+  otpValueBadge: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#818CF8',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    shadowColor: '#4F46E5',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  otpValueText: {
+    fontFamily: 'Satoshi-Black',
+    fontSize: 18,
+    color: '#4F46E5',
+    letterSpacing: 3,
+  },
+  otpExplainerText: {
+    fontFamily: 'Satoshi-Medium',
+    fontSize: 11.5,
+    color: '#475569',
+    lineHeight: 16,
+  },
+  cancelVisitRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    backgroundColor: '#FEF2F2',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    alignSelf: 'flex-start',
+  },
+  cancelVisitLink: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 11,
+    color: '#DC2626',
   },
   cardFooter: {
     flexDirection: 'row',

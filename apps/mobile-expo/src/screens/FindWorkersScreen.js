@@ -109,8 +109,8 @@ function WorkerCard({ worker, isSelected, onSelect, onOpenProfile, onProceedBook
       {/* Bottom row */}
       <View style={styles.workerCardBottom}>
         <View style={styles.rateContainer}>
-          <Text style={styles.rateAmount}>₹{worker.rate || 800}</Text>
-          <Text style={styles.rateType}>/{lang === 'hi' ? 'दिन' : lang === 'gu' ? 'દિવસ' : lang === 'mr' ? 'दिवस' : (worker.rateType || 'day')}</Text>
+          <Text style={styles.rateAmount}>₹{worker.bookingFee || 99}</Text>
+          <Text style={styles.rateType}>{lang === 'hi' ? ' विजिट' : ' Visit'}</Text>
         </View>
 
         <View style={styles.workerActions}>
@@ -596,7 +596,7 @@ export default function FindWorkersScreen({
         '<div class="popup-skill">' + (w.skill || 'Labour') + '</div>' +
         statusBadge +
         '<div>⭐ ' + (w.rating || 5.0) + ' (' + (w.reviews || 0) + ' reviews)</div>' +
-        '<div class="popup-rate">₹' + (w.rate || 800) + '/' + (w.rateType || 'day') + ' • ' + (w.distance || '2.0') + ' km away</div>' +
+        '<div class="popup-rate">₹' + (w.bookingFee || 99) + ' Visit Fee • ' + (w.distance || '2.0') + ' km away • Quote on-site</div>' +
         actionBtn +
       '</div>';
 
@@ -631,8 +631,10 @@ export default function FindWorkersScreen({
     try {
       if (!event?.nativeEvent?.data) return;
       const data = JSON.parse(event.nativeEvent.data);
-      if (data.type === 'CALL' && data.phone) {
-        Linking.openURL(`tel:${data.phone}`);
+      if (data.type === 'CALL') {
+        Linking.openURL('tel:+919829012345').catch(() => {
+          Alert.alert('Company Helpline', 'Calling MistriPro Helpline at +91 98290 12345');
+        });
       } else if (data.type === 'SELECT_WORKER' && data.id) {
         setSelectedWorkerId(data.id);
       } else if (data.type === 'OFFLINE_ALERT') {

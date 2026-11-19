@@ -8,6 +8,9 @@ import {
   Alert,
   Linking,
   Platform,
+  Modal,
+  TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import {
   Calendar,
@@ -22,8 +25,12 @@ import {
   Check,
   Navigation,
   ExternalLink,
+  X,
+  KeyRound,
+  ShieldAlert,
 } from 'lucide-react-native';
 import { DeviceFeedback } from '../services/deviceFeedback';
+import { LiveBackend } from '../services/liveBackend';
 
 const STEPS = [
   { step: 1, title: 'Approved', hindi: 'स्वीकृत' },
@@ -42,6 +49,14 @@ export default function WorkerBookingsScreen({
   const [tab, setTab] = useState('ACTIVE'); // 'ACTIVE' | 'HISTORY'
   const [localBookings, setLocalBookings] = useState(Array.isArray(bookings) ? bookings : []);
 
+  // OTP Verification Modal State
+  const [otpModalVisible, setOtpModalVisible] = useState(false);
+  const [otpType, setOtpType] = useState('ARRIVAL'); // 'ARRIVAL' | 'COMPLETION' | 'CANCELLATION'
+  const [targetBooking, setTargetBooking] = useState(null);
+  const [inputOtp, setInputOtp] = useState('');
+  const [otpError, setOtpError] = useState('');
+  const [isVerifying, setIsVerifying] = useState(false);
+
   React.useEffect(() => {
     setLocalBookings(Array.isArray(bookings) ? bookings : []);
   }, [bookings]);
@@ -53,8 +68,8 @@ export default function WorkerBookingsScreen({
     const s = (b.status || '').toLowerCase();
     const step = Number(b.step || b.progress_step || 1);
     if (s === 'completed' || step === 4) return false;
-    if (s === 'cancelled' || s === 'rejected' || s === 'refunded') return false;
-    return s === 'active' || s === 'confirmed' || s === 'in_progress' || s === 'waiting_confirmation' || step < 4;
+    if (s === 'cancelled' || s === 'cancelled_on_site' || s === 'rejected' || s === 'refunded') return false;
+    return s === 'active' || s === 'confirmed' || s === 'in_progress' || s === 'reached_site' || s === 'waiting_confirmation' || step < 4;
   });
 
   const historyBookings = safeBookings.filter((b) => {
@@ -118,80 +133,97 @@ export default function WorkerBookingsScreen({
     });
   };
 
-  // Advance step progress
+  // Open OTP verification modal
+  const handleOpenOtpModal = (booking, type) => {
+    setTargetBooking(booking);
+    setOtpType(type);
+    setInputOtp('');
+    setOtpError('');
+    setOtpModalVisible(true);
+  };
+
+  // Submit OTP Verification
+  const handleSubmitOtp = async () => {
+    if (!targetBooking || !inputOtp.trim()) {
+      setOtpError('कृपया 4-अंकीय OTP दर्ज करें (Please enter 4-digit OTP)');
+      return;
+    }
+    setIsVerifying(true);
+    setOtpError('');
+
+    try {
+      if (otpType === 'ARRIVAL') {
+        const res = await LiveBackend.verifyArrivalOtp(targetBooking, inputOtp);
+        if (!res.success) {
+          setOtpError(res.error || 'अमान्य OTP! ग्राहक से आगमन OTP पूछें।');
+          setIsVerifying(false);
+          return;
+        }
+        updateBookingStep(targetBooking.id, 2);
+        DeviceFeedback?.triggerSuccessHaptics?.();
+        setOtpModalVisible(false);
+        Alert.alert(
+          'आगमन सत्यापित! 📍',
+          'आप सफलतापूर्वक साइट पर पहुंच चुके हैं। ग्राहक को सूचित कर दिया गया है। अब साइट देखकर काम का मूल्य तय करें।'
+        );
+      } else if (otpType === 'COMPLETION') {
+        const res = await LiveBackend.verifyCompletionOtp(targetBooking, inputOtp);
+        if (!res.success) {
+          setOtpError(res.error || 'अमान्य OTP! ग्राहक से कार्य समापन OTP पूछें।');
+          setIsVerifying(false);
+          return;
+        }
+        updateBookingStep(targetBooking.id, 4);
+        if (onCompleteBooking) {
+          onCompleteBooking(targetBooking);
+        }
+        DeviceFeedback?.triggerSuccessHaptics?.();
+        setOtpModalVisible(false);
+        Alert.alert(
+          'काम पूरा हुआ! 🎉',
+          'कार्य समापन सफलतापूर्वक दर्ज किया गया है। यह काम आपकी प्रोफाइल के 10-काम माइलस्टोन रिवॉर्ड में जोड़ दिया गया है!',
+          [
+            { text: 'View Earnings', onPress: () => onNavigateTab && onNavigateTab('EARNINGS') },
+            { text: 'OK' },
+          ]
+        );
+      } else if (otpType === 'CANCELLATION') {
+        const res = await LiveBackend.verifyCancellationOtp(targetBooking, inputOtp);
+        if (!res.success) {
+          setOtpError(res.error || 'अमान्य Cancellation OTP! ग्राहक से रद्दीकरण कोड पूछें।');
+          setIsVerifying(false);
+          return;
+        }
+        setLocalBookings((prev) =>
+          prev.map((b) => (b.id === targetBooking.id ? { ...b, status: 'cancelled_on_site', step: 0 } : b))
+        );
+        DeviceFeedback?.triggerAlertHaptics?.();
+        setOtpModalVisible(false);
+        Alert.alert('साइट विजिट रद्द', 'ग्राहक के साथ आपसी OTP सत्यापन के बाद साइट विजिट रद्द कर दी गई है।');
+      }
+    } catch (e) {
+      setOtpError(e.message || 'OTP verification error');
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  // Advance step progress via OTP or in-progress toggle
   const handleAdvanceStep = (booking) => {
     if (!booking) return;
     const currentStep = Number(booking.step || booking.progress_step || 1);
-    const custName = booking.customerName || booking.customer_name || 'Customer';
-    const loc = booking.location || booking.site_location || 'Work Location';
-    const jobTitle = booking.title || 'Work';
-    const rawAmt = booking.amount || '₹950';
-    const amt = String(rawAmt).startsWith('₹') ? rawAmt : `₹${rawAmt}`;
 
     if (currentStep === 1) {
-      // Step 1 -> Step 2
-      Alert.alert(
-        'Mark Site Visited? 📍',
-        `Confirm that you have arrived at ${custName}'s work location (${loc})?`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Yes, Reached Site',
-            onPress: () => {
-              updateBookingStep(booking.id, 2);
-              DeviceFeedback?.triggerSuccessHaptics?.();
-              Alert.alert('Status Updated', 'Site Visit recorded! Customer has been notified.');
-            },
-          },
-        ]
-      );
+      // Step 1: Must enter customer's Arrival OTP
+      handleOpenOtpModal(booking, 'ARRIVAL');
     } else if (currentStep === 2) {
-      // Step 2 -> Step 3
-      Alert.alert(
-        'Start Work? 🔨',
-        `Start working on "${jobTitle}"?`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Start Work',
-            onPress: () => {
-              updateBookingStep(booking.id, 3);
-              DeviceFeedback?.triggerSuccessHaptics?.();
-              Alert.alert('Work in Progress', 'Timer & work tracker active.');
-            },
-          },
-        ]
-      );
+      // Step 2: Site visited -> Start Work
+      updateBookingStep(booking.id, 3);
+      DeviceFeedback?.triggerSuccessHaptics?.();
+      Alert.alert('काम चालू 🔨', 'काम शुरू हो चुका है। काम समाप्त होने पर ग्राहक से Completion OTP प्राप्त करें।');
     } else if (currentStep === 3) {
-      // Step 3 -> Step 4 (Work Done / Completed)
-      Alert.alert(
-        'Mark Work Done? 🎉',
-        `Have you completed all tasks for "${jobTitle}"?\n\nThis will send a completion notification to ${custName} and transfer ${amt} into your Wallet balance.`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Yes, Work Completed',
-            onPress: () => {
-              updateBookingStep(booking.id, 4);
-              if (onCompleteBooking) {
-                onCompleteBooking(booking);
-              }
-              DeviceFeedback?.triggerSuccessHaptics?.();
-              Alert.alert(
-                'Job Completed! 💰',
-                `Congratulations! ${amt} has been released as payment into your Wallet.\n\nMoved to Booking History.`,
-                [
-                  {
-                    text: 'View Wallet',
-                    onPress: () => onNavigateTab && onNavigateTab('EARNINGS'),
-                  },
-                  { text: 'OK' },
-                ]
-              );
-            },
-          },
-        ]
-      );
+      // Step 3: Must enter customer's Work Completion OTP
+      handleOpenOtpModal(booking, 'COMPLETION');
     }
   };
 
@@ -425,7 +457,7 @@ export default function WorkerBookingsScreen({
                       })}
                     </View>
 
-                    {/* Action button to advance step */}
+                    {/* Action button to advance step via OTP */}
                     <TouchableOpacity
                       style={[
                         styles.advanceBtn,
@@ -437,7 +469,7 @@ export default function WorkerBookingsScreen({
                       {currentStep === 1 && (
                         <>
                           <Navigation size={16} color="#FFFFFF" />
-                          <Text style={styles.advanceBtnText}>I Have Reached Site (साइट पहुंचे)</Text>
+                          <Text style={styles.advanceBtnText}>Enter Arrival OTP (साइट आगमन OTP)</Text>
                         </>
                       )}
                       {currentStep === 2 && (
@@ -449,7 +481,7 @@ export default function WorkerBookingsScreen({
                       {currentStep === 3 && (
                         <>
                           <CheckCircle2 size={18} color="#FFFFFF" />
-                          <Text style={styles.advanceBtnText}>Mark Work Completed (काम पूरा हुआ)</Text>
+                          <Text style={styles.advanceBtnText}>Enter Completion OTP (काम पूरा हुआ)</Text>
                         </>
                       )}
                       {currentStep === 4 && (
@@ -459,6 +491,18 @@ export default function WorkerBookingsScreen({
                         </>
                       )}
                     </TouchableOpacity>
+
+                    {/* On-Site Mutual Cancellation Button (Available after arrival) */}
+                    {(currentStep === 2 || currentStep === 3) && (
+                      <TouchableOpacity
+                        style={styles.workerCancelBtn}
+                        onPress={() => handleOpenOtpModal(booking, 'CANCELLATION')}
+                        activeOpacity={0.8}
+                      >
+                        <ShieldAlert size={14} color="#DC2626" />
+                        <Text style={styles.workerCancelBtnText}>Cancel Visit (Enter Customer Cancel OTP)</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 </View>
               );
@@ -545,6 +589,88 @@ export default function WorkerBookingsScreen({
           )
         )}
       </ScrollView>
+
+      {/* ─── WORKER OTP VERIFICATION MODAL ─── */}
+      <Modal
+        visible={otpModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setOtpModalVisible(false)}
+      >
+        <View style={styles.otpModalBackdrop}>
+          <View style={styles.otpModalCard}>
+            <View style={styles.otpModalHeader}>
+              <View style={styles.otpIconBadge}>
+                <KeyRound size={20} color="#4F46E5" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.otpModalTitle}>
+                  {otpType === 'ARRIVAL'
+                    ? '📍 ग्राहक का Arrival OTP दर्ज करें'
+                    : otpType === 'COMPLETION'
+                    ? '✅ कार्य समापन OTP दर्ज करें'
+                    : '❌ साइट रद्दीकरण OTP दर्ज करें'}
+                </Text>
+                <Text style={styles.otpModalSub}>
+                  {otpType === 'ARRIVAL'
+                    ? 'ग्राहक के MistriPro ऐप में दिख रहा 4-अंकीय Arrival OTP लेकर दर्ज करें।'
+                    : otpType === 'COMPLETION'
+                    ? 'काम पूरा होने पर ग्राहक से 4-अंकीय Work Completion OTP प्राप्त करें।'
+                    : 'ग्राहक से साइट रद्दीकरण कोड (Cancellation OTP) प्राप्त करें।'}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setOtpModalVisible(false)} style={styles.otpCloseBtn}>
+                <X size={18} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.otpInputWrap}>
+              <TextInput
+                style={styles.otpInput}
+                value={inputOtp}
+                onChangeText={(val) => {
+                  setInputOtp(val.replace(/[^0-9]/g, '').slice(0, 4));
+                  if (otpError) setOtpError('');
+                }}
+                placeholder="• • • •"
+                placeholderTextColor="#94A3B8"
+                keyboardType="numeric"
+                maxLength={4}
+                autoFocus
+              />
+            </View>
+
+            {!!otpError && (
+              <View style={styles.otpErrorWrap}>
+                <ShieldAlert size={14} color="#DC2626" />
+                <Text style={styles.otpErrorText}>{otpError}</Text>
+              </View>
+            )}
+
+            <View style={styles.otpModalActions}>
+              <TouchableOpacity
+                style={styles.otpCancelBtn}
+                onPress={() => setOtpModalVisible(false)}
+                disabled={isVerifying}
+              >
+                <Text style={styles.otpCancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.otpSubmitBtn, inputOtp.length < 4 && styles.otpSubmitBtnDisabled]}
+                onPress={handleSubmitOtp}
+                disabled={inputOtp.length < 4 || isVerifying}
+              >
+                {isVerifying ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.otpSubmitBtnText}>Verify OTP ✓</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -1078,6 +1204,146 @@ const styles = StyleSheet.create({
   emptyActionText: {
     fontFamily: 'Satoshi-Bold',
     fontSize: 12.5,
+    color: '#FFFFFF',
+  },
+  workerCancelBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    marginTop: 8,
+    borderRadius: 12,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+  },
+  workerCancelBtnText: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 12,
+    color: '#DC2626',
+  },
+
+  /* OTP Verification Modal Styles */
+  otpModalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  otpModalCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 24,
+    width: '100%',
+    maxWidth: 380,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  otpModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    marginBottom: 20,
+  },
+  otpIconBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#EEF2FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  otpModalTitle: {
+    fontFamily: 'Satoshi-Black',
+    fontSize: 16,
+    color: '#0F172A',
+    marginBottom: 4,
+  },
+  otpModalSub: {
+    fontFamily: 'Satoshi-Regular',
+    fontSize: 12,
+    color: '#64748B',
+    lineHeight: 16,
+  },
+  otpCloseBtn: {
+    padding: 4,
+  },
+  otpInputWrap: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 2,
+    borderColor: '#6366F1',
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginBottom: 12,
+    alignItems: 'center',
+  },
+  otpInput: {
+    fontFamily: 'Satoshi-Black',
+    fontSize: 32,
+    letterSpacing: 12,
+    textAlign: 'center',
+    color: '#0F172A',
+    width: '100%',
+  },
+  otpErrorWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#FEF2F2',
+    padding: 10,
+    borderRadius: 10,
+    marginBottom: 14,
+  },
+  otpErrorText: {
+    fontFamily: 'Satoshi-Medium',
+    fontSize: 12,
+    color: '#DC2626',
+    flex: 1,
+  },
+  otpModalActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 8,
+  },
+  otpCancelBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 14,
+    backgroundColor: '#F1F5F9',
+  },
+  otpCancelBtnText: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 14,
+    color: '#64748B',
+  },
+  otpSubmitBtn: {
+    flex: 2,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 14,
+    backgroundColor: '#4F46E5',
+    shadowColor: '#4F46E5',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  otpSubmitBtnDisabled: {
+    backgroundColor: '#94A3B8',
+    shadowOpacity: 0,
+  },
+  otpSubmitBtnText: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 14,
     color: '#FFFFFF',
   },
 });

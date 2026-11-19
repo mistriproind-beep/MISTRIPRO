@@ -64,22 +64,20 @@ export default function RazorpayModal({
   const {
     workerName = 'Mistri',
     workerSkill = 'Labour Service',
-    workerFee = 950,
-    platformFee = 99,
-    txnFee = 48,
-    totalAmount = 1097,
+    bookingFee = 99,
     customerName = 'Customer',
     customerPhone = '',
   } = bookingData;
 
-  const safeAmountPaise = Math.round(
-    Number(String(totalAmount).replace(/[^0-9.]/g, '') || 0) * 100
-  );
+  // The platform charges ONLY the nominal booking/inspection fee (e.g. ₹99).
+  // Worker quotes actual work price directly upon site inspection.
+  const payableAmount = Number(bookingData.totalAmount || bookingData.bookingFee || bookingFee || 99);
+  const safeAmountPaise = Math.round(payableAmount * 100);
   const safeWorkerSkill = String(workerSkill || 'Labour Service').replace(/["\\]/g, '');
   const safeWorkerName = String(workerName || 'Mistri').replace(/["\\]/g, '');
   const safeCustomerName = String(customerName || 'Customer').replace(/["\\]/g, '');
   const safeCustomerPhone = String(customerPhone || '').replace(/[^0-9+]/g, '');
-  const formattedTotal = Number(totalAmount || 0).toLocaleString('en-IN');
+  const formattedTotal = Number(payableAmount || 99).toLocaleString('en-IN');
 
   // Complete Payment helper
   const handlePaymentCompleted = (paymentId, method = 'Razorpay Official Gateway') => {
@@ -459,30 +457,30 @@ export default function RazorpayModal({
               {/* Order Card */}
               <View style={styles.orderCard}>
                 <View style={styles.orderTop}>
-                  <Text style={styles.merchantLabel}>Total Payable Amount</Text>
+                  <Text style={styles.merchantLabel}>Nominal Booking & Inspection Fee</Text>
                   <Text style={styles.amountDisplay}>₹{formattedTotal}</Text>
                 </View>
                 <Text style={styles.workerSummaryText}>
-                  Booking: {workerName} • {workerSkill}
+                  Worker: {safeWorkerName} • {safeWorkerSkill}
                 </Text>
 
                 <View style={styles.breakdown}>
                   <View style={styles.breakdownRow}>
                     <Text style={styles.breakdownLabel}>
-                      {bookingData.wageLabel || 'Mistri Wage (1 Day)'}
+                      Site Visit & Inspection Fee
                     </Text>
-                    <Text style={styles.breakdownVal}>₹{Number(workerFee || 0).toLocaleString('en-IN')}</Text>
+                    <Text style={styles.breakdownVal}>₹{formattedTotal}</Text>
                   </View>
                   <View style={styles.breakdownRow}>
-                    <Text style={styles.breakdownLabel}>Platform Service Fee</Text>
-                    <Text style={styles.breakdownVal}>₹{Number(platformFee || 0).toLocaleString('en-IN')}</Text>
+                    <Text style={styles.breakdownLabel}>Actual Work Charges</Text>
+                    <Text style={[styles.breakdownVal, { color: '#059669', fontWeight: '700' }]}>Decided On-Site</Text>
                   </View>
-                  <View style={styles.breakdownRow}>
-                    <Text style={styles.breakdownLabel}>
-                      {bookingData.txnFeeLabel || 'Gateway & Processing (5%)'}
-                    </Text>
-                    <Text style={styles.breakdownVal}>₹{Number(txnFee || 0).toLocaleString('en-IN')}</Text>
-                  </View>
+                </View>
+
+                <View style={{ backgroundColor: '#F0FDF4', padding: 10, borderRadius: 8, marginTop: 10, borderWidth: 1, borderColor: '#DCFCE7' }}>
+                  <Text style={{ fontSize: 11, color: '#166534', lineHeight: 16 }}>
+                    💡 <Text style={{ fontWeight: '700' }}>Direct Pricing:</Text> You only pay ₹{formattedTotal} upfront to schedule the mistri. The mistri visits your site, evaluates the work, and quotes the actual price directly with you.
+                  </Text>
                 </View>
               </View>
 
@@ -502,7 +500,7 @@ export default function RazorpayModal({
                 disabled={isProcessing}
               >
                 <Text style={styles.primaryPayBtnText}>
-                  Pay with Razorpay Gateway • ₹{formattedTotal}
+                  Pay Booking Fee • ₹{formattedTotal}
                 </Text>
                 <ArrowRight size={18} color="#FFFFFF" />
               </TouchableOpacity>
