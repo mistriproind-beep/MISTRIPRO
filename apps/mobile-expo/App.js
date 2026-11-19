@@ -942,7 +942,7 @@ function MainApp() {
         {
           id: `NOTIF-${Date.now()}`,
           title: 'Booking Sent & Payment Secured',
-          message: `Booking request sent to ${bookingDetails.workerName}. Payment ₹${bookingDetails.totalAmount} secured via Razorpay Test.`,
+          message: `Booking request sent to ${bookingDetails.workerName}. Payment ₹${bookingDetails.totalAmount} secured via Razorpay Escrow Protection.`,
           time: 'Just now',
           type: 'booking',
         },
