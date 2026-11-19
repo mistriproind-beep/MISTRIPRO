@@ -29,7 +29,14 @@ import {
 } from 'lucide-react-native';
 import * as Location from 'expo-location';
 
-import { CATEGORIES, CATEGORY_GROUPS } from '../data/categories';
+import {
+  CATEGORIES,
+  CATEGORY_GROUPS,
+  getCategoryDisplayName,
+  getCategoryGroupLabel,
+  translateWorkerSkill,
+  translateLocationName,
+} from '../data/categories';
 import RazorpayModal from '../components/RazorpayModal';
 
 /* ─── helpers ─── */
@@ -68,6 +75,8 @@ export default function CustomerHomeScreen({
   notificationsCount = 0,
   workers = [],
   userName = 'User',
+  lang = 'en',
+  t,
 }) {
   const [locationText, setLocationText] = useState('Sawai Madhopur, Rajasthan');
   const [locationLoading, setLocationLoading] = useState(true);
@@ -371,14 +380,14 @@ export default function CustomerHomeScreen({
 
   const renderCategoryItem = useCallback(
     ({ item }) => {
-      const catLabel = shortName(item.name);
-      const isSelected = selectedCategory === catLabel;
+      const catLabel = getCategoryDisplayName(item, lang);
+      const isSelected = selectedCategory === item.name;
       return (
         <TouchableOpacity
           style={styles.categoryItem}
           activeOpacity={0.7}
           onPress={() => {
-            setSelectedCategory((prev) => (prev === catLabel ? null : catLabel));
+            setSelectedCategory((prev) => (prev === item.name ? null : item.name));
           }}
         >
           <View
@@ -411,7 +420,7 @@ export default function CustomerHomeScreen({
         </TouchableOpacity>
       );
     },
-    [selectedCategory],
+    [selectedCategory, lang],
   );
 
   const renderWorkerCard = useCallback(
@@ -436,20 +445,22 @@ export default function CustomerHomeScreen({
               </View>
             )}
           </View>
-          <Text style={styles.workerSkill}>{item?.skill || 'Labour'}</Text>
+          <Text style={styles.workerSkill}>{translateWorkerSkill(item?.skill || item?.category, lang)}</Text>
           {/* Availability Status Badge */}
           <View style={[styles.cardAvailBadge, item?.available ? styles.cardAvailOnline : styles.cardAvailOffline]}>
             <View style={[styles.cardAvailDot, item?.available ? styles.cardDotOnline : styles.cardDotOffline]} />
             <Text style={[styles.cardAvailText, item?.available ? styles.cardTextOnline : styles.cardTextOffline]}>
-              {item?.available ? 'Online' : 'Not Available Right Now'}
+              {item?.available
+                ? (lang === 'hi' ? '● ऑनलाइन' : lang === 'gu' ? '● ઓનલાઇન' : lang === 'mr' ? '● ऑनलाइन' : '● Online')
+                : (lang === 'hi' ? '○ अभी उपलब्ध नहीं' : lang === 'gu' ? '○ હાલમાં ઉપલબ્ધ નથી' : lang === 'mr' ? '○ सध्या उपलब्ध नाही' : '○ Not Available Right Now')}
             </Text>
           </View>
           <View style={styles.workerMeta}>
             <Star size={13} color="#F59E0B" fill="#F59E0B" />
             <Text style={styles.workerRating}>{item?.rating || '5.0'}</Text>
-            <Text style={styles.workerReviews}>({item?.reviews ?? 0})</Text>
+            <Text style={styles.workerReviews}>({item?.reviews ?? 0} {lang === 'hi' ? 'समीक्षाएं' : lang === 'gu' ? 'રિવ્યુઝ' : lang === 'mr' ? 'अभिप्राय' : 'reviews'})</Text>
             <View style={styles.metaDot} />
-            <Text style={styles.workerRate}>₹{item?.rate || 800}/{item?.rateType || 'day'}</Text>
+            <Text style={styles.workerRate}>₹{item?.rate || 800}/{lang === 'hi' ? 'दिन' : lang === 'gu' ? 'દિવસ' : lang === 'mr' ? 'दिवस' : (item?.rateType || 'day')}</Text>
           </View>
         </View>
 
@@ -457,7 +468,7 @@ export default function CustomerHomeScreen({
         <View style={styles.workerRight}>
           <View style={styles.distanceBadge}>
             <MapPin size={11} color="#4F46E5" />
-            <Text style={styles.distanceText}>{item?.distance || '2.0'} km</Text>
+            <Text style={styles.distanceText}>{item?.distance || '2.0'} {lang === 'hi' ? 'किमी' : lang === 'gu' ? 'કિમી' : lang === 'mr' ? 'किमी' : 'km'}</Text>
           </View>
           <TouchableOpacity
             style={[styles.hireBtn, !item?.available && styles.hireBtnOffline]}
@@ -467,20 +478,22 @@ export default function CustomerHomeScreen({
                 setSelectedWorker(item);
               } else {
                 Alert.alert(
-                  'Worker Offline 🔴',
-                  `${item?.name || 'This worker'} is not available right now. You can view their verified profile or check back later.`
+                  lang === 'hi' ? 'कारीगर ऑफलाइन है 🔴' : lang === 'gu' ? 'કારીગર ઑફલાઇન છે 🔴' : lang === 'mr' ? 'कामगार ऑफलाइन आहे 🔴' : 'Worker Offline 🔴',
+                  lang === 'hi' ? `${item?.name || 'यह कारीगर'} अभी ऑफलाइन है। जब वे ऑनलाइन आएंगे तब आप बुक कर सकते हैं।` : lang === 'gu' ? `${item?.name || 'આ કારીગર'} હાલમાં ઑફલાઇન છે. જ્યારે તેઓ ઑનલાઇન આવશે ત્યારે તમે બુક કરી શકો છો.` : lang === 'mr' ? `${item?.name || 'हा कामगार'} सध्या ऑफलाइन आहे. ते ऑनलाइन आल्यावर आपण बुक करू शकता.` : `${item?.name || 'This worker'} is not available right now. You can view their verified profile or check back later.`
                 );
               }
             }}
           >
             <Text style={[styles.hireBtnText, !item?.available && styles.hireBtnTextOffline]}>
-              {item?.available ? 'Book' : 'Offline'}
+              {item?.available
+                ? (lang === 'hi' ? 'बुक करें' : lang === 'gu' ? 'બુક કરો' : lang === 'mr' ? 'बुक करा' : 'Book')
+                : (lang === 'hi' ? 'ऑफलाइन' : lang === 'gu' ? 'ઑફલાઇન' : lang === 'mr' ? 'ऑफलाइन' : 'Offline')}
             </Text>
           </TouchableOpacity>
         </View>
       </TouchableOpacity>
     ),
-    [],
+    [lang],
   );
 
   return (
@@ -499,8 +512,12 @@ export default function CustomerHomeScreen({
               <Text style={styles.avatarInitials}>{userInitials}</Text>
             </TouchableOpacity>
             <View>
-              <Text style={styles.greetingSub}>Good morning 👋</Text>
-              <Text style={styles.greetingName}>Hello, {userName || 'User'}!</Text>
+              <Text style={styles.greetingSub}>
+                {lang === 'hi' ? 'शुभ प्रभात 👋' : lang === 'gu' ? 'શુભ સવાર 👋' : lang === 'mr' ? 'शुभ प्रभात 👋' : 'Good morning 👋'}
+              </Text>
+              <Text style={styles.greetingName}>
+                {lang === 'hi' ? `नमस्ते, ${userName || 'उपयोगकर्ता'}!` : lang === 'gu' ? `નમસ્તે, ${userName || 'વપરાશકર્તા'}!` : lang === 'mr' ? `नमस्कार, ${userName || 'वापरकर्ता'}!` : `Hello, ${userName || 'User'}!`}
+              </Text>
             </View>
           </View>
           <TouchableOpacity
@@ -520,7 +537,7 @@ export default function CustomerHomeScreen({
             <ActivityIndicator size="small" color="#4F46E5" style={{ marginLeft: 6 }} />
           ) : (
             <Text style={styles.locationText} numberOfLines={1}>
-              {locationText}
+              {translateLocationName(locationText, lang)}
             </Text>
           )}
           <ChevronDown size={16} color="#64748B" />
@@ -528,12 +545,14 @@ export default function CustomerHomeScreen({
 
         {/* ─── 3. Main Hero Card with Search ─── */}
         <View style={styles.heroCard}>
-          <Text style={styles.heroTitle}>Which worker do you need today?</Text>
+          <Text style={styles.heroTitle}>
+            {lang === 'hi' ? 'आज आपको किस कारीगर की जरूरत है?' : lang === 'gu' ? 'આજે તમને કયા કારીગરની જરૂર છે?' : lang === 'mr' ? 'आज आपल्याला कोणत्या कामगाराची गरज आहे?' : 'Which worker do you need today?'}
+          </Text>
           <View style={styles.searchBar}>
             <Search size={18} color="#94A3B8" style={{ marginRight: 8 }} />
             <TextInput
               style={styles.searchInput}
-              placeholder="Search mason, plumber, electrician..."
+              placeholder={lang === 'hi' ? 'मिस्त्री, प्लंबर, इलेक्ट्रीशियन खोजें...' : lang === 'gu' ? 'કડિયા, પ્લમ્બર, ઇલેક્ટ્રિશિયન શોધો...' : lang === 'mr' ? 'गवंडी, प्लंबर, इलेक्ट्रिशियन शोधा...' : 'Search mason, plumber, electrician...'}
               placeholderTextColor="#94A3B8"
               value={searchQuery}
               onChangeText={setSearchQuery}
@@ -648,7 +667,7 @@ export default function CustomerHomeScreen({
                   style={[styles.tabText, active && styles.tabTextActive]}
                   numberOfLines={1}
                 >
-                  {g.label}
+                  {getCategoryGroupLabel(g, lang)}
                 </Text>
               </TouchableOpacity>
             );
@@ -674,8 +693,8 @@ export default function CustomerHomeScreen({
           >
             <Text style={styles.seeAllCategoriesBtnText}>
               {showAllCategories
-                ? 'Show Less (कम देखें) ▴'
-                : `See All Services (${filteredCategories.length}) ▾`}
+                ? (lang === 'hi' ? 'कम देखें ▴' : lang === 'gu' ? 'ઓછું જુઓ ▴' : lang === 'mr' ? 'कमी पहा ▴' : 'Show Less ▴')
+                : (lang === 'hi' ? `सभी सेवाएं देखें (${filteredCategories.length}) ▾` : lang === 'gu' ? `બધી સેવાઓ જુઓ (${filteredCategories.length}) ▾` : lang === 'mr' ? `सर्व सेवा पहा (${filteredCategories.length}) ▾` : `See All Services (${filteredCategories.length}) ▾`)}
             </Text>
           </TouchableOpacity>
         )}
@@ -685,22 +704,26 @@ export default function CustomerHomeScreen({
           <View style={styles.nearbyTitleRow}>
             <Text style={styles.sectionTitle}>
               {selectedCategory
-                ? `${selectedCategory}s Online (${nearbyWorkers10km.length})`
+                ? `${translateWorkerSkill(selectedCategory, lang)} (${nearbyWorkers10km.length})`
                 : searchQuery
-                ? `Search: "${searchQuery}" (${nearbyWorkers10km.length})`
-                : `Workers near you (${nearbyWorkers10km.length})`}
+                ? `${lang === 'hi' ? 'खोज' : lang === 'gu' ? 'શોધ' : lang === 'mr' ? 'शोध' : 'Search'}: "${searchQuery}" (${nearbyWorkers10km.length})`
+                : (lang === 'hi' ? `आपके पास उपलब्ध कारीगर (${nearbyWorkers10km.length})` : lang === 'gu' ? `તમારી નજીકના ઉપલબ્ધ કારીગરો (${nearbyWorkers10km.length})` : lang === 'mr' ? `तुमच्या जवळील उपलब्ध कामगार (${nearbyWorkers10km.length})` : `Workers near you (${nearbyWorkers10km.length})`)}
             </Text>
             <View style={styles.rangeBadge}>
-              <Text style={styles.rangeBadgeText}>Live GPS</Text>
+              <Text style={styles.rangeBadgeText}>{lang === 'hi' ? 'लाइव GPS' : lang === 'gu' ? 'લાઈવ GPS' : lang === 'mr' ? 'लाइव्ह GPS' : 'Live GPS'}</Text>
             </View>
           </View>
           {(selectedCategory || searchQuery) ? (
             <TouchableOpacity onPress={() => { setSelectedCategory(null); setSearchQuery(''); }}>
-              <Text style={[styles.seeAll, { color: '#DC2626', fontFamily: 'Satoshi-Bold' }]}>Clear Filter ✕</Text>
+              <Text style={[styles.seeAll, { color: '#DC2626', fontFamily: 'Satoshi-Bold' }]}>
+                {lang === 'hi' ? 'फ़िल्टर हटाएं ✕' : lang === 'gu' ? 'ફિલ્ટર હટાવો ✕' : lang === 'mr' ? 'फिल्टर काढा ✕' : 'Clear Filter ✕'}
+              </Text>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity onPress={() => onNavigateTab && onNavigateTab('FIND_WORKERS')}>
-              <Text style={styles.seeAll}>Open Map →</Text>
+              <Text style={styles.seeAll}>
+                {lang === 'hi' ? 'नक्शा खोलें →' : lang === 'gu' ? 'નકશો ખોલો →' : lang === 'mr' ? 'नकाशा उघडा →' : 'Open Map →'}
+              </Text>
             </TouchableOpacity>
           )}
         </View>
@@ -709,16 +732,18 @@ export default function CustomerHomeScreen({
           <View style={styles.emptyCard}>
             <Text style={{ fontSize: 30, marginBottom: 8 }}>👷‍♂️</Text>
             <Text style={styles.emptyTitle}>
-              No Online {selectedCategory || searchQuery} Near You
+              {lang === 'hi' ? `आपके पास कोई ऑनलाइन ${translateWorkerSkill(selectedCategory || searchQuery, lang)} नहीं मिला` : lang === 'gu' ? `તમારી નજીક કોઈ ઑનલાઇન ${translateWorkerSkill(selectedCategory || searchQuery, lang)} મળ્યા નથી` : lang === 'mr' ? `तुमच्याजवळ कोणताही ऑनलाइन ${translateWorkerSkill(selectedCategory || searchQuery, lang)} आढळला नाही` : `No Online ${selectedCategory || searchQuery} Near You`}
             </Text>
             <Text style={styles.emptySub}>
-              All workers in this trade are currently offline or engaged in active contracts. Please check back shortly or explore another skill.
+              {lang === 'hi' ? 'इस ट्रेड के सभी कारीगर अभी ऑफलाइन हैं या अन्य काम में व्यस्त हैं। कृपया थोड़ी देर बाद देखें।' : lang === 'gu' ? 'આ ટ્રેડના બધા કારીગરો હાલમાં ઑફલાઇન છે અથવા અન્ય કામમાં વ્યસ્ત છે. કૃપા કરીને થોડી વાર પછી તપાસો.' : lang === 'mr' ? 'या कामाचे सर्व कारागीर सध्या ऑफलाइन आहेत किंवा इतर कामात व्यस्त आहेत. कृपया काही वेळाने तपासा.' : 'All workers in this trade are currently offline or engaged in active contracts. Please check back shortly or explore another skill.'}
             </Text>
             <TouchableOpacity
               style={styles.clearBtn}
               onPress={() => { setSelectedCategory(null); setSearchQuery(''); }}
             >
-              <Text style={styles.clearBtnText}>Show All Available Mistris</Text>
+              <Text style={styles.clearBtnText}>
+                {lang === 'hi' ? 'सभी उपलब्ध मिस्त्री देखें' : lang === 'gu' ? 'બધા ઉપલબ્ધ મિસ્ત્રી જુઓ' : lang === 'mr' ? 'सर्व उपलब्ध मिस्त्री पहा' : 'Show All Available Mistris'}
+              </Text>
             </TouchableOpacity>
           </View>
         ) : (
@@ -759,39 +784,39 @@ export default function CustomerHomeScreen({
             <View style={styles.modalStatsRow}>
               <View style={styles.modalStatCol}>
                 <Text style={styles.modalStatNum}>{selectedWorker?.rating} ★</Text>
-                <Text style={styles.modalStatLabel}>{selectedWorker?.reviews} reviews</Text>
+                <Text style={styles.modalStatLabel}>{selectedWorker?.reviews} {lang === 'hi' ? 'समीक्षाएं' : lang === 'gu' ? 'રિવ્યુઝ' : lang === 'mr' ? 'अभिप्राय' : 'reviews'}</Text>
               </View>
               <View style={styles.modalStatDivider} />
               <View style={styles.modalStatCol}>
-                <Text style={styles.modalStatNum}>{selectedWorker?.exp} Yrs</Text>
-                <Text style={styles.modalStatLabel}>Experience</Text>
+                <Text style={styles.modalStatNum}>{selectedWorker?.exp || 5} {lang === 'hi' ? 'साल' : lang === 'gu' ? 'વર્ષ' : lang === 'mr' ? 'वर्षे' : 'Yrs'}</Text>
+                <Text style={styles.modalStatLabel}>{lang === 'hi' ? 'अनुभव' : lang === 'gu' ? 'અનુભવ' : lang === 'mr' ? 'अनुभव' : 'Experience'}</Text>
               </View>
               <View style={styles.modalStatDivider} />
               <View style={styles.modalStatCol}>
-                <Text style={styles.modalStatNum}>{selectedWorker?.distance} km</Text>
-                <Text style={styles.modalStatLabel}>Distance</Text>
+                <Text style={styles.modalStatNum}>{selectedWorker?.distance || '2.1'} {lang === 'hi' ? 'किमी' : lang === 'gu' ? 'કિમી' : lang === 'mr' ? 'किमी' : 'km'}</Text>
+                <Text style={styles.modalStatLabel}>{lang === 'hi' ? 'दूरी' : lang === 'gu' ? 'અંતર' : lang === 'mr' ? 'अंतर' : 'Distance'}</Text>
               </View>
             </View>
 
             <View style={styles.credentialsBox}>
               <ShieldCheck size={16} color="#15803D" />
               <Text style={styles.credentialsText}>
-                Aadhaar Verified Mistri • Razorpay Protected • Police Verification Cleared
+                {lang === 'hi' ? 'आधार सत्यापित मिस्त्री • रेज़रपे सुरक्षित' : lang === 'gu' ? 'આધાર ચકાસાયેલ મિસ્ત્રી • રેઝરપે સુરક્ષિત' : lang === 'mr' ? 'आधार सत्यापित मिस्त्री • रेझरपे सुरक्षित' : 'Aadhaar Verified Mistri • Razorpay Protected'}
               </Text>
             </View>
 
             {!selectedWorker?.available && (
               <View style={styles.modalOfflineNotice}>
                 <Text style={styles.modalOfflineNoticeText}>
-                  ⚠️ This mistri is currently OFFLINE / Not Available Right Now. Immediate bookings are paused until they go online.
+                  {lang === 'hi' ? '⚠️ यह मिस्त्री अभी ऑफलाइन है। जब वे ऑनलाइन आएंगे तब बुकिंग संभव होगी।' : lang === 'gu' ? '⚠️ આ મિસ્ત્રી હાલમાં ઑફલાઇન છે. તેઓ ઑનલાઇન આવશે ત્યારે બુકિંગ શક્ય બનશે.' : lang === 'mr' ? '⚠️ हा मिस्त्री सध्या ऑफलाइन आहे. ते ऑनलाइन आल्यावर बुकिंग शक्य होईल.' : '⚠️ This mistri is currently OFFLINE / Not Available Right Now. Immediate bookings are paused until they go online.'}
                 </Text>
               </View>
             )}
 
             <View style={styles.modalFooterRow}>
               <View>
-                <Text style={styles.modalRateLabel}>Daily Wage</Text>
-                <Text style={styles.modalRateVal}>₹{selectedWorker?.rate} <Text style={{ fontSize: 13, color: '#64748B' }}>/day</Text></Text>
+                <Text style={styles.modalRateLabel}>{lang === 'hi' ? 'दैनिक मजदूरी' : lang === 'gu' ? 'દૈનિક વેતન' : lang === 'mr' ? 'दैनिक मजुरी' : 'Daily Wage'}</Text>
+                <Text style={styles.modalRateVal}>₹{selectedWorker?.rate} <Text style={{ fontSize: 13, color: '#64748B' }}>/{lang === 'hi' ? 'दिन' : lang === 'gu' ? 'દિવસ' : lang === 'mr' ? 'दिवस' : 'day'}</Text></Text>
               </View>
 
               {selectedWorker?.available ? (
@@ -800,20 +825,20 @@ export default function CustomerHomeScreen({
                   onPress={() => handleProceedToBooking(selectedWorker)}
                   activeOpacity={0.85}
                 >
-                  <Text style={styles.modalBookBtnText}>Proceed to Book</Text>
+                  <Text style={styles.modalBookBtnText}>{lang === 'hi' ? 'आगे बढ़ें और बुक करें' : lang === 'gu' ? 'આગળ વધો અને બુક કરો' : lang === 'mr' ? 'पुढे जा आणि बुक करा' : 'Proceed to Book'}</Text>
                 </TouchableOpacity>
               ) : (
                 <TouchableOpacity
                   style={[styles.modalBookBtn, { backgroundColor: '#94A3B8' }]}
                   onPress={() => {
                     Alert.alert(
-                      'Worker Currently Offline',
-                      `${selectedWorker?.name} is currently not available for instant booking.`
+                      lang === 'hi' ? 'कारीगर ऑफलाइन है' : lang === 'gu' ? 'કારીગર ઑફલાઇન છે' : lang === 'mr' ? 'कामगार ऑफलाइन आहे' : 'Worker Currently Offline',
+                      `${selectedWorker?.name} ${lang === 'hi' ? 'अभी बुकिंग के लिए उपलब्ध नहीं हैं।' : lang === 'gu' ? 'હાલમાં બુકિંગ માટે ઉપલબ્ધ નથી.' : lang === 'mr' ? 'सध्या बुकिंगसाठी उपलब्ध नाहीत.' : 'is currently not available for instant booking.'}`
                     );
                   }}
                   activeOpacity={0.85}
                 >
-                  <Text style={styles.modalBookBtnText}>Currently Offline</Text>
+                  <Text style={styles.modalBookBtnText}>{lang === 'hi' ? 'अभी ऑफलाइन हैं' : lang === 'gu' ? 'હાલમાં ઑફલાઇન છે' : lang === 'mr' ? 'સध्या ऑफलाइन आहेत' : 'Currently Offline'}</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -827,8 +852,8 @@ export default function CustomerHomeScreen({
           <View style={styles.modalSheet}>
             <View style={styles.modalSheetHeader}>
               <View>
-                <Text style={styles.modalTitle}>Confirm Booking & Pay</Text>
-                <Text style={styles.modalSub}>{checkoutWorker?.name} • {checkoutWorker?.skill}</Text>
+                <Text style={styles.modalTitle}>{lang === 'hi' ? 'बुकिंग की पुष्टि और भुगतान' : lang === 'gu' ? 'બુકિંગની પુષ્ટિ અને ચુકવણી' : lang === 'mr' ? 'बुकिंगची पुष्टी आणि पेमेंट' : 'Confirm Booking & Pay'}</Text>
+                <Text style={styles.modalSub}>{checkoutWorker?.name} • {translateWorkerSkill(checkoutWorker?.skill || checkoutWorker?.category, lang)}</Text>
               </View>
               <TouchableOpacity onPress={() => setCheckoutWorker(null)}>
                 <X size={20} color="#64748B" />
@@ -837,20 +862,20 @@ export default function CustomerHomeScreen({
 
             <View style={styles.billBox}>
               <View style={styles.billRow}>
-                <Text style={styles.billItem}>Worker Fee (1 Day)</Text>
+                <Text style={styles.billItem}>{lang === 'hi' ? 'कारीगर शुल्क (1 दिन)' : lang === 'gu' ? 'કારીગર શુલ્ક (1 દિવસ)' : lang === 'mr' ? 'कामगार शुल्क (1 दिवस)' : 'Worker Fee (1 Day)'}</Text>
                 <Text style={styles.billVal}>₹{Number(checkoutWorker?.rate) || 950}</Text>
               </View>
               <View style={styles.billRow}>
-                <Text style={styles.billItem}>Mistri Pro Platform Fee</Text>
+                <Text style={styles.billItem}>{lang === 'hi' ? 'मिस्त्री प्रो प्लेटफॉर्म शुल्क' : lang === 'gu' ? 'મિસ્ત્રી પ્રો પ્લેટફોર્મ ફી' : lang === 'mr' ? 'मिस्त्री प्रो प्लॅटफॉर्म फी' : 'Mistri Pro Platform Fee'}</Text>
                 <Text style={styles.billVal}>₹99</Text>
               </View>
               <View style={styles.billRow}>
-                <Text style={styles.billItem}>Gateway & Service Processing (5%)</Text>
+                <Text style={styles.billItem}>{lang === 'hi' ? 'गेटवे और प्रोसेसिंग शुल्क (5%)' : lang === 'gu' ? 'ગેટવે અને પ્રોસેસિંગ ફી (5%)' : lang === 'mr' ? 'गेटવે आणि प्रोसेसिंग फी (5%)' : 'Gateway & Service Processing (5%)'}</Text>
                 <Text style={styles.billVal}>₹{Math.round((Number(checkoutWorker?.rate) || 950) * 0.05)}</Text>
               </View>
               <View style={styles.billDivider} />
               <View style={styles.billRowGrand}>
-                <Text style={styles.billTotalLabel}>Total to Pay</Text>
+                <Text style={styles.billTotalLabel}>{lang === 'hi' ? 'कुल देय राशि' : lang === 'gu' ? 'કુલ ચૂકવવાપાત્ર રકમ' : lang === 'mr' ? 'एकूण देय रक्कम' : 'Total to Pay'}</Text>
                 <Text style={styles.billTotalVal}>
                   ₹{(Number(checkoutWorker?.rate) || 950) + 99 + Math.round((Number(checkoutWorker?.rate) || 950) * 0.05)}
                 </Text>
@@ -860,7 +885,7 @@ export default function CustomerHomeScreen({
             <View style={styles.escrowNotice}>
               <ShieldCheck size={16} color="#15803D" />
               <Text style={styles.escrowNoticeText}>
-                100% Protected Payment: Processed securely via Razorpay. Money is transferred to mistri only after you confirm work completion.
+                {lang === 'hi' ? '100% सुरक्षित भुगतान: रेज़रपे द्वारा सुरक्षित। जब आप काम पूरा होने की पुष्टि करेंगे तभी मिस्त्री को भुगतान जारी होगा।' : lang === 'gu' ? '100% સુરક્ષિત ચુકવણી: રેઝરપે દ્વારા સુરક્ષિત. તમે કામ પૂર્ણ થયાની પુષ્ટિ કરશો ત્યારે જ મિસ્ત્રીને પૈસા ટ્રાન્સફર થશે.' : lang === 'mr' ? '100% सुरक्षित पेमेंट: रेझरपे द्वारे सुरक्षित. आपण काम पूर्ण झाल्याची पुष्टी केल्यावरच मिस्त्रीला पैसे दिले जातील.' : '100% Protected Payment: Processed securely via Razorpay. Money is transferred to mistri only after you confirm work completion.'}
               </Text>
             </View>
 
@@ -870,7 +895,7 @@ export default function CustomerHomeScreen({
               activeOpacity={0.85}
             >
               <CheckCircle2 size={18} color="#FFFFFF" />
-              <Text style={styles.payBtnText}>Pay & Request Booking</Text>
+              <Text style={styles.payBtnText}>{lang === 'hi' ? 'भुगतान करें और बुक करें' : lang === 'gu' ? 'ચુકવણી કરો અને બુક કરો' : lang === 'mr' ? 'पेमेंट करा आणि बुक करा' : 'Pay & Request Booking'}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -914,7 +939,7 @@ export default function CustomerHomeScreen({
               <Text style={{ fontSize: 24, color: '#3D47D6' }}>←</Text>
             </TouchableOpacity>
             <Text style={{ fontSize: 20, fontWeight: '700', color: '#1A1A2E', fontFamily: 'Satoshi-Bold' }}>
-              Choose Location
+              {lang === 'hi' ? 'स्थान चुनें' : lang === 'gu' ? 'સ્થાન પસંદ કરો' : lang === 'mr' ? 'स्थान निवडा' : 'Choose Location'}
             </Text>
           </View>
 
@@ -939,7 +964,7 @@ export default function CustomerHomeScreen({
                 autoFocus
                 value={locationSearchQuery}
                 onChangeText={setLocationSearchQuery}
-                placeholder="Search city, area, town in India..."
+                placeholder={lang === 'hi' ? 'भारत में शहर या इलाका खोजें...' : lang === 'gu' ? 'ભારતમાં શહેર કે વિસ્તાર શોધો...' : lang === 'mr' ? 'भारतातील शहर किंवा परिसर शोधा...' : 'Search city, area, town in India...'}
                 placeholderTextColor="#9BA3C7"
                 style={{
                   flex: 1,
@@ -960,7 +985,9 @@ export default function CustomerHomeScreen({
           {locationSearchLoading && (
             <View style={{ alignItems: 'center', paddingTop: 20 }}>
               <ActivityIndicator size="large" color="#3D47D6" />
-              <Text style={{ marginTop: 8, color: '#6B7280', fontFamily: 'Satoshi-Regular' }}>Searching...</Text>
+              <Text style={{ marginTop: 8, color: '#6B7280', fontFamily: 'Satoshi-Regular' }}>
+                {lang === 'hi' ? 'खोज रहे हैं...' : lang === 'gu' ? 'શોધી રહ્યું છે...' : lang === 'mr' ? 'शोधत आहे...' : 'Searching...'}
+              </Text>
             </View>
           )}
 
@@ -1017,21 +1044,27 @@ export default function CustomerHomeScreen({
                 <View style={{ alignItems: 'center', paddingTop: 40 }}>
                   <Text style={{ fontSize: 32 }}>🗺️</Text>
                   <Text style={{ fontSize: 16, color: '#6B7280', marginTop: 8, fontFamily: 'Satoshi-Regular' }}>
-                    No locations found
+                    {lang === 'hi' ? 'कोई स्थान नहीं मिला' : lang === 'gu' ? 'કોઈ સ્થાન મળ્યું નથી' : lang === 'mr' ? 'कोणतेही स्थान आढळले नाही' : 'No locations found'}
                   </Text>
-                  <Text style={{ fontSize: 13, color: '#9BA3C7', marginTop: 4 }}>Try a different city or area name</Text>
+                  <Text style={{ fontSize: 13, color: '#9BA3C7', marginTop: 4 }}>
+                    {lang === 'hi' ? 'कोई दूसरा शहर या क्षेत्र खोजें' : lang === 'gu' ? 'કોઈ અન્ય શહેર કે વિસ્તાર શોધો' : lang === 'mr' ? 'दुसरे शहर किंवा परिसर शोधा' : 'Try a different city or area name'}
+                  </Text>
                 </View>
               ) : locationSearchQuery.length < 3 && locationSearchQuery.length > 0 ? (
                 <View style={{ alignItems: 'center', paddingTop: 40 }}>
-                  <Text style={{ fontSize: 13, color: '#9BA3C7', fontFamily: 'Satoshi-Regular' }}>Type at least 3 characters to search</Text>
+                  <Text style={{ fontSize: 13, color: '#9BA3C7', fontFamily: 'Satoshi-Regular' }}>
+                    {lang === 'hi' ? 'कम से कम 3 अक्षर दर्ज करें' : lang === 'gu' ? 'ઓછામાં ઓછા 3 અક્ષર દાખલ કરો' : lang === 'mr' ? 'किमान 3 अक्षरे प्रविष्ट करा' : 'Type at least 3 characters to search'}
+                  </Text>
                 </View>
               ) : (
                 <View style={{ alignItems: 'center', paddingTop: 40 }}>
                   <Text style={{ fontSize: 32 }}>🏙️</Text>
                   <Text style={{ fontSize: 15, color: '#6B7280', marginTop: 8, fontFamily: 'Satoshi-Regular' }}>
-                    Search for your city or area
+                    {lang === 'hi' ? 'अपना शहर या क्षेत्र खोजें' : lang === 'gu' ? 'તમારું શહેર કે વિસ્તાર શોધો' : lang === 'mr' ? 'आपले शहर किंवा परिसर शोधा' : 'Search for your city or area'}
                   </Text>
-                  <Text style={{ fontSize: 12, color: '#9BA3C7', marginTop: 4 }}>India locations only</Text>
+                  <Text style={{ fontSize: 12, color: '#9BA3C7', marginTop: 4 }}>
+                    {lang === 'hi' ? 'केवल भारत के स्थान' : lang === 'gu' ? 'માત્ર ભારતના સ્થળો' : lang === 'mr' ? 'ફક્ત भारतातील ठिकाणे' : 'India locations only'}
+                  </Text>
                 </View>
               )
             }

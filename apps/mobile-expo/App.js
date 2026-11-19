@@ -141,6 +141,33 @@ const I18N = {
     customerDesc: 'Book verified mistris instantly for home repair, construction & daily needs.',
     workerRole: 'Worker / Mistri',
     workerDesc: 'Find local work near you, get booked by customers & earn daily with Aadhaar badge.',
+    customerTags: 'Post Work • Hire Workers • Secured Payments',
+    workerTags: 'Instant Bids • Direct Payout • Aadhaar Badge',
+    roleNote: '🔒 Profile Persona Lock: Your registered persona determines account verification and live tools.',
+    enterMobile: 'Enter 10-Digit Mobile Number',
+    mobileNotice: 'We will send a 6-digit verification code via SMS to this number.',
+    getCodeBtn: 'Get Verification Code →',
+    verifyPhoneTitle: 'Verify Phone Number',
+    enterOtpSubtitle: 'Enter 6-Digit OTP Sent to +91',
+    verifyProceedBtn: 'Verify & Proceed ✓',
+    resendOtp: "Didn't receive code? Resend SMS",
+    emailAuthTitle: 'Email Authentication',
+    emailAuthHeading: 'Sign in with Email',
+    emailAuthSub: 'Enter your registered Email ID & Password to sign in or register instantly.',
+    emailLabel: 'Email Address *',
+    passwordLabel: 'Password *',
+    forgotPassword: 'Forgot Password?',
+    signInWithEmailBtn: 'Sign In with Email →',
+    newUserEmailNotice: 'New user? Entering your email and password will create your verified account automatically.',
+    termsOfService: 'Terms of Service',
+    privacyPolicy: 'Privacy Policy',
+    navHome: 'Home',
+    navFind: 'Find',
+    navBookings: 'Bookings',
+    navContractor: 'Contractor',
+    navProfile: 'Profile',
+    navAlerts: 'Alerts',
+    navEarnings: 'Earnings',
     hello: 'Hello,',
     activeReqCard: 'Manage your tasks',
     activeReqCount: '6/10',
@@ -198,6 +225,33 @@ const I18N = {
     customerDesc: 'घर की मरम्मत के लिए तुरंत सत्यापित मिस्त्री बुक करें। तेज़, सुरक्षित और गारंटीड।',
     workerRole: 'कारीगर / मिस्त्री (Worker)',
     workerDesc: 'अपने पास काम खोजें, ग्राहकों से बुकिंग पाएं और आधार बैज के साथ रोज़ कमाएं।',
+    customerTags: 'काम पोस्ट करें • कारीगर चुनें • सुरक्षित भुगतान',
+    workerTags: 'तुरंत काम • सीधा भुगतान • आधार बैज',
+    roleNote: '🔒 प्रोफाइल लॉक: आपकी चुनी गई भूमिका खाता सत्यापन और टूल्स निर्धारित करती है।',
+    enterMobile: '10 अंकों का मोबाइल नंबर दर्ज करें',
+    mobileNotice: 'हम इस नंबर पर SMS द्वारा 6 अंकों का सत्यापन कोड भेजेंगे।',
+    getCodeBtn: 'सत्यापन कोड प्राप्त करें →',
+    verifyPhoneTitle: 'फोन नंबर सत्यापित करें',
+    enterOtpSubtitle: 'भेजा गया 6 अंकों का OTP दर्ज करें +91',
+    verifyProceedBtn: 'सत्यापित करें और आगे बढ़ें ✓',
+    resendOtp: 'कोड नहीं मिला? दोबारा SMS भेजें',
+    emailAuthTitle: 'ईमेल प्रमाणीकरण',
+    emailAuthHeading: 'ईमेल से साइन इन करें',
+    emailAuthSub: 'साइन इन करने के लिए अपनी पंजीकृत ईमेल आईडी और पासवर्ड दर्ज करें।',
+    emailLabel: 'ईमेल आईडी *',
+    passwordLabel: 'पासवर्ड *',
+    forgotPassword: 'पासवर्ड भूल गए?',
+    signInWithEmailBtn: 'ईमेल से साइन इन करें →',
+    newUserEmailNotice: 'नए उपयोगकर्ता? ईमेल और पासवर्ड दर्ज करने से आपका खाता अपने आप बन जाएगा।',
+    termsOfService: 'सेवा की शर्तें',
+    privacyPolicy: 'गोपनीयता नीति',
+    navHome: 'होम',
+    navFind: 'खोजें',
+    navBookings: 'बुकिंग',
+    navContractor: 'ठेकेदार',
+    navProfile: 'प्रोफाइल',
+    navAlerts: 'अलर्ट',
+    navEarnings: 'कमाई',
     hello: 'नमस्ते,',
     activeReqCard: 'अपने कार्य प्रबंधित करें',
     activeReqCount: '6/10',
@@ -255,6 +309,33 @@ const I18N = {
     customerDesc: 'ઘરની મરામત માટે તરત ચકાસાયેલ મિસ્ત્રી બુક કરો. ઝડપ, સુરક્ષા અને ગ્યારન્ટી.',
     workerRole: 'કારીગર / મિસ્ત્રી (Worker)',
     workerDesc: 'નજીકના ગ્રાહકો પાસેથી કામ મેળવો, ઝડપથી બૂક થાઓ અને આધાર બેજ સાથે કમાઓ.',
+    customerTags: 'કામ પોસ્ટ કરો • કારીગર પસંદ કરો • સુરક્ષિત પેમેન્ટ',
+    workerTags: 'તરત કામ • સીધું પેમેન્ટ • આધાર બેજ',
+    roleNote: '🔒 પ્રોફાઇલ લૉક: તમારી પસંદ કરેલી ભૂમિકા ખાતાની ચકાસણી અને ટૂલ્સ નક્કી કરે છે.',
+    enterMobile: '10 અંકનો મોબાઇલ નંબર દાખલ કરો',
+    mobileNotice: 'અમે આ નંબર પર SMS દ્વારા 6 અંકનો વેરિફિકેશન કોડ મોકલીશું.',
+    getCodeBtn: 'વેરિફિકેશન કોડ મેળવો →',
+    verifyPhoneTitle: 'ફોન નંબર ચકાસો',
+    enterOtpSubtitle: 'મોકલેલ 6 અંકનો OTP દાખલ કરો +91',
+    verifyProceedBtn: 'ચકાસો અને આગળ વધો ✓',
+    resendOtp: 'કોડ નથી મળ્યો? ફરી SMS મોકલો',
+    emailAuthTitle: 'ઇમેઇલ પ્રમાણીકરણ',
+    emailAuthHeading: 'ઇમેઇલ દ્વારા સાઇન ઇન કરો',
+    emailAuthSub: 'સાઇન ઇન કરવા માટે તમારું રજિસ્ટર્ડ ઇમેઇલ આઈડી અને પાસવર્ડ દાખલ કરો.',
+    emailLabel: 'ઇમેઇલ સરનામું *',
+    passwordLabel: 'પાસવર્ડ *',
+    forgotPassword: 'પાસવર્ડ ભૂલી ગયા?',
+    signInWithEmailBtn: 'ઇમેઇલ દ્વારા સાઇન ઇન કરો →',
+    newUserEmailNotice: 'નવા વપરાશકર્તા? ઇમેઇલ અને પાસવર્ડ દાખલ કરવાથી તમારું ખાતું આપમેળે બની જશે.',
+    termsOfService: 'સેવાની શરતો',
+    privacyPolicy: 'ગોપનીયતા નીતિ',
+    navHome: 'હોમ',
+    navFind: 'શોધો',
+    navBookings: 'બુકિંગ્સ',
+    navContractor: 'કોન્ટ્રાક્ટર',
+    navProfile: 'પ્રોફાઇલ',
+    navAlerts: 'અલર્ટ્સ',
+    navEarnings: 'કમાણી',
     hello: 'નમસ્તે,',
     activeReqCard: 'તમારા કાર્યો મેનેજ કરો',
     activeReqCount: '6/10',
@@ -312,6 +393,33 @@ const I18N = {
     customerDesc: 'घर दुरुस्तीसाठी ताबडतोब सत्यापित मिस्त्री बुक करा. जलद, सुरक्षित आणि हमी.',
     workerRole: 'कारागीर / मिस्त्री (Worker)',
     workerDesc: 'जवळच्या ग्राहकांकडून काम मिळवा, बुकिंग मिळवा आणि आधार बॅजसह दररोज कमाई करा.',
+    customerTags: 'काम पोस्ट करा • कारागीर निवडा • सुरक्षित पेमेंट',
+    workerTags: 'त्वरित काम • थेट पेमेंट • आधार बॅज',
+    roleNote: '🔒 प्रोफाइल लॉक: तुमची निवडलेली भूमिका खाते पडताळणी आणि टूल्स निश्चित करते.',
+    enterMobile: '10 अंकी मोबाईल नंबर प्रविष्ट करा',
+    mobileNotice: 'आम्ही या नंबरवर SMS द्वारे 6 अंकी पडताळणी कोड पाठवू.',
+    getCodeBtn: 'पडताळणी कोड मिळवा →',
+    verifyPhoneTitle: 'फोन नंबर पडताळा',
+    enterOtpSubtitle: 'पाठवलेला 6 अंकी OTP प्रविष्ट करा +91',
+    verifyProceedBtn: 'पडताळणी करा आणि पुढे जा ✓',
+    resendOtp: 'कोड मिळाला नाही? पुन्हा SMS पाठवा',
+    emailAuthTitle: 'ईमेल प्रमाणीकरण',
+    emailAuthHeading: 'ईमेलद्वारे साइन इन करा',
+    emailAuthSub: 'साइन इन करण्यासाठी आपला नोंदणीकृत ईमेल आयडी आणि पासवर्ड प्रविष्ट करा.',
+    emailLabel: 'ईमेल पत्ता *',
+    passwordLabel: 'पासवर्ड *',
+    forgotPassword: 'पासवर्ड विसरलात?',
+    signInWithEmailBtn: 'ईमेलद्वारे साइन इन करा →',
+    newUserEmailNotice: 'नवीन वापरकर्ता? ईमेल आणि पासवर्ड प्रविष्ट केल्याने आपले खाते आपोआप तयार होईल.',
+    termsOfService: 'सेवा अटी',
+    privacyPolicy: 'गोपनीयता धोरण',
+    navHome: 'होम',
+    navFind: 'शोधा',
+    navBookings: 'बुकिंग्ज',
+    navContractor: 'कंत्राटदार',
+    navProfile: 'प्रोफाइल',
+    navAlerts: 'अलर्ट्स',
+    navEarnings: 'कमाई',
     hello: 'नमस्कार,',
     activeReqCard: 'आपली कामे व्यवस्थापित करा',
     activeReqCount: '6/10',
@@ -1059,7 +1167,9 @@ function MainApp() {
       setLang(newLang);
       await StorageService.setLanguage(newLang);
       await StorageService.setHasChosenLanguage(true);
-      DeviceFeedback.triggerLightHaptics();
+      if (DeviceFeedback && DeviceFeedback.triggerLightTap) {
+        DeviceFeedback.triggerLightTap();
+      }
     } catch (err) {
       console.log('handleSelectLanguage err:', err);
     }
@@ -2123,9 +2233,7 @@ function MainApp() {
           {/* Footer Terms & Legal notice */}
           <View style={styles.signInFooter}>
             <Text style={styles.signInTermsText}>
-              By continuing, you confirm that you have read and agreed to the{' '}
-              <Text style={styles.termsLink}>Terms of Service</Text> and consent to the{' '}
-              <Text style={styles.termsLink}>Privacy Policy</Text>.
+              {t.termsNotice}
             </Text>
           </View>
         </ScrollView>
@@ -2142,10 +2250,10 @@ function MainApp() {
               <View style={styles.modalHeader}>
                 <View>
                   <Text style={styles.modalStepBadge}>
-                    {isOtpSent ? 'STEP 2: VERIFY OTP' : 'STEP 1: ENTER MOBILE'}
+                    {isOtpSent ? (lang === 'hi' ? 'चरण 2: OTP सत्यापित करें' : lang === 'gu' ? 'પગલું 2: OTP ચકાસો' : lang === 'mr' ? 'पायरी 2: OTP पडताळा' : 'STEP 2: VERIFY OTP') : (lang === 'hi' ? 'चरण 1: मोबाइल नंबर' : lang === 'gu' ? 'પગલું 1: મોબાઇલ નંબર' : lang === 'mr' ? 'पायरी 1: मोबाईल नंबर' : 'STEP 1: ENTER MOBILE')}
                   </Text>
                   <Text style={styles.modalTitle}>
-                    {isOtpSent ? 'Verify Phone Number' : 'Mobile Authentication'}
+                    {isOtpSent ? t.verifyPhoneTitle : (lang === 'hi' ? 'मोबाइल प्रमाणीकरण' : lang === 'gu' ? 'મોબાઇલ પ્રમાણીકરણ' : lang === 'mr' ? 'मोबाईल प्रमाणीकरण' : 'Mobile Authentication')}
                   </Text>
                 </View>
                 <TouchableOpacity
@@ -2163,7 +2271,7 @@ function MainApp() {
               {!isOtpSent ? (
                 // Step 1: Phone Number Input
                 <View style={styles.modalBody}>
-                  <Text style={styles.inputLabel}>Enter 10-Digit Mobile Number</Text>
+                  <Text style={styles.inputLabel}>{t.enterMobile}</Text>
                   <View style={styles.phoneInputRow}>
                     <View style={styles.phoneCountryCode}>
                       <Text style={styles.phoneCountryCodeText}>🇮🇳 +91</Text>
@@ -2180,7 +2288,7 @@ function MainApp() {
                     />
                   </View>
                   <Text style={styles.otpNoticeHelp}>
-                    We will send a 6-digit verification code via SMS to this number.
+                    {t.mobileNotice}
                   </Text>
 
                   <TouchableOpacity
@@ -2192,14 +2300,14 @@ function MainApp() {
                     {isAuthLoading ? (
                       <ActivityIndicator size="small" color="#FFFFFF" />
                     ) : (
-                      <Text style={styles.modalPublishBtnText}>Get Verification Code →</Text>
+                      <Text style={styles.modalPublishBtnText}>{t.getCodeBtn}</Text>
                     )}
                   </TouchableOpacity>
                 </View>
               ) : (
                 // Step 2: 6-Digit OTP Auto-Verification Input
                 <View style={styles.modalBody}>
-                  <Text style={styles.inputLabel}>Enter 6-Digit OTP Sent to +91 {phoneInput}</Text>
+                  <Text style={styles.inputLabel}>{t.enterOtpSubtitle} {phoneInput}</Text>
                   <TextInput
                     style={styles.otpBoxesInput}
                     placeholder="• • • • • •"
@@ -2211,7 +2319,7 @@ function MainApp() {
                     autoFocus
                   />
                   <Text style={styles.otpNoticeHelp}>
-                    ⚡ Automatically verifying when 6 digits are entered...
+                    ⚡ {lang === 'hi' ? '6 अंक दर्ज होते ही अपने आप सत्यापित होगा...' : lang === 'gu' ? '6 અંક દાખલ થતાં જ આપમેળે ચકાસાઈ જશે...' : lang === 'mr' ? '6 अंक प्रविष्ट करताच आपोआप पडताळणी होईल...' : 'Automatically verifying when 6 digits are entered...'}
                   </Text>
 
                   <TouchableOpacity
@@ -2223,7 +2331,7 @@ function MainApp() {
                     {isAuthLoading ? (
                       <ActivityIndicator size="small" color="#FFFFFF" />
                     ) : (
-                      <Text style={styles.modalPublishBtnText}>Verify & Proceed ✓</Text>
+                      <Text style={styles.modalPublishBtnText}>{t.verifyProceedBtn}</Text>
                     )}
                   </TouchableOpacity>
 
@@ -2232,7 +2340,7 @@ function MainApp() {
                     onPress={handleSendOtp}
                     activeOpacity={0.7}
                   >
-                    <Text style={styles.resendOtpText}>Didn't receive code? Resend SMS</Text>
+                    <Text style={styles.resendOtpText}>{t.resendOtp}</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -2514,7 +2622,7 @@ function MainApp() {
               <Text style={styles.roleCardTitle}>{t.customerRole}</Text>
               <Text style={styles.roleCardDesc}>{t.customerDesc}</Text>
               <View style={styles.roleTag}>
-                <Text style={styles.roleTagText}>Post Work • Hire Workers • Secured Payments</Text>
+                <Text style={styles.roleTagText}>{t.customerTags}</Text>
               </View>
             </TouchableOpacity>
 
@@ -2544,14 +2652,14 @@ function MainApp() {
               <Text style={styles.roleCardDesc}>{t.workerDesc}</Text>
               <View style={[styles.roleTag, { backgroundColor: '#F0FDF4' }]}>
                 <Text style={[styles.roleTagText, { color: '#166534' }]}>
-                  Instant Bids • Direct Payout • Aadhaar Badge
+                  {t.workerTags}
                 </Text>
               </View>
             </TouchableOpacity>
           </View>
 
           <Text style={styles.roleNote}>
-            🔒 Profile Persona Lock: Your registered persona determines account verification and live tools.
+            {t.roleNote}
           </Text>
         </View>
       </SafeAreaView>
@@ -3133,6 +3241,8 @@ function MainApp() {
             <CustomerHomeScreen
               insets={insets}
               userName={custName}
+              lang={lang}
+              t={t}
               onNavigateTab={(tab, category) => {
                 if (category) setFindInitialCategory(category);
                 setActiveTab(tab);
@@ -3147,6 +3257,8 @@ function MainApp() {
           {activeTab === 'FIND_WORKERS' && (
             <FindWorkersScreen
               insets={insets}
+              lang={lang}
+              t={t}
               initialCategory={findInitialCategory}
               onNavigateTab={(tab) => setActiveTab(tab)}
               onBookWorker={(details) => handleCustomerBookWorker(details)}
@@ -3157,6 +3269,8 @@ function MainApp() {
           {activeTab === 'BOOKINGS' && (
             <MyBookingsScreen
               insets={insets}
+              lang={lang}
+              t={t}
               onNavigateTab={(tab) => setActiveTab(tab)}
               bookings={customerBookings}
               onAutoAssignAnother={handleAutoAssignAnother}
@@ -3266,6 +3380,8 @@ function MainApp() {
           {activeTab === 'HOME' && (
             <WorkerHomeScreen
               insets={insets}
+              lang={lang}
+              t={t}
               workerProfile={workerProfile}
               onUpdateProfile={handleUpdateWorkerProfile}
               alertsCount={workerAlerts.length}
@@ -3350,7 +3466,7 @@ function MainApp() {
                 />
               </View>
               <Text style={[styles.navLabel, activeTab === 'HOME' && styles.navLabelActive]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
-                Home
+                {t.navHome}
               </Text>
             </TouchableOpacity>
 
@@ -3368,7 +3484,7 @@ function MainApp() {
                 />
               </View>
               <Text style={[styles.navLabel, activeTab === 'FIND_WORKERS' && styles.navLabelActive]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
-                Find
+                {t.navFind}
               </Text>
             </TouchableOpacity>
 
@@ -3386,7 +3502,7 @@ function MainApp() {
                 />
               </View>
               <Text style={[styles.navLabel, activeTab === 'BOOKINGS' && styles.navLabelActive]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
-                Bookings
+                {t.navBookings}
               </Text>
             </TouchableOpacity>
 
@@ -3404,7 +3520,7 @@ function MainApp() {
                 />
               </View>
               <Text style={[styles.navLabel, activeTab === 'CONTRACTOR' && styles.navLabelActive]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
-                Contractor
+                {t.navContractor}
               </Text>
             </TouchableOpacity>
 
@@ -3422,7 +3538,7 @@ function MainApp() {
                 />
               </View>
               <Text style={[styles.navLabel, activeTab === 'PROFILE' && styles.navLabelActive]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
-                Profile
+                {t.navProfile}
               </Text>
             </TouchableOpacity>
           </>
@@ -3442,7 +3558,7 @@ function MainApp() {
                 />
               </View>
               <Text style={[styles.navLabel, activeTab === 'HOME' && styles.navLabelActive]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
-                Home
+                {t.navHome}
               </Text>
             </TouchableOpacity>
 
@@ -3463,7 +3579,7 @@ function MainApp() {
                 )}
               </View>
               <Text style={[styles.navLabel, activeTab === 'ALERTS' && styles.navLabelActive]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
-                Alerts
+                {t.navAlerts}
               </Text>
             </TouchableOpacity>
 
@@ -3481,7 +3597,7 @@ function MainApp() {
                 />
               </View>
               <Text style={[styles.navLabel, activeTab === 'BOOKINGS' && styles.navLabelActive]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
-                Bookings
+                {t.navBookings}
               </Text>
             </TouchableOpacity>
 
@@ -3499,7 +3615,7 @@ function MainApp() {
                 />
               </View>
               <Text style={[styles.navLabel, activeTab === 'EARNINGS' && styles.navLabelActive]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
-                Earnings
+                {t.navEarnings}
               </Text>
             </TouchableOpacity>
 
@@ -3517,7 +3633,7 @@ function MainApp() {
                 />
               </View>
               <Text style={[styles.navLabel, activeTab === 'PROFILE' && styles.navLabelActive]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
-                Profile
+                {t.navProfile}
               </Text>
             </TouchableOpacity>
           </>

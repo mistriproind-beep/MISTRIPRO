@@ -31,6 +31,7 @@ import { supabase } from '../services/supabase';
 import { LiveBackend } from '../services/liveBackend';
 import { DeviceFeedback } from '../services/deviceFeedback';
 import { StorageService } from '../services/storage';
+import { translateWorkerSkill, translateLocationName } from '../data/categories';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -54,6 +55,8 @@ const resolveWorkerTarget = (profile) => {
 
 export default function WorkerHomeScreen({
   insets,
+  lang = 'en',
+  t,
   workerProfile,
   onUpdateProfile,
   alertsCount = 0,
@@ -221,12 +224,16 @@ export default function WorkerHomeScreen({
                 </Text>
                 <View style={styles.kycBadge}>
                   <ShieldCheck size={11} color="#15803D" />
-                  <Text style={styles.kycText}>Verified</Text>
+                  <Text style={styles.kycText}>
+                    {lang === 'hi' ? 'सत्यापित' : lang === 'gu' ? 'વેરિફાઇડ' : lang === 'mr' ? 'सत्यापित' : 'Verified'}
+                  </Text>
                 </View>
               </View>
               <View style={styles.locRow}>
                 <MapPin size={12} color="#64748B" />
-                <Text style={styles.locText}>{workerProfile?.location || 'Sawai Madhopur, Rajasthan'}</Text>
+                <Text style={styles.locText}>
+                  {translateLocationName(workerProfile?.location || 'Sawai Madhopur, Rajasthan', lang)}
+                </Text>
               </View>
             </View>
           </View>
@@ -258,13 +265,15 @@ export default function WorkerHomeScreen({
               <View style={styles.availStatusRow}>
                 <View style={[styles.statusDot, isAvailable ? styles.statusDotOn : styles.statusDotOff]} />
                 <Text style={[styles.availStatusTitle, isAvailable ? styles.availTitleOn : styles.availTitleOff]}>
-                  {isAvailable ? 'You are ONLINE for Work' : 'You are OFFLINE / Busy'}
+                  {isAvailable
+                    ? (lang === 'hi' ? 'आप काम के लिए ऑनलाइन हैं' : lang === 'gu' ? 'તમે કામ માટે ઓનલાઇન છો' : lang === 'mr' ? 'तुम्ही कामासाठी ऑनलाइन आहात' : 'You are ONLINE for Work')
+                    : (lang === 'hi' ? 'आप ऑफलाइन / व्यस्त हैं' : lang === 'gu' ? 'તમે ઑફલાઇન / વ્યસ્ત છો' : lang === 'mr' ? 'तुम्ही ऑफलाइन / व्यस्त आहात' : 'You are OFFLINE / Busy')}
                 </Text>
               </View>
               <Text style={styles.availSubText}>
                 {isAvailable
-                  ? 'Active in 15 km radius. Customers near you can find & hire you now.'
-                  : 'Hidden from customer search. Turn ON when ready to take jobs.'}
+                  ? (lang === 'hi' ? '15 किमी के दायरे में सक्रिय। आसपास के ग्राहक आपको देखकर तुरंत हायर कर सकते हैं।' : lang === 'gu' ? '15 કિમી વિસ્તારમાં સક્રિય. નજીકના ગ્રાહકો તમને તરત જ હાયર કરી શકે છે.' : lang === 'mr' ? '15 किमी परिघात सक्रिय. जवळपासचे ग्राहक तुम्हाला कामावर ठेवू शकतात.' : 'Active in 15 km radius. Customers near you can find & hire you now.')
+                  : (lang === 'hi' ? 'ग्राहक खोज से छिपा हुआ। काम लेने के लिए चालू करें।' : lang === 'gu' ? 'ગ્રાહક શોધમાંથી છુપાયેલું. કામ સ્વીકારવા માટે ચાલુ કરો.' : lang === 'mr' ? 'ग्राहक शोधातून लपविलेले. काम स्वीकारण्यासाठी सुरू करा.' : 'Hidden from customer search. Turn ON when ready to take jobs.')}
               </Text>
             </View>
 
@@ -281,7 +290,9 @@ export default function WorkerHomeScreen({
           <View style={[styles.availBadgeRow, isAvailable ? styles.availBadgeOn : styles.availBadgeOff]}>
             <Radio size={12} color={isAvailable ? '#15803D' : '#64748B'} />
             <Text style={[styles.availBadgeText, isAvailable ? styles.badgeTextOn : styles.badgeTextOff]}>
-              {isAvailable ? 'Broadcasting live GPS location to nearby clients' : 'Profile paused • Not receiving calls'}
+              {isAvailable
+                ? (lang === 'hi' ? 'ग्राहकों को लाइव जीपीएस लोकेशन शेयर हो रहा है' : lang === 'gu' ? 'ગ્રાહકો સાથે લાઈવ જીપીએસ શેર થઈ રહ્યું છે' : lang === 'mr' ? 'ग्राहकांना थेट जीपीएस लोकेशन शेअर होत आहे' : 'Broadcasting live GPS location to nearby clients')
+                : (lang === 'hi' ? 'प्रोफ़ाइल रोक दी गई है • कॉल नहीं आएंगे' : lang === 'gu' ? 'પ્રોફાઇલ પોઝ કરેલ છે • કોલ્સ આવશે નહીં' : lang === 'mr' ? 'प्रोफाइल थांबवली आहे • कॉल येणार नाहीत' : 'Profile paused • Not receiving calls')}
             </Text>
           </View>
         </View>
@@ -293,8 +304,12 @@ export default function WorkerHomeScreen({
               <Briefcase size={18} color="#4F46E5" />
             </View>
             <View style={styles.skillTextCol}>
-              <Text style={styles.skillCardLabel}>Selected Primary Trade</Text>
-              <Text style={styles.skillCardTitle}>{workerProfile?.skill || 'Master Mason (राजमिस्त्री)'}</Text>
+              <Text style={styles.skillCardLabel}>
+                {lang === 'hi' ? 'चुना हुआ प्राथमिक कार्य' : lang === 'gu' ? 'પસંદ કરેલ મુખ્ય કામ' : lang === 'mr' ? 'निवडलेला मुख्य व्यवसाय' : 'Selected Primary Trade'}
+              </Text>
+              <Text style={styles.skillCardTitle}>
+                {translateWorkerSkill(workerProfile?.skill || 'Mason (राजमिस्त्री)', lang)}
+              </Text>
             </View>
           </View>
 
@@ -302,13 +317,19 @@ export default function WorkerHomeScreen({
 
           <View style={styles.priceRow}>
             <View>
-              <Text style={styles.priceLabel}>Your Working Rate</Text>
+              <Text style={styles.priceLabel}>
+                {lang === 'hi' ? 'आपकी काम की दर' : lang === 'gu' ? 'તમારો કામનો દર' : lang === 'mr' ? 'तुमचा कामाचा दर' : 'Your Working Rate'}
+              </Text>
               <View style={styles.priceValueRow}>
                 <Text style={styles.priceSymbol}>₹</Text>
                 <Text style={styles.priceAmount}>{workerProfile?.price || workerProfile?.daily_rate || 950}</Text>
-                <Text style={styles.priceUnit}>/{workerProfile?.priceType || 'day'}</Text>
+                <Text style={styles.priceUnit}>
+                  /{workerProfile?.priceType === 'day' ? (lang === 'hi' ? 'दिन' : lang === 'gu' ? 'દિવસ' : lang === 'mr' ? 'दिवस' : 'day') : workerProfile?.priceType || 'day'}
+                </Text>
               </View>
-              <Text style={styles.priceHint}>Shown to customers when booking</Text>
+              <Text style={styles.priceHint}>
+                {lang === 'hi' ? 'बुकिंग के समय ग्राहकों को दिखाई देगा' : lang === 'gu' ? 'બુકિંગ વખતે ગ્રાહકોને દેખાશે' : lang === 'mr' ? 'बुकिंग दरम्यान ग्राहकांना दिसेल' : 'Shown to customers when booking'}
+              </Text>
             </View>
 
             {/* Editable Button */}
@@ -322,7 +343,9 @@ export default function WorkerHomeScreen({
               activeOpacity={0.8}
             >
               <Edit3 size={15} color="#4F46E5" />
-              <Text style={styles.editPriceBtnText}>Edit Price</Text>
+              <Text style={styles.editPriceBtnText}>
+                {lang === 'hi' ? 'दर बदलें' : lang === 'gu' ? 'ભાવ બદલો' : lang === 'mr' ? 'दर बदला' : 'Edit Price'}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -338,8 +361,12 @@ export default function WorkerHomeScreen({
               <Zap size={16} color="#D97706" />
             </View>
             <Text style={styles.statCount}>{alertsCount}</Text>
-            <Text style={styles.statTitle}>New Alerts</Text>
-            <Text style={styles.statSub}>Tap to view →</Text>
+            <Text style={styles.statTitle}>
+              {lang === 'hi' ? 'नए अलर्ट' : lang === 'gu' ? 'નવા એલર્ટ' : lang === 'mr' ? 'नवीन सूचना' : 'New Alerts'}
+            </Text>
+            <Text style={styles.statSub}>
+              {lang === 'hi' ? 'देखने के लिए टैप करें →' : lang === 'gu' ? 'જોવા માટે ટૅપ કરો →' : lang === 'mr' ? 'पाहण्यासाठी टॅप करा →' : 'Tap to view →'}
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -350,9 +377,13 @@ export default function WorkerHomeScreen({
             <View style={[styles.statIconWrap, { backgroundColor: '#EEF2FF' }]}>
               <Briefcase size={16} color="#4F46E5" />
             </View>
-            <Text style={styles.statCount}>2 Active</Text>
-            <Text style={styles.statTitle}>Ongoing Jobs</Text>
-            <Text style={styles.statSub}>Track progress →</Text>
+            <Text style={styles.statCount}>2 {lang === 'hi' ? 'सक्रिय' : lang === 'gu' ? 'સક્રિય' : lang === 'mr' ? 'सक्रिय' : 'Active'}</Text>
+            <Text style={styles.statTitle}>
+              {lang === 'hi' ? 'चल रहे काम' : lang === 'gu' ? 'ચાલુ કામ' : lang === 'mr' ? 'सुरू कामे' : 'Ongoing Jobs'}
+            </Text>
+            <Text style={styles.statSub}>
+              {lang === 'hi' ? 'प्रगति देखें →' : lang === 'gu' ? 'પ્રગતિ જુઓ →' : lang === 'mr' ? 'प्रगती तपासा →' : 'Track progress →'}
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -364,8 +395,12 @@ export default function WorkerHomeScreen({
               <Wallet size={16} color="#15803D" />
             </View>
             <Text style={styles.statCount}>₹{Number(walletBalance || 0).toLocaleString('en-IN')}</Text>
-            <Text style={styles.statTitle}>Wallet Cash</Text>
-            <Text style={styles.statSub}>Withdraw now →</Text>
+            <Text style={styles.statTitle}>
+              {lang === 'hi' ? 'वॉलेट राशि' : lang === 'gu' ? 'વોલેટ કેશ' : lang === 'mr' ? 'वॉलेट रोख' : 'Wallet Cash'}
+            </Text>
+            <Text style={styles.statSub}>
+              {lang === 'hi' ? 'अभी निकालें →' : lang === 'gu' ? 'હમણા ઉપાડો →' : lang === 'mr' ? 'आता काढा →' : 'Withdraw now →'}
+            </Text>
           </TouchableOpacity>
         </View>
 

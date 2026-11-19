@@ -31,4 +31,11 @@ export const DeviceFeedback = {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch (e) {}
   },
+
+  // Alias for compatibility
+  triggerLightHaptics: async () => {
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch (e) {}
+  },
 };

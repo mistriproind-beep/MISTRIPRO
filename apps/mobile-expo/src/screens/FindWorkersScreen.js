@@ -30,7 +30,7 @@ import {
 } from 'lucide-react-native';
 import { WebView } from 'react-native-webview';
 import * as Location from 'expo-location';
-import { CATEGORIES } from '../data/categories';
+import { CATEGORIES, translateWorkerSkill } from '../data/categories';
 import RazorpayModal from '../components/RazorpayModal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -52,7 +52,7 @@ function RatingStars({ rating }) {
   return <View style={styles.starsRow}>{stars}</View>;
 }
 
-function WorkerCard({ worker, isSelected, onSelect, onOpenProfile, onProceedBooking }) {
+function WorkerCard({ worker, isSelected, onSelect, onOpenProfile, onProceedBooking, lang = 'en' }) {
   if (!worker) return null;
   return (
     <TouchableOpacity
@@ -76,13 +76,15 @@ function WorkerCard({ worker, isSelected, onSelect, onOpenProfile, onProceedBook
               </View>
             )}
           </View>
-          <Text style={styles.workerSkill}>{worker.skill || 'Labour'}</Text>
+          <Text style={styles.workerSkill}>{translateWorkerSkill(worker.skill || worker.category, lang)}</Text>
 
           {/* Availability Status Badge */}
           <View style={[styles.cardAvailBadge, worker.available ? styles.cardAvailOnline : styles.cardAvailOffline]}>
             <View style={[styles.cardAvailDot, worker.available ? styles.cardDotOnline : styles.cardDotOffline]} />
             <Text style={[styles.cardAvailText, worker.available ? styles.cardTextOnline : styles.cardTextOffline]}>
-              {worker.available ? 'Online' : 'Not Available Right Now'}
+              {worker.available
+                ? (lang === 'hi' ? '● ऑनलाइन' : lang === 'gu' ? '● ઓનલાઇન' : lang === 'mr' ? '● ऑनलाइन' : '● Online')
+                : (lang === 'hi' ? '○ अभी उपलब्ध नहीं' : lang === 'gu' ? '○ હાલમાં ઉપલબ્ધ નથી' : lang === 'mr' ? '○ सध्या उपलब्ध नाही' : '○ Not Available Right Now')}
             </Text>
           </View>
 
@@ -96,7 +98,7 @@ function WorkerCard({ worker, isSelected, onSelect, onOpenProfile, onProceedBook
         {/* Distance Badge */}
         <View style={styles.distanceBadge}>
           <Navigation size={10} color="#059669" />
-          <Text style={styles.distanceText}>{worker.distance || '2.0'} km</Text>
+          <Text style={styles.distanceText}>{worker.distance || '2.0'} {lang === 'hi' ? 'किमी' : lang === 'gu' ? 'કિમી' : lang === 'mr' ? 'किમી' : 'km'}</Text>
         </View>
       </View>
 
@@ -104,7 +106,7 @@ function WorkerCard({ worker, isSelected, onSelect, onOpenProfile, onProceedBook
       <View style={styles.workerCardBottom}>
         <View style={styles.rateContainer}>
           <Text style={styles.rateAmount}>₹{worker.rate || 800}</Text>
-          <Text style={styles.rateType}>/{worker.rateType || 'day'}</Text>
+          <Text style={styles.rateType}>/{lang === 'hi' ? 'दिन' : lang === 'gu' ? 'દિવસ' : lang === 'mr' ? 'दिवस' : (worker.rateType || 'day')}</Text>
         </View>
 
         <View style={styles.workerActions}>
@@ -113,26 +115,32 @@ function WorkerCard({ worker, isSelected, onSelect, onOpenProfile, onProceedBook
             onPress={() => onOpenProfile && onOpenProfile(worker)}
           >
             <User size={13} color="#4F46E5" />
-            <Text style={styles.viewProfileText}>Profile</Text>
+            <Text style={styles.viewProfileText}>
+              {lang === 'hi' ? 'प्रोफाइल' : lang === 'gu' ? 'પ્રોફાઇલ' : lang === 'mr' ? 'प्रोफाइल' : 'Profile'}
+            </Text>
           </TouchableOpacity>
           {worker.available ? (
             <TouchableOpacity
               style={styles.bookActionBtn}
               onPress={() => onProceedBooking && onProceedBooking(worker)}
             >
-              <Text style={styles.bookActionText}>Book</Text>
+              <Text style={styles.bookActionText}>
+                {lang === 'hi' ? 'बुक करें' : lang === 'gu' ? 'બુક કરો' : lang === 'mr' ? 'बुक करा' : 'Book'}
+              </Text>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity
               style={[styles.bookActionBtn, styles.bookActionBtnOffline]}
               onPress={() => {
                 Alert.alert(
-                  'Worker Offline 🔴',
-                  `${worker.name || 'This worker'} is not available right now. You can view their verified profile or check back later.`
+                  lang === 'hi' ? 'कारीगर ऑफलाइन है 🔴' : lang === 'gu' ? 'કારીગર ઑફલાઇન છે 🔴' : lang === 'mr' ? 'कामगार ऑफलाइन आहे 🔴' : 'Worker Offline 🔴',
+                  lang === 'hi' ? `${worker.name || 'यह कारीगर'} अभी ऑफलाइन है। जब वे ऑनलाइन आएंगे तब आप बुक कर सकते हैं।` : lang === 'gu' ? `${worker.name || 'આ કારીગર'} હાલમાં ઑફલાઇન છે. જ્યારે તેઓ ઑનલાઇન આવશે ત્યારે તમે બુક કરી શકો છો.` : lang === 'mr' ? `${worker.name || 'हा कामगार'} सध्या ऑफलाइन आहे. ते ऑनलाइन आल्यावर आपण बुक करू शकता.` : `${worker.name || 'This worker'} is not available right now. You can view their verified profile or check back later.`
                 );
               }}
             >
-              <Text style={styles.bookActionTextOffline}>Offline</Text>
+              <Text style={styles.bookActionTextOffline}>
+                {lang === 'hi' ? 'ऑफलाइन' : lang === 'gu' ? 'ઑફલાઇન' : lang === 'mr' ? 'ऑफलाइन' : 'Offline'}
+              </Text>
             </TouchableOpacity>
           )}
         </View>
@@ -147,6 +155,8 @@ export default function FindWorkersScreen({
   onNavigateTab,
   initialCategory = 'All',
   workers = [],
+  lang = 'en',
+  t,
 }) {
   const [selectedCategory, setSelectedCategory] = useState(initialCategory || 'All');
   const [searchQuery, setSearchQuery] = useState('');
@@ -748,6 +758,7 @@ export default function FindWorkersScreen({
               <WorkerCard
                 key={worker.id}
                 worker={worker}
+                lang={lang}
                 isSelected={selectedWorkerId === worker.id}
                 onSelect={(w) => setSelectedWorkerId(w.id)}
                 onOpenProfile={(w) => setSelectedProfileWorker(w)}
@@ -776,7 +787,7 @@ export default function FindWorkersScreen({
                       </View>
                     )}
                   </View>
-                  <Text style={styles.modalWorkerSkill}>{selectedProfileWorker?.skill}</Text>
+                  <Text style={styles.modalWorkerSkill}>{translateWorkerSkill(selectedProfileWorker?.skill || selectedProfileWorker?.category, lang)}</Text>
                 </View>
               </View>
               <TouchableOpacity onPress={() => setSelectedProfileWorker(null)}>
@@ -787,65 +798,65 @@ export default function FindWorkersScreen({
             <View style={styles.modalStatsRow}>
               <View style={styles.modalStatCol}>
                 <Text style={styles.modalStatNum}>{selectedProfileWorker?.rating} ★</Text>
-                <Text style={styles.modalStatLabel}>{selectedProfileWorker?.reviews} reviews</Text>
+                <Text style={styles.modalStatLabel}>{selectedProfileWorker?.reviews} {lang === 'hi' ? 'समीक्षाएं' : lang === 'gu' ? 'રિવ્યુઝ' : lang === 'mr' ? 'अभिप्राय' : 'reviews'}</Text>
               </View>
               <View style={styles.modalStatDivider} />
               <View style={styles.modalStatCol}>
-                <Text style={styles.modalStatNum}>{selectedProfileWorker?.exp} Yrs</Text>
-                <Text style={styles.modalStatLabel}>Experience</Text>
+                <Text style={styles.modalStatNum}>{selectedProfileWorker?.exp} {lang === 'hi' ? 'साल' : lang === 'gu' ? 'વર્ષ' : lang === 'mr' ? 'वर्षे' : 'Yrs'}</Text>
+                <Text style={styles.modalStatLabel}>{lang === 'hi' ? 'अनुभव' : lang === 'gu' ? 'અનુભવ' : lang === 'mr' ? 'अनुभव' : 'Experience'}</Text>
               </View>
               <View style={styles.modalStatDivider} />
               <View style={styles.modalStatCol}>
-                <Text style={styles.modalStatNum}>{selectedProfileWorker?.distance} km</Text>
-                <Text style={styles.modalStatLabel}>Distance</Text>
+                <Text style={styles.modalStatNum}>{selectedProfileWorker?.distance} {lang === 'hi' ? 'किमी' : lang === 'gu' ? 'કિમી' : lang === 'mr' ? 'किમી' : 'km'}</Text>
+                <Text style={styles.modalStatLabel}>{lang === 'hi' ? 'दूरी' : lang === 'gu' ? 'અંતર' : lang === 'mr' ? 'अंतर' : 'Distance'}</Text>
               </View>
             </View>
 
             <View style={styles.credentialsBox}>
               <ShieldCheck size={16} color="#15803D" />
               <Text style={styles.credentialsText}>
-                Aadhaar Verified Mistri • Razorpay Protected
+                {lang === 'hi' ? 'आधार सत्यापित मिस्त्री • रेज़रपे सुरक्षित' : lang === 'gu' ? 'આધાર ચકાસાયેલ મિસ્ત્રી • રેઝરપે સુરક્ષિત' : lang === 'mr' ? 'आधार सत्यापित मिस्त्री • रेझरपे सुरक्षित' : 'Aadhaar Verified Mistri • Razorpay Protected'}
               </Text>
             </View>
 
             {!selectedProfileWorker?.available && (
               <View style={styles.modalOfflineNotice}>
                 <Text style={styles.modalOfflineNoticeText}>
-                  ⚠️ This mistri is currently OFFLINE / Not Available Right Now. Direct booking will resume when they go online.
+                  {lang === 'hi' ? '⚠️ यह मिस्त्री अभी ऑफलाइन है। जब वे ऑनलाइन आएंगे तब बुकिंग संभव होगी।' : lang === 'gu' ? '⚠️ આ મિસ્ત્રી હાલમાં ઑફલાઇન છે. તેઓ ઑનલાઇન આવશે ત્યારે બુકિંગ શક્ય બનશે.' : lang === 'mr' ? '⚠️ हा मिस्त्री सध्या ऑफलाइन आहे. ते ऑनलाइन आल्यावर बुकिंग शक्य होईल.' : '⚠️ This mistri is currently OFFLINE / Not Available Right Now. Direct booking will resume when they go online.'}
                 </Text>
               </View>
             )}
 
             <View style={styles.modalFooterRow}>
               <View>
-                <Text style={styles.modalRateLabel}>Daily Wage</Text>
-                <Text style={styles.modalRateVal}>₹{selectedProfileWorker?.rate} <Text style={{ fontSize: 13, color: '#64748B' }}>/day</Text></Text>
+                <Text style={styles.modalRateLabel}>{lang === 'hi' ? 'दैनिक मजदूरी' : lang === 'gu' ? 'દૈનિક વેતન' : lang === 'mr' ? 'दैनिक मजुरी' : 'Daily Wage'}</Text>
+                <Text style={styles.modalRateVal}>₹{selectedProfileWorker?.rate} <Text style={{ fontSize: 13, color: '#64748B' }}>/{lang === 'hi' ? 'दिन' : lang === 'gu' ? 'દિવસ' : lang === 'mr' ? 'दिवस' : 'day'}</Text></Text>
               </View>
 
               {selectedProfileWorker?.available ? (
                 <TouchableOpacity
                   style={styles.modalBookBtn}
                   onPress={() => {
-                    const w = selectedProfileWorker;
+                    const targetWorker = selectedProfileWorker;
                     setSelectedProfileWorker(null);
-                    setCheckoutWorker(w);
+                    setCheckoutWorker(targetWorker);
                   }}
                   activeOpacity={0.85}
                 >
-                  <Text style={styles.modalBookBtnText}>Proceed to Book</Text>
+                  <Text style={styles.modalBookBtnText}>{lang === 'hi' ? 'आगे बढ़ें और बुक करें' : lang === 'gu' ? 'આગળ વધો અને બુક કરો' : lang === 'mr' ? 'पुढे जा आणि बुक करा' : 'Proceed to Book'}</Text>
                 </TouchableOpacity>
               ) : (
                 <TouchableOpacity
                   style={[styles.modalBookBtn, { backgroundColor: '#94A3B8' }]}
                   onPress={() => {
                     Alert.alert(
-                      'Worker Currently Offline',
-                      `${selectedProfileWorker?.name} is currently not available for instant bookings.`
+                      lang === 'hi' ? 'कारीगर ऑफलाइन है' : lang === 'gu' ? 'કારીગર ઑફલાઇન છે' : lang === 'mr' ? 'कामगार ऑफलाइन आहे' : 'Worker Currently Offline',
+                      `${selectedProfileWorker?.name} ${lang === 'hi' ? 'अभी बुकिंग के लिए उपलब्ध नहीं हैं।' : lang === 'gu' ? 'હાલમાં બુકિંગ માટે ઉપલબ્ધ નથી.' : lang === 'mr' ? 'सध्या बुकिंगसाठी उपलब्ध नाहीत.' : 'is currently not available for instant booking.'}`
                     );
                   }}
                   activeOpacity={0.85}
                 >
-                  <Text style={styles.modalBookBtnText}>Currently Offline</Text>
+                  <Text style={styles.modalBookBtnText}>{lang === 'hi' ? 'अभी ऑफलाइन हैं' : lang === 'gu' ? 'હાલમાં ઑફલાઇન છે' : lang === 'mr' ? 'સध्या ऑफलाइन आहेत' : 'Currently Offline'}</Text>
                 </TouchableOpacity>
               )}
             </View>
