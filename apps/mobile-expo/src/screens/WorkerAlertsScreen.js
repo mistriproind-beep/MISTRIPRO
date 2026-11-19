@@ -209,10 +209,12 @@ export default function WorkerAlertsScreen({
                     <View style={styles.countdownPill}>
                       <Clock size={12} color="#DC2626" />
                       <Text style={styles.countdownPillText}>
-                        समय शेष: {min}:{remainSec}
+                        {lang === 'hi' ? `समय शेष: ${min}:${remainSec}` : `Time Left: ${min}:${remainSec}`}
                       </Text>
                     </View>
-                    <Text style={styles.countdownNotice}>5 मिनट में अगले मिस्त्री को ट्रांसफर होगा</Text>
+                    <Text style={styles.countdownNotice}>
+                      {lang === 'hi' ? '5 मिनट में अगले मिस्त्री को ट्रांसफर होगा' : 'Auto-forwards in 5 mins'}
+                    </Text>
                   </View>
                 </View>
 
@@ -243,7 +245,9 @@ export default function WorkerAlertsScreen({
                   {/* Offered Rate Pill */}
                   <View style={styles.ratePill}>
                     <Text style={styles.ratePillAmount}>₹99</Text>
-                    <Text style={styles.ratePillUnit}>विजिट शुल्क</Text>
+                    <Text style={styles.ratePillUnit}>
+                      {lang === 'hi' ? 'बुकिंग शुल्क' : 'Booking Fee'}
+                    </Text>
                   </View>
                 </View>
 
@@ -255,7 +259,9 @@ export default function WorkerAlertsScreen({
                   </View>
                   <Text style={styles.jobTitle}>{alertItem.title}</Text>
                   <Text style={{ fontSize: 11, color: '#059669', fontWeight: '700', marginTop: 3 }}>
-                    • वास्तविक काम का रेट आप साइट विजिट करके तय करेंगे
+                    {lang === 'hi'
+                      ? '• वास्तविक काम का रेट आप साइट विजिट करके तय करेंगे'
+                      : '• Final work rate is decided directly by you upon site inspection'}
                   </Text>
                   {alertItem.description ? (
                     <Text style={styles.jobDesc} numberOfLines={2}>

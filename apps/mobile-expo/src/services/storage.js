@@ -34,15 +34,18 @@ export const StorageService = {
   // 1. Language Preferences (Ask once, remember forever)
   getLanguage: async () => {
     try {
-      return await AsyncStorage.getItem(KEYS.LANG);
+      const saved = await AsyncStorage.getItem(KEYS.LANG);
+      return saved || 'en';
     } catch (e) {
-      return null;
+      return 'en';
     }
   },
   getHasChosenLanguage: async () => {
     try {
       const val = await AsyncStorage.getItem(KEYS.HAS_CHOSEN_LANG);
-      return val === 'true';
+      if (val === 'true') return true;
+      const lang = await AsyncStorage.getItem(KEYS.LANG);
+      return Boolean(lang);
     } catch (e) {
       return false;
     }
@@ -63,14 +66,18 @@ export const StorageService = {
   getSession: async () => {
     try {
       const data = await AsyncStorage.getItem(KEYS.USER_SESSION);
-      return data ? JSON.parse(data) : null;
+      if (!data) return null;
+      const parsed = JSON.parse(data);
+      return parsed && typeof parsed === 'object' ? parsed : null;
     } catch (e) {
       return null;
     }
   },
   setSession: async (sessionObj) => {
     try {
-      await AsyncStorage.setItem(KEYS.USER_SESSION, JSON.stringify(sessionObj));
+      if (sessionObj) {
+        await AsyncStorage.setItem(KEYS.USER_SESSION, JSON.stringify(sessionObj));
+      }
     } catch (e) {}
   },
   clearSession: async () => {

@@ -40,6 +40,7 @@ import {
   translateLocationName,
 } from '../data/categories';
 import RazorpayModal from '../components/RazorpayModal';
+import SiteAddressPickerModal from '../components/SiteAddressPickerModal';
 
 /* ─── helpers ─── */
 function getDistanceKm(lat1, lon1, lat2, lon2) {
@@ -86,8 +87,10 @@ export default function CustomerHomeScreen({
   lang = 'en',
   t,
   customerWalletBalance = 0,
+  sessionLocation,
+  onUpdateSessionLocation,
 }) {
-  const [locationText, setLocationText] = useState('Sawai Madhopur, Rajasthan');
+  const [locationText, setLocationText] = useState(sessionLocation?.text || 'Sawai Madhopur, Rajasthan');
   const [locationLoading, setLocationLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeGroup, setActiveGroup] = useState('all');
@@ -99,15 +102,27 @@ export default function CustomerHomeScreen({
   const [showRazorpayModal, setShowRazorpayModal] = useState(false);
   const [razorpayBookingData, setRazorpayBookingData] = useState(null);
   const [showAllCategories, setShowAllCategories] = useState(false);
+  const [showSiteAddressPicker, setShowSiteAddressPicker] = useState(false);
+  const [pendingPaidBooking, setPendingPaidBooking] = useState(null);
 
-  const [userLat, setUserLat] = useState(25.9928);
-  const [userLon, setUserLon] = useState(76.3712);
+  const [userLat, setUserLat] = useState(sessionLocation?.lat || 25.9928);
+  const [userLon, setUserLon] = useState(sessionLocation?.lng || 76.3712);
   const [distanceRange, setDistanceRange] = useState(10);
-  const [isManualLocation, setIsManualLocation] = useState(false);
+  const [isManualLocation, setIsManualLocation] = useState(Boolean(sessionLocation?.isManual));
   const [showLocationSearch, setShowLocationSearch] = useState(false);
   const [locationSearchQuery, setLocationSearchQuery] = useState('');
   const [locationResults, setLocationResults] = useState([]);
   const [locationSearchLoading, setLocationSearchLoading] = useState(false);
+
+  // Sync when sessionLocation changes from outside (e.g., from FindWorkersScreen)
+  useEffect(() => {
+    if (sessionLocation) {
+      if (sessionLocation.text) setLocationText(sessionLocation.text);
+      if (sessionLocation.lat) setUserLat(sessionLocation.lat);
+      if (sessionLocation.lng) setUserLon(sessionLocation.lng);
+      setIsManualLocation(Boolean(sessionLocation.isManual));
+    }
+  }, [sessionLocation]);
 
   const userInitials = useMemo(() => {
     const clean = (typeof userName === 'string' ? userName : 'User').trim();
@@ -146,7 +161,16 @@ export default function CustomerHomeScreen({
           const place = rev[0];
           const area = place.subregion || place.district || place.city || place.name || 'Sawai Madhopur';
           const st = place.region || 'Rajasthan';
-          setLocationText(`${area}, ${st}`);
+          const formattedLoc = `${area}, ${st}`;
+          setLocationText(formattedLoc);
+          if (onUpdateSessionLocation) {
+            onUpdateSessionLocation({
+              text: formattedLoc,
+              lat: loc.coords.latitude,
+              lng: loc.coords.longitude,
+              isManual: false,
+            });
+          }
         }
       }
     } catch (err) {
@@ -154,7 +178,7 @@ export default function CustomerHomeScreen({
     } finally {
       setLocationLoading(false);
     }
-  }, []);
+  }, [onUpdateSessionLocation]);
 
   // 1. Initial Launch / Mount: Always detect and apply current device GPS location
   useEffect(() => {
@@ -505,12 +529,7 @@ export default function CustomerHomeScreen({
             <Star size={13} color="#F59E0B" fill="#F59E0B" />
             <Text style={styles.workerRating}>{item?.rating || '5.0'}</Text>
             <Text style={styles.workerReviews}>({item?.reviews ?? 0})</Text>
-            <View style={styles.metaDot} />
-            <Text style={styles.workerRate}>₹{item?.bookingFee || 99} <Text style={{ fontSize: 11, color: '#64748B', fontWeight: '500' }}>{lang === 'hi' ? 'विजिट' : 'Visit'}</Text></Text>
           </View>
-          <Text style={{ fontSize: 10, color: '#059669', fontWeight: '600', marginTop: 2 }}>
-            • {lang === 'hi' ? 'काम का रेट साइट विजिट पर तय होगा' : lang === 'gu' ? 'કામનો દર સાઇટ મુલાકાત પર નક્કી થશે' : lang === 'mr' ? 'कामाचा दर साइट भेटीवर ठरेल' : 'Work price decided on-site'}
-          </Text>
         </View>
 
         {/* Right side */}
@@ -941,8 +960,8 @@ export default function CustomerHomeScreen({
 
             <View style={styles.modalFooterRow}>
               <View>
-                <Text style={styles.modalRateLabel}>{lang === 'hi' ? 'साइट विजिट शुल्क' : lang === 'gu' ? 'મુલાકાત શુલ્ક' : lang === 'mr' ? 'भेट शुल्क' : 'Site Visit Fee'}</Text>
-                <Text style={styles.modalRateVal}>₹{selectedWorker?.bookingFee || 99} <Text style={{ fontSize: 12, color: '#059669', fontWeight: '600' }}>• {lang === 'hi' ? 'काम का रेट साइट पर' : 'Quote On-Site'}</Text></Text>
+                <Text style={styles.modalRateLabel}>{lang === 'hi' ? 'बुकिंग शुल्क' : lang === 'gu' ? 'બુકિંગ શુલ્ક' : lang === 'mr' ? 'बुकिंग शुल्क' : 'Booking Charge'}</Text>
+                <Text style={styles.modalRateVal}>₹{selectedWorker?.bookingFee || 99} <Text style={{ fontSize: 12, color: '#059669', fontWeight: '600' }}>• {lang === 'hi' ? 'काम का रेट साइट पर' : 'Work Price On-Site'}</Text></Text>
               </View>
 
               {selectedWorker?.available ? (
@@ -959,7 +978,7 @@ export default function CustomerHomeScreen({
                   onPress={() => {
                     Alert.alert(
                       lang === 'hi' ? 'कारीगर ऑफलाइन है' : lang === 'gu' ? 'કારીગર ઑફલાઇન છે' : lang === 'mr' ? 'कामगार ऑफलाइन आहे' : 'Worker Currently Offline',
-                      `${selectedWorker?.name} ${lang === 'hi' ? 'अभी बुकिंग के लिए उपलब्ध नहीं हैं।' : lang === 'gu' ? 'હાલમાં બુકિંગ માટે ઉપલબ્ધ નથી.' : lang === 'mr' ? 'सध्या बुकिंगसाठी उपलब्ध नाहीत.' : 'is currently not available for instant booking.'}`
+                      `${selectedWorker?.name} ${lang === 'hi' ? 'अभी बुकिंग के लिए उपलब्ध नहीं हैं।' : lang === 'gu' ? 'હાલમાં બુકિંગ માટે ઉપલબ્ધ નથી.' : lang === 'mr' ? 'સध्या बुकिंगसाठी उपलब्ध नाहीत.' : 'is currently not available for instant booking.'}`
                     );
                   }}
                   activeOpacity={0.85}
@@ -988,7 +1007,7 @@ export default function CustomerHomeScreen({
 
             <View style={styles.billBox}>
               <View style={styles.billRow}>
-                <Text style={styles.billItem}>{lang === 'hi' ? 'साइट विजिट व निरीक्षण शुल्क' : lang === 'gu' ? 'સાઇટ મુલાકાત અને નિરીક્ષણ શુલ્ક' : lang === 'mr' ? 'साइट भेट व तपासणी शुल्क' : 'Site Visit & Inspection Fee'}</Text>
+                <Text style={styles.billItem}>{lang === 'hi' ? 'बुकिंग शुल्क (साइट निरीक्षण)' : lang === 'gu' ? 'બુકિંગ શુલ્ક' : lang === 'mr' ? 'बुकिंग शुल्क' : 'Booking Charge (Site Inspection)'}</Text>
                 <Text style={styles.billVal}>₹99</Text>
               </View>
               <View style={styles.billRow}>
@@ -997,7 +1016,7 @@ export default function CustomerHomeScreen({
               </View>
               <View style={styles.billDivider} />
               <View style={styles.billRowGrand}>
-                <Text style={styles.billTotalLabel}>{lang === 'hi' ? 'अभी देय बुकिंग राशि' : lang === 'gu' ? 'હાલ ચૂકવવાપાત્ર બુકિંગ રકમ' : lang === 'mr' ? 'आता देय बुकिंग रक्कम' : 'Total to Pay Now'}</Text>
+                <Text style={styles.billTotalLabel}>{lang === 'hi' ? 'अभी देय बुकिंग राशि' : lang === 'gu' ? 'હાલ ચૂકવવાપાત્ર બુકિંગ રકમ' : lang === 'mr' ? 'आता देय बुकिंग रक्कम' : 'Total Booking Charge'}</Text>
                 <Text style={styles.billTotalVal}>₹99</Text>
               </View>
             </View>
@@ -1005,7 +1024,7 @@ export default function CustomerHomeScreen({
             <View style={styles.escrowNotice}>
               <ShieldCheck size={16} color="#15803D" />
               <Text style={styles.escrowNoticeText}>
-                {lang === 'hi' ? '100% सुरक्षित: आप अभी केवल ₹99 विजिट शुल्क दे रहे हैं। मिस्त्री आपकी साइट पर आकर काम देखकर उचित रेट तय करेंगे।' : lang === 'gu' ? '100% સુરક્ષિત: તમે અત્યારે ફક્ત ₹99 વિઝિટ ફી ચૂકવી રહ્યા છો. મિસ્ત્રી સાઇટ જોઈને યોગ્ય ભાવ નક્કી કરશે.' : lang === 'mr' ? '100% सुरक्षित: आपण सध्या फक्त ₹99 भेट शुल्क देत आहात. मिस्त्री जागेवर येऊन कामाचा योग्य दर ठरवतील.' : '100% Protected: You only pay ₹99 inspection booking fee. The mistri visits your site and quotes work price directly.'}
+                {lang === 'hi' ? '100% सुरक्षित: आप अभी केवल ₹99 बुकिंग शुल्क दे रहे हैं। मिस्त्री आपकी साइट पर आकर काम देखकर उचित रेट तय करेंगे।' : lang === 'gu' ? '100% સુરક્ષિત: તમે અત્યારે ફક્ત ₹99 બુકિંગ ફી ચૂકવી રહ્યા છો. મિસ્ત્રી સાઇટ જોઈને યોગ્ય ભાવ નક્કી કરશે.' : lang === 'mr' ? '100% सुरक्षित: आपण सध्या फक्त ₹99 बुकिंग शुल्क देत आहात. मिस्त्री जागेवर येऊन कामाचा योग्य दर ठरवतील.' : '100% Protected: You only pay ₹99 booking charge. The mistri visits your site and quotes work price directly.'}
               </Text>
             </View>
 
@@ -1015,37 +1034,39 @@ export default function CustomerHomeScreen({
                 style={[styles.payBtn, { backgroundColor: '#059669', marginBottom: 10 }]}
                 onPress={() => {
                   Alert.alert(
-                    'वर्चुअल वॉलेट से भुगतान करें? 💰',
-                    `आपके पास MistriPro वर्चुअल वॉलेट में ₹${customerWalletBalance} शेष हैं।\n\nइस बुकिंग के लिए ₹99 वॉलेट से कटेंगे (अतिरिक्त कोई ऑनलाइन भुगतान नहीं करना होगा)।`,
+                    lang === 'hi' ? 'वर्चुअल वॉलेट से भुगतान करें? 💰' : 'Pay via Virtual Wallet? 💰',
+                    lang === 'hi'
+                      ? `आपके पास MistriPro वर्चुअल वॉलेट में ₹${customerWalletBalance} शेष हैं।\n\nइस बुकिंग के लिए ₹99 वॉलेट से कटेंगे (अतिरिक्त कोई ऑनलाइन भुगतान नहीं करना होगा)।`
+                      : `You have ₹${customerWalletBalance} in your MistriPro Virtual Wallet.\n\n₹99 booking charge will be deducted from your wallet balance.`,
                     [
-                      { text: 'रद्द करें (Cancel)', style: 'cancel' },
+                      { text: lang === 'hi' ? 'रद्द करें' : 'Cancel', style: 'cancel' },
                       {
-                        text: 'हाँ, वॉलेट से बुक करें (₹0)',
+                        text: lang === 'hi' ? 'हाँ, वॉलेट से बुक करें (₹0)' : 'Yes, Book via Wallet',
                         onPress: () => {
                           const worker = checkoutWorker;
                           setCheckoutWorker(null);
-                          if (onBookWorker) {
-                            onBookWorker({
-                              workerId: worker.id,
-                              workerName: worker.name,
-                              workerAvatar: worker.avatar,
-                              workerColor: worker.color,
-                              workerPhone: '+91 98290 12345',
-                              workerSkill: worker.skill,
-                              category: worker.category || worker.skill,
-                              title: `${worker.skill} Site Inspection`,
-                              siteLocation: locationText,
-                              scheduledDate: 'Today, Immediate',
-                              duration: 'Site Inspection & On-site Quote',
-                              bookingFee: 99,
-                              workerFee: 0,
-                              platformFee: 99,
-                              txnFee: 0,
-                              totalAmount: 99,
-                              pricingModel: 'ON_SITE_QUOTE',
-                              paidViaWallet: true,
-                            });
-                          }
+                          const walletBookingPayload = {
+                            workerId: worker.id,
+                            workerName: worker.name,
+                            workerAvatar: worker.avatar,
+                            workerColor: worker.color,
+                            workerPhone: '+91 98290 12345',
+                            workerSkill: worker.skill,
+                            category: worker.category || worker.skill,
+                            title: `${worker.skill} Site Inspection`,
+                            siteLocation: locationText,
+                            scheduledDate: 'Today, Immediate',
+                            duration: 'Site Inspection & On-site Quote',
+                            bookingFee: 99,
+                            workerFee: 0,
+                            platformFee: 99,
+                            txnFee: 0,
+                            totalAmount: 99,
+                            pricingModel: 'ON_SITE_QUOTE',
+                            paidViaWallet: true,
+                          };
+                          setPendingPaidBooking(walletBookingPayload);
+                          setShowSiteAddressPicker(true);
                         },
                       },
                     ]
@@ -1071,7 +1092,7 @@ export default function CustomerHomeScreen({
               <Text style={styles.payBtnText}>
                 {customerWalletBalance >= 99
                   ? (lang === 'hi' ? 'रेज़रपे ऑनलाइन भुगतान' : 'Pay via Razorpay')
-                  : (lang === 'hi' ? 'भुगतान करें और बुक करें' : 'Pay & Request Booking')}
+                  : (lang === 'hi' ? 'भुगतान करें और बुक करें' : 'Pay ₹99 Booking Fee')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -1084,9 +1105,35 @@ export default function CustomerHomeScreen({
         onClose={() => setShowRazorpayModal(false)}
         bookingData={razorpayBookingData}
         onPaymentSuccess={(completedDetails) => {
-          if (onBookWorker) {
-            onBookWorker(completedDetails);
+          setShowRazorpayModal(false);
+          setPendingPaidBooking(completedDetails);
+          setShowSiteAddressPicker(true);
+        }}
+      />
+
+      {/* ─── POST-PAYMENT EXACT SITE LOCATION & ADDRESS PICKER MODAL ─── */}
+      <SiteAddressPickerModal
+        visible={showSiteAddressPicker}
+        onClose={() => {
+          setShowSiteAddressPicker(false);
+          setPendingPaidBooking(null);
+        }}
+        initialLocation={{ text: locationText, lat: userLat, lng: userLon }}
+        customerName={userName}
+        lang={lang}
+        onConfirmSiteAddress={(siteData) => {
+          setShowSiteAddressPicker(false);
+          if (onBookWorker && pendingPaidBooking) {
+            onBookWorker({
+              ...pendingPaidBooking,
+              siteAddress: siteData.siteAddress,
+              siteLocation: siteData.siteLocation,
+              siteCoordinates: siteData.siteCoordinates,
+              siteContactPerson: siteData.siteContactPerson,
+              siteContactPhone: siteData.siteContactPhone,
+            });
           }
+          setPendingPaidBooking(null);
         }}
       />
 
@@ -1218,14 +1265,25 @@ export default function CustomerHomeScreen({
                   onPress={() => {
                     const cleanPrimary = (mainName || parts[0] || '').trim();
                     const shortLocationName = cleanPrimary.length > 25 ? cleanPrimary.slice(0, 22) + '...' : cleanPrimary;
-                    setLocationText(shortLocationName || item.display_name);
-                    setUserLat(parseFloat(item.lat));
-                    setUserLon(parseFloat(item.lon));
+                    const finalLoc = shortLocationName || item.display_name;
+                    const parsedLat = parseFloat(item.lat);
+                    const parsedLon = parseFloat(item.lon);
+                    setLocationText(finalLoc);
+                    setUserLat(parsedLat);
+                    setUserLon(parsedLon);
                     setIsManualLocation(true);
                     setDistanceRange(10);
                     setShowLocationSearch(false);
                     setLocationSearchQuery('');
                     setLocationResults([]);
+                    if (onUpdateSessionLocation) {
+                      onUpdateSessionLocation({
+                        text: finalLoc,
+                        lat: parsedLat,
+                        lng: parsedLon,
+                        isManual: true,
+                      });
+                    }
                   }}
                   style={{
                     flexDirection: 'row',

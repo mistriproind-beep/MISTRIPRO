@@ -707,6 +707,12 @@ function MainApp() {
   const [lang, setLang] = useState('en');
   const [role, setRole] = useState('CUSTOMER'); // 'CUSTOMER' | 'WORKER'
   const [activeTab, setActiveTab] = useState('HOME'); // 'HOME' | 'WORK' | 'REVIEWS' | 'PROFILE'
+  const [sessionLocation, setSessionLocation] = useState({
+    text: 'Sawai Madhopur, Rajasthan',
+    lat: 25.9928,
+    lng: 76.3712,
+    isManual: false,
+  });
 
   // Live Auth & OTP State
   const [showOtpModal, setShowOtpModal] = useState(false);
@@ -1543,15 +1549,15 @@ function MainApp() {
     let isMounted = true;
     const checkInitialState = async () => {
       try {
-        // 1. Immediately request all app permissions (GPS, Storage, Camera)
-        await requestAppPermissions();
+        // 1. Request app permissions safely in background without blocking startup
+        requestAppPermissions().catch(() => {});
 
-        // 2. Fetch Real Live Workers from Supabase immediately (Zero Mock Data)
+        // 2. Fetch Real Live Workers from Supabase in background
         LiveBackend.fetchRealWorkers().then((w) => {
           if (w && isMounted) setRealWorkers(w);
         }).catch(() => {});
 
-        // 3. Language & First-time Launch Check (Prompt once on first install, remember permanently)
+        // 3. Language Check (If chosen once, remember permanently)
         const hasChosenLang = await StorageService.getHasChosenLanguage();
         const savedLang = await StorageService.getLanguage();
         if (savedLang && isMounted) {
@@ -1561,10 +1567,11 @@ function MainApp() {
         // 4. Session Check & Auto-provisioning (If already logged in, send directly to Home)
         let savedSession = await StorageService.getSession();
         let savedCredentials = await StorageService.getCredentials();
+        let savedRole = await StorageService.getRole();
 
-        if (savedSession && (savedSession.email || savedSession.mobile || savedSession.phone || savedSession.name)) {
-          const effectiveRole = savedSession.role || 'CUSTOMER';
-          const userDisplayName = savedSession.name || 'User';
+        if (savedSession && (savedSession.email || savedSession.mobile || savedSession.phone || savedSession.name || savedSession.id)) {
+          const effectiveRole = savedSession.role || savedRole || 'CUSTOMER';
+          const userDisplayName = savedSession.name || (effectiveRole === 'CUSTOMER' ? 'Customer' : 'Worker');
           setRole(effectiveRole);
 
           if (isMounted) {
@@ -1580,19 +1587,8 @@ function MainApp() {
                 phone: savedSession.mobile || savedSession.phone || prev.phone,
                 location: savedSession.address || prev.location,
               }));
-              const workerCheckPhone = savedSession.mobile || savedSession.phone;
-              if (workerCheckPhone) {
-                const approval = await LiveBackend.checkWorkerApprovalStatus(workerCheckPhone);
-                if (approval?.status === 'APPROVED' || approval?.approved) {
-                  setActiveTab('HOME');
-                  setCurrentScreen('MAIN');
-                } else {
-                  setCurrentScreen('WORKER_UNDER_REVIEW');
-                }
-              } else {
-                setActiveTab('HOME');
-                setCurrentScreen('MAIN');
-              }
+              setActiveTab('HOME');
+              setCurrentScreen('MAIN');
             } else {
               setCustName(userDisplayName);
               setCustMobile(savedSession.mobile || savedSession.phone || '');
@@ -1605,7 +1601,7 @@ function MainApp() {
           // Auto-restore session from saved credentials and send directly to Home
           const credTarget = savedCredentials.email || savedCredentials.phone;
           const localAcct = await StorageService.getAccountProfile(credTarget);
-          const effectiveRole = localAcct?.role || 'CUSTOMER';
+          const effectiveRole = localAcct?.role || savedRole || 'CUSTOMER';
           const effectiveName = localAcct?.name || formatNameFromEmail(credTarget);
           setRole(effectiveRole);
           await StorageService.setSession({
@@ -1623,8 +1619,8 @@ function MainApp() {
             setActiveTab('HOME');
             setCurrentScreen('MAIN');
           }
-        } else if (!hasChosenLang) {
-          // First time app launch: show Language Selection screen once
+        } else if (!hasChosenLang && !savedLang) {
+          // Absolute first time app launch: show Language Selection screen once
           if (isMounted) {
             setCurrentScreen('LANGUAGE');
           }
@@ -1632,15 +1628,6 @@ function MainApp() {
         } else {
           // NO ACTIVE LOGGED IN SESSION: Show clean sign in screen
           if (isMounted) {
-            setEmailInput('');
-            setPasswordInput('');
-            setPhoneInput('');
-            setCustName('');
-            setCustMobile('');
-            setCustAddress('');
-            setWorkerName('');
-            setWorkerMobile('');
-            setWorkerAddress('');
             setCurrentScreen('SIGN_IN');
           }
         }
@@ -3481,6 +3468,8 @@ function MainApp() {
               lang={lang}
               t={t}
               customerWalletBalance={customerWalletBalance}
+              sessionLocation={sessionLocation}
+              onUpdateSessionLocation={setSessionLocation}
               onNavigateTab={(tab, category) => {
                 if (category) setFindInitialCategory(category);
                 const normalizedTab = String(tab || '').trim().toUpperCase();
@@ -3499,6 +3488,8 @@ function MainApp() {
               lang={lang}
               t={t}
               customerWalletBalance={customerWalletBalance}
+              sessionLocation={sessionLocation}
+              onUpdateSessionLocation={setSessionLocation}
               initialCategory={findInitialCategory}
               onNavigateTab={(tab) => setActiveTab(tab)}
               onBookWorker={(details) => handleCustomerBookWorker(details)}
@@ -4697,10 +4688,14 @@ function ProfileScreen({
             <View style={styles.walletHeaderRow}>
               <View style={styles.walletBadge}>
                 <Wallet size={16} color="#4F46E5" />
-                <Text style={styles.walletBadgeTitle}>MistriPro Virtual Wallet (वर्चुअल वॉलेट)</Text>
+                <Text style={styles.walletBadgeTitle}>
+                  {lang === 'hi' ? 'वर्चुअल वॉलेट' : 'MistriPro Virtual Wallet'}
+                </Text>
               </View>
               <View style={styles.walletStatusTag}>
-                <Text style={styles.walletStatusText}>Non-Withdrawable</Text>
+                <Text style={styles.walletStatusText}>
+                  {lang === 'hi' ? 'अहस्तांतरणीय' : 'Non-Withdrawable'}
+                </Text>
               </View>
             </View>
 
@@ -4712,24 +4707,17 @@ function ProfileScreen({
             <View style={styles.walletUsageNotice}>
               <ShieldCheck size={14} color="#059669" />
               <Text style={styles.walletUsageNoticeText}>
-                {customerWalletBalance > 0
-                  ? 'यह राशि केवल किसी अन्य मिस्त्री को बुक करने के लिए मान्य है। अगली बुकिंग पर यह स्वतः इस्तेमाल हो जाएगी (निकासी उपलब्ध नहीं)।'
-                  : 'कारीगर के साइट पर पहुंचने से पहले बुकिंग रद्द करने पर ₹99 का रिफंड तुरंत इस वर्चुअल वॉलेट में क्रेडिट होगा।'}
+                {lang === 'hi'
+                  ? (customerWalletBalance > 0
+                      ? 'यह राशि केवल किसी अन्य मिस्त्री को बुक करने के लिए मान्य है। अगली बुकिंग पर यह स्वतः इस्तेमाल हो जाएगी (निकासी उपलब्ध नहीं)।'
+                      : 'कारीगर के साइट पर पहुंचने से पहले बुकिंग रद्द करने पर ₹99 का रिफंड तुरंत इस वर्चुअल वॉलेट में क्रेडिट होगा।')
+                  : (customerWalletBalance > 0
+                      ? 'This balance can only be used to book another mistri. It will be applied automatically on your next booking (non-withdrawable).'
+                      : 'Cancellations made before the worker reaches your site are refunded instantly to this virtual wallet.')}
               </Text>
             </View>
           </View>
         )}
-
-        {/* ChoosingHer Invite Friends / Promo Banner */}
-        <View style={styles.profilePromoCard}>
-          <View style={styles.promoTextCol}>
-            <Text style={styles.promoTitle}>Invite Friends & Contractors</Text>
-            <Text style={styles.promoSub}>Get ₹250 wallet credit on their 1st verified booking.</Text>
-          </View>
-          <View style={styles.promoIconArt}>
-            <Sparkles size={24} color="#EA580C" />
-          </View>
-        </View>
 
         {/* Settings Clean Rows (ChoosingHer exact layout) */}
         <View style={styles.settingsGroupCard}>
@@ -6454,12 +6442,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
     marginBottom: 8,
   },
   walletBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    flexShrink: 1,
+    minWidth: 0,
   },
   walletBadgeTitle: {
     fontFamily: 'Satoshi-Bold',
@@ -6473,6 +6465,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#FDE68A',
+    alignSelf: 'flex-start',
+    flexShrink: 0,
   },
   walletStatusText: {
     fontFamily: 'Satoshi-Bold',
@@ -6481,7 +6475,7 @@ const styles = StyleSheet.create({
   },
   walletBalanceRow: {
     flexDirection: 'row',
-    alignItems: 'baseline',
+    alignItems: 'center',
     gap: 4,
     marginVertical: 4,
   },

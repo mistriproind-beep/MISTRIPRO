@@ -234,7 +234,9 @@ export default function WorkerEarningsScreen({
             activeOpacity={0.85}
           >
             <ArrowUpRight size={18} color="#0F172A" />
-            <Text style={styles.withdrawBtnText}>Withdraw Money (पैसे निकालें)</Text>
+            <Text style={styles.withdrawBtnText}>
+              {lang === 'hi' ? 'पैसे निकालें (Withdraw)' : 'Withdraw Money'}
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -251,33 +253,45 @@ export default function WorkerEarningsScreen({
           </View>
 
           <Text style={styles.milestoneTitle}>
-            {activeTier === 1
-              ? '10 नए काम पूरे करें और पाएं ₹200 बोनस'
-              : activeTier === 2
-              ? '20 नए काम पूरे करें और पाएं ₹500 बोनस'
-              : '30 नए काम पूरे करें और पाएं ₹1,000 बोनस'}
+            {lang === 'hi'
+              ? (activeTier === 1
+                  ? '10 नए काम पूरे करें और पाएं ₹200 बोनस'
+                  : activeTier === 2
+                  ? '20 नए काम पूरे करें और पाएं ₹500 बोनस'
+                  : '30 नए काम पूरे करें और पाएं ₹1,000 बोनस')
+              : (activeTier === 1
+                  ? 'Complete 10 new jobs and get ₹200 bonus'
+                  : activeTier === 2
+                  ? 'Complete 20 new jobs and get ₹500 bonus'
+                  : 'Complete 30 new jobs and get ₹1,000 bonus')}
           </Text>
           <Text style={styles.milestoneSub}>
-            {activeTier === 1
-              ? 'चरण 1: 10 नए काम पूरा करने पर ₹200 बोनस मिलेगा। इसके बाद काउंटर रीसेट होकर चरण 2 (20 नए काम) शुरू होगा।'
-              : activeTier === 2
-              ? 'चरण 2: 20 नए काम पूरा करने पर ₹500 बोनस मिलेगा। इसके बाद काउंटर रीसेट होकर चरण 3 (30 नए काम) शुरू होगा।'
-              : 'चरण 3: 30 नए काम पूरा करने पर ₹1,000 का महा-बोनस आपके वॉलेट में क्रेडिट होगा!'}
+            {lang === 'hi'
+              ? (activeTier === 1
+                  ? 'चरण 1: 10 नए काम पूरा करने पर ₹200 बोनस मिलेगा। इसके बाद काउंटर रीसेट होकर चरण 2 (20 नए काम) शुरू होगा।'
+                  : activeTier === 2
+                  ? 'चरण 2: 20 नए काम पूरा करने पर ₹500 बोनस मिलेगा। इसके बाद काउंटर रीसेट होकर चरण 3 (30 नए काम) शुरू होगा।'
+                  : 'चरण 3: 30 नए काम पूरा करने पर ₹1,000 का महा-बोनस आपके वॉलेट में क्रेडिट होगा!')
+              : (activeTier === 1
+                  ? 'Tier 1: Complete 10 new bookings to earn ₹200 reward. Counter resets for Tier 2 upon completion.'
+                  : activeTier === 2
+                  ? 'Tier 2: Complete 20 new bookings to earn ₹500 reward. Counter resets for Tier 3 upon completion.'
+                  : 'Tier 3: Complete 30 new bookings to earn ₹1,000 grand milestone reward!')}
           </Text>
 
           {/* Tier Tracker Pills */}
           <View style={{ flexDirection: 'row', gap: 6, marginVertical: 10 }}>
             <View style={{ flex: 1, paddingVertical: 6, paddingHorizontal: 8, borderRadius: 8, backgroundColor: activeTier === 1 ? '#EEF2FF' : '#F1F5F9', borderWidth: 1, borderColor: activeTier === 1 ? '#6366F1' : '#E2E8F0', alignItems: 'center' }}>
               <Text style={{ fontSize: 11, fontWeight: '700', color: activeTier === 1 ? '#4F46E5' : '#64748B' }}>Tier 1</Text>
-              <Text style={{ fontSize: 10, color: activeTier === 1 ? '#4338CA' : '#94A3B8' }}>10 काम • ₹200</Text>
+              <Text style={{ fontSize: 10, color: activeTier === 1 ? '#4338CA' : '#94A3B8' }}>{lang === 'hi' ? '10 काम • ₹200' : '10 Jobs • ₹200'}</Text>
             </View>
             <View style={{ flex: 1, paddingVertical: 6, paddingHorizontal: 8, borderRadius: 8, backgroundColor: activeTier === 2 ? '#EEF2FF' : '#F1F5F9', borderWidth: 1, borderColor: activeTier === 2 ? '#6366F1' : '#E2E8F0', alignItems: 'center' }}>
               <Text style={{ fontSize: 11, fontWeight: '700', color: activeTier === 2 ? '#4F46E5' : '#64748B' }}>Tier 2</Text>
-              <Text style={{ fontSize: 10, color: activeTier === 2 ? '#4338CA' : '#94A3B8' }}>20 काम • ₹500</Text>
+              <Text style={{ fontSize: 10, color: activeTier === 2 ? '#4338CA' : '#94A3B8' }}>{lang === 'hi' ? '20 काम • ₹500' : '20 Jobs • ₹500'}</Text>
             </View>
             <View style={{ flex: 1, paddingVertical: 6, paddingHorizontal: 8, borderRadius: 8, backgroundColor: activeTier === 3 ? '#EEF2FF' : '#F1F5F9', borderWidth: 1, borderColor: activeTier === 3 ? '#6366F1' : '#E2E8F0', alignItems: 'center' }}>
               <Text style={{ fontSize: 11, fontWeight: '700', color: activeTier === 3 ? '#4F46E5' : '#64748B' }}>Tier 3</Text>
-              <Text style={{ fontSize: 10, color: activeTier === 3 ? '#4338CA' : '#94A3B8' }}>30 काम • ₹1000</Text>
+              <Text style={{ fontSize: 10, color: activeTier === 3 ? '#4338CA' : '#94A3B8' }}>{lang === 'hi' ? '30 काम • ₹1000' : '30 Jobs • ₹1000'}</Text>
             </View>
           </View>
 

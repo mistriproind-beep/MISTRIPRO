@@ -30,12 +30,15 @@ import {
   ShieldCheck,
   CheckCircle2,
   List,
+  ChevronDown,
+  ArrowLeft,
 } from 'lucide-react-native';
 import { WebView } from 'react-native-webview';
 import * as Location from 'expo-location';
 import { CATEGORIES, translateWorkerSkill } from '../data/categories';
 import LiveBackend, { getDistanceKm } from '../services/liveBackend';
 import RazorpayModal from '../components/RazorpayModal';
+import SiteAddressPickerModal from '../components/SiteAddressPickerModal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -108,9 +111,11 @@ function WorkerCard({ worker, isSelected, onSelect, onOpenProfile, onProceedBook
 
       {/* Bottom row */}
       <View style={styles.workerCardBottom}>
-        <View style={styles.rateContainer}>
-          <Text style={styles.rateAmount}>₹{worker.bookingFee || 99}</Text>
-          <Text style={styles.rateType}>{lang === 'hi' ? ' विजिट' : ' Visit'}</Text>
+        <View style={styles.verifiedRowTag}>
+          <ShieldCheck size={13} color="#16A34A" />
+          <Text style={styles.verifiedRowTagText}>
+            {lang === 'hi' ? 'सत्यापित मिस्त्री' : 'Verified Mistri'}
+          </Text>
         </View>
 
         <View style={styles.workerActions}>
@@ -162,6 +167,8 @@ export default function FindWorkersScreen({
   lang = 'en',
   t,
   customerWalletBalance = 0,
+  sessionLocation,
+  onUpdateSessionLocation,
 }) {
   const [selectedCategory, setSelectedCategory] = useState(initialCategory || 'All');
   const [searchQuery, setSearchQuery] = useState('');
@@ -172,8 +179,12 @@ export default function FindWorkersScreen({
     }
   }, [initialCategory]);
   const [selectedWorkerId, setSelectedWorkerId] = useState(null);
-  const [userLocation, setUserLocation] = useState(null); // { latitude, longitude, areaName }
-  const [isLocLoading, setIsLocLoading] = useState(true);
+  const [userLocation, setUserLocation] = useState(
+    sessionLocation
+      ? { latitude: sessionLocation.lat, longitude: sessionLocation.lng, areaName: sessionLocation.text }
+      : null
+  ); // { latitude, longitude, areaName }
+  const [isLocLoading, setIsLocLoading] = useState(false);
   const [mapStyle, setMapStyle] = useState('google'); // 'google' | 'voyager'
   const [viewMode, setViewMode] = useState('list'); // 'list' | 'map'
   const [localWorkers, setLocalWorkers] = useState(Array.isArray(workers) && workers.length > 0 ? workers : []);
@@ -185,6 +196,27 @@ export default function FindWorkersScreen({
   const [checkoutWorker, setCheckoutWorker] = useState(null);
   const [showRazorpayModal, setShowRazorpayModal] = useState(false);
   const [razorpayBookingData, setRazorpayBookingData] = useState(null);
+  const [showSiteAddressPicker, setShowSiteAddressPicker] = useState(false);
+  const [pendingPaidBooking, setPendingPaidBooking] = useState(null);
+
+  // Location search modal state
+  const [showLocationSearch, setShowLocationSearch] = useState(false);
+  const [locationSearchQuery, setLocationSearchQuery] = useState('');
+  const [locationResults, setLocationResults] = useState([]);
+  const [locationSearchLoading, setLocationSearchLoading] = useState(false);
+  const [isManualLocation, setIsManualLocation] = useState(Boolean(sessionLocation?.isManual));
+
+  // Sync with sessionLocation if updated outside
+  useEffect(() => {
+    if (sessionLocation) {
+      setUserLocation({
+        latitude: sessionLocation.lat,
+        longitude: sessionLocation.lng,
+        areaName: sessionLocation.text,
+      });
+      setIsManualLocation(Boolean(sessionLocation.isManual));
+    }
+  }, [sessionLocation]);
 
   // Sync workers function
   const syncLiveWorkers = async () => {
@@ -238,11 +270,13 @@ export default function FindWorkersScreen({
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        setUserLocation({
+        const fallback = {
           latitude: 26.0124,
           longitude: 76.3533,
           areaName: 'Sawai Madhopur, Rajasthan',
-        });
+        };
+        setUserLocation(fallback);
+        setIsManualLocation(false);
         setIsLocLoading(false);
         return;
       }
@@ -260,11 +294,21 @@ export default function FindWorkersScreen({
         const sub = place.name || place.street || '';
         area = sub ? `${sub}, ${locality}` : locality || 'Current Location';
       }
-      setUserLocation({
+      const newLoc = {
         latitude: loc.coords.latitude,
         longitude: loc.coords.longitude,
         areaName: area,
-      });
+      };
+      setUserLocation(newLoc);
+      setIsManualLocation(false);
+      if (onUpdateSessionLocation) {
+        onUpdateSessionLocation({
+          text: area,
+          lat: loc.coords.latitude,
+          lng: loc.coords.longitude,
+          isManual: false,
+        });
+      }
     } catch (e) {
       console.log('Location error:', e);
       setUserLocation({
@@ -272,8 +316,58 @@ export default function FindWorkersScreen({
         longitude: 76.3533,
         areaName: 'Sawai Madhopur, Rajasthan',
       });
+      setIsManualLocation(false);
     } finally {
       setIsLocLoading(false);
+    }
+  };
+
+  const searchLocationByName = async (query) => {
+    if (!query || query.trim().length < 3) {
+      setLocationResults([]);
+      return;
+    }
+    setLocationSearchLoading(true);
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query.trim())}&format=json&countrycodes=IN&limit=7&addressdetails=1`;
+      const resp = await fetch(url, {
+        headers: { 'User-Agent': 'MistriPro-MobileApp/2.0' },
+      });
+      const data = await resp.json();
+      setLocationResults(Array.isArray(data) ? data : []);
+    } catch (e) {
+      setLocationResults([]);
+    } finally {
+      setLocationSearchLoading(false);
+    }
+  };
+
+  const handleSelectLocation = (item) => {
+    const parts = (item.display_name || '').split(',');
+    const mainName = parts[0]?.trim() || item.display_name;
+    const cleanPrimary = (mainName || parts[0] || '').trim();
+    const shortLocationName = cleanPrimary.length > 25 ? cleanPrimary.slice(0, 22) + '...' : cleanPrimary;
+    const finalLoc = shortLocationName || item.display_name;
+    const parsedLat = parseFloat(item.lat);
+    const parsedLon = parseFloat(item.lon);
+
+    setUserLocation({
+      latitude: parsedLat,
+      longitude: parsedLon,
+      areaName: finalLoc,
+    });
+    setIsManualLocation(true);
+    setShowLocationSearch(false);
+    setLocationSearchQuery('');
+    setLocationResults([]);
+
+    if (onUpdateSessionLocation) {
+      onUpdateSessionLocation({
+        text: finalLoc,
+        lat: parsedLat,
+        lng: parsedLon,
+        isManual: true,
+      });
     }
   };
 
@@ -659,12 +753,24 @@ export default function FindWorkersScreen({
           <Text style={styles.headerTitle}>
             {lang === 'hi' ? 'कारीगर खोजें' : lang === 'gu' ? 'કારીગરો શોધો' : lang === 'mr' ? 'कामगार शोधा' : 'Find Workers'}
           </Text>
-          <View style={styles.locationSubRow}>
-            <MapPin size={13} color="#2563EB" />
+          <TouchableOpacity
+            style={styles.locationSubRow}
+            activeOpacity={0.7}
+            onPress={() => setShowLocationSearch(true)}
+          >
+            <MapPin size={13} color={isManualLocation ? '#4F46E5' : '#16A34A'} />
             <Text style={styles.headerSubtitle} numberOfLines={1}>
               {areaLabel}
             </Text>
-          </View>
+            {isManualLocation && (
+              <View style={{ backgroundColor: '#EEF2FF', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
+                <Text style={{ fontSize: 9, fontFamily: 'Satoshi-Bold', color: '#4F46E5' }}>
+                  {lang === 'hi' ? 'चुना हुआ' : 'Selected'}
+                </Text>
+              </View>
+            )}
+            <ChevronDown size={13} color="#64748B" />
+          </TouchableOpacity>
         </View>
 
         <View style={styles.headerRightActions}>
@@ -1015,16 +1121,24 @@ export default function FindWorkersScreen({
 
             <View style={styles.billBox}>
               <View style={styles.billRow}>
-                <Text style={styles.billItem}>Site Visit & Inspection Fee</Text>
+                <Text style={styles.billItem}>
+                  {lang === 'hi' ? 'बुकिंग शुल्क (साइट निरीक्षण)' : 'Booking Charge (Site Inspection)'}
+                </Text>
                 <Text style={styles.billVal}>₹99</Text>
               </View>
               <View style={styles.billRow}>
-                <Text style={styles.billItem}>Actual Labor & Material Wages</Text>
-                <Text style={[styles.billVal, { color: '#059669', fontWeight: '700' }]}>Decided On-Site</Text>
+                <Text style={styles.billItem}>
+                  {lang === 'hi' ? 'काम का वास्तविक खर्च' : 'Actual Work Price'}
+                </Text>
+                <Text style={[styles.billVal, { color: '#059669', fontWeight: '700' }]}>
+                  {lang === 'hi' ? 'साइट देखकर तय होगा' : 'Decided On-Site'}
+                </Text>
               </View>
               <View style={styles.billDivider} />
               <View style={styles.billRowGrand}>
-                <Text style={styles.billTotalLabel}>Total Booking Fee</Text>
+                <Text style={styles.billTotalLabel}>
+                  {lang === 'hi' ? 'अभी देय बुकिंग राशि' : 'Total Booking Charge'}
+                </Text>
                 <Text style={styles.billTotalVal}>₹99</Text>
               </View>
             </View>
@@ -1032,7 +1146,9 @@ export default function FindWorkersScreen({
             <View style={styles.escrowNotice}>
               <ShieldCheck size={16} color="#15803D" />
               <Text style={styles.escrowNoticeText}>
-                100% Protected: You only pay ₹99 inspection booking fee. The mistri visits your site and quotes work price directly.
+                {lang === 'hi'
+                  ? '100% सुरक्षित: आप अभी केवल ₹99 बुकिंग शुल्क दे रहे हैं। मिस्त्री आपकी साइट पर आकर काम देखकर उचित रेट तय करेंगे।'
+                  : '100% Protected: You only pay ₹99 booking charge. The mistri visits your site and quotes work price directly.'}
               </Text>
             </View>
 
@@ -1042,37 +1158,39 @@ export default function FindWorkersScreen({
                 style={[styles.payBtn, { backgroundColor: '#059669', marginBottom: 10 }]}
                 onPress={() => {
                   Alert.alert(
-                    'वर्चुअल वॉलेट से भुगतान करें? 💰',
-                    `आपके पास MistriPro वर्चुअल वॉलेट में ₹${customerWalletBalance} शेष हैं।\n\nइस बुकिंग के लिए ₹99 वॉलेट से कटेंगे (अतिरिक्त कोई ऑनलाइन भुगतान नहीं करना होगा)।`,
+                    lang === 'hi' ? 'वर्चुअल वॉलेट से भुगतान करें? 💰' : 'Pay via Virtual Wallet? 💰',
+                    lang === 'hi'
+                      ? `आपके पास MistriPro वर्चुअल वॉलेट में ₹${customerWalletBalance} शेष हैं।\n\nइस बुकिंग के लिए ₹99 वॉलेट से कटेंगे (अतिरिक्त कोई ऑनलाइन भुगतान नहीं करना होगा)।`
+                      : `You have ₹${customerWalletBalance} in your MistriPro Virtual Wallet.\n\n₹99 booking charge will be deducted from your wallet balance.`,
                     [
-                      { text: 'रद्द करें (Cancel)', style: 'cancel' },
+                      { text: lang === 'hi' ? 'रद्द करें' : 'Cancel', style: 'cancel' },
                       {
-                        text: 'हाँ, वॉलेट से बुक करें (₹0)',
+                        text: lang === 'hi' ? 'हाँ, वॉलेट से बुक करें (₹0)' : 'Yes, Book via Wallet',
                         onPress: () => {
                           const worker = checkoutWorker;
                           setCheckoutWorker(null);
-                          if (onBookWorker) {
-                            onBookWorker({
-                              workerId: worker.id,
-                              workerName: worker.name || 'Verified Mistri',
-                              workerAvatar: worker.avatar || 'W',
-                              workerColor: worker.color || '#4F46E5',
-                              workerPhone: '+91 98290 12345',
-                              workerSkill: worker.skill || 'Labour Service',
-                              category: worker.category || worker.skill || 'Labour Service',
-                              title: `${worker.skill || 'Labour'} Site Inspection`,
-                              siteLocation: areaLabel,
-                              scheduledDate: 'Today, Immediate',
-                              duration: 'Site Inspection & On-site Quote',
-                              bookingFee: 99,
-                              workerFee: 0,
-                              platformFee: 99,
-                              txnFee: 0,
-                              totalAmount: 99,
-                              pricingModel: 'ON_SITE_QUOTE',
-                              paidViaWallet: true,
-                            });
-                          }
+                          const walletBookingPayload = {
+                            workerId: worker.id,
+                            workerName: worker.name || 'Verified Mistri',
+                            workerAvatar: worker.avatar || 'W',
+                            workerColor: worker.color || '#4F46E5',
+                            workerPhone: '+91 98290 12345',
+                            workerSkill: worker.skill || 'Labour Service',
+                            category: worker.category || worker.skill || 'Labour Service',
+                            title: `${worker.skill || 'Labour'} Site Inspection`,
+                            siteLocation: areaLabel,
+                            scheduledDate: 'Today, Immediate',
+                            duration: 'Site Inspection & On-site Quote',
+                            bookingFee: 99,
+                            workerFee: 0,
+                            platformFee: 99,
+                            txnFee: 0,
+                            totalAmount: 99,
+                            pricingModel: 'ON_SITE_QUOTE',
+                            paidViaWallet: true,
+                          };
+                          setPendingPaidBooking(walletBookingPayload);
+                          setShowSiteAddressPicker(true);
                         },
                       },
                     ]
@@ -1122,7 +1240,9 @@ export default function FindWorkersScreen({
             >
               <CheckCircle2 size={18} color="#FFFFFF" />
               <Text style={styles.payBtnText}>
-                {customerWalletBalance >= 99 ? 'Pay via Razorpay' : 'Pay ₹99 Booking Fee'}
+                {customerWalletBalance >= 99
+                  ? (lang === 'hi' ? 'रेज़रपे ऑनलाइन भुगतान' : 'Pay via Razorpay')
+                  : (lang === 'hi' ? 'भुगतान करें और बुक करें' : 'Pay ₹99 Booking Fee')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -1135,11 +1255,138 @@ export default function FindWorkersScreen({
         onClose={() => setShowRazorpayModal(false)}
         bookingData={razorpayBookingData}
         onPaymentSuccess={(completedDetails) => {
-          if (onBookWorker) {
-            onBookWorker(completedDetails);
-          }
+          setShowRazorpayModal(false);
+          setPendingPaidBooking(completedDetails);
+          setShowSiteAddressPicker(true);
         }}
       />
+
+      {/* ─── POST-PAYMENT EXACT SITE LOCATION & ADDRESS PICKER MODAL ─── */}
+      <SiteAddressPickerModal
+        visible={showSiteAddressPicker}
+        onClose={() => {
+          setShowSiteAddressPicker(false);
+          setPendingPaidBooking(null);
+        }}
+        initialLocation={{ text: areaLabel, lat: userLat, lng: userLng }}
+        lang={lang}
+        onConfirmSiteAddress={(siteData) => {
+          setShowSiteAddressPicker(false);
+          if (onBookWorker && pendingPaidBooking) {
+            onBookWorker({
+              ...pendingPaidBooking,
+              siteAddress: siteData.siteAddress,
+              siteLocation: siteData.siteLocation,
+              siteCoordinates: siteData.siteCoordinates,
+              siteContactPerson: siteData.siteContactPerson,
+              siteContactPhone: siteData.siteContactPhone,
+            });
+          }
+          setPendingPaidBooking(null);
+        }}
+      />
+
+      {/* ─── LOCATION SEARCH MODAL (Shared Session-Only Location Picker) ─── */}
+      <Modal
+        visible={showLocationSearch}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => setShowLocationSearch(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: '#F8FAFC', paddingTop: Platform.OS === 'ios' ? 44 : 20 }}>
+          {/* Header */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#E2E8F0', backgroundColor: '#fff' }}>
+            <TouchableOpacity onPress={() => setShowLocationSearch(false)} style={{ padding: 4, marginRight: 10 }}>
+              <ArrowLeft size={22} color="#0F172A" />
+            </TouchableOpacity>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 16, fontFamily: 'Satoshi-Bold', color: '#0F172A' }}>
+                {lang === 'hi' ? 'स्थान बदलें' : 'Change Location'}
+              </Text>
+              <Text style={{ fontSize: 11, fontFamily: 'Satoshi-Regular', color: '#64748B' }}>
+                {lang === 'hi' ? 'ऐप रीलोड होने तक यह स्थान मान्य रहेगा' : 'Active for this app session'}
+              </Text>
+            </View>
+          </View>
+
+          {/* Search Box */}
+          <View style={{ padding: 16, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F1F5F9', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 }}>
+              <Search size={18} color="#64748B" style={{ marginRight: 8 }} />
+              <TextInput
+                style={{ flex: 1, fontSize: 14, fontFamily: 'Satoshi-Medium', color: '#0F172A' }}
+                placeholder={lang === 'hi' ? 'शहर, कस्बा, कॉलोनी खोजें...' : 'Search city, town, area...'}
+                placeholderTextColor="#94A3B8"
+                value={locationSearchQuery}
+                onChangeText={(text) => {
+                  setLocationSearchQuery(text);
+                  searchLocationByName(text);
+                }}
+                autoFocus
+              />
+              {locationSearchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => { setLocationSearchQuery(''); setLocationResults([]); }}>
+                  <X size={16} color="#64748B" />
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+
+          {/* Live GPS Reset Button */}
+          <TouchableOpacity
+            onPress={() => {
+              setShowLocationSearch(false);
+              fetchLiveLocation();
+            }}
+            style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F0FDF4', margin: 16, padding: 14, borderRadius: 12, borderWidth: 1, borderColor: '#BBF7D0' }}
+            activeOpacity={0.8}
+          >
+            <Compass size={20} color="#16A34A" style={{ marginRight: 10 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 14, fontFamily: 'Satoshi-Bold', color: '#15803D' }}>
+                {lang === 'hi' ? 'वर्तमान GPS स्थान का उपयोग करें' : 'Use Current Live GPS Location'}
+              </Text>
+              <Text style={{ fontSize: 11, fontFamily: 'Satoshi-Regular', color: '#166534' }}>
+                {lang === 'hi' ? 'डिवाइस का सटीक स्थान स्वतः पहचानें' : 'Automatically detect live device coordinates'}
+              </Text>
+            </View>
+          </TouchableOpacity>
+
+          {locationSearchLoading && (
+            <View style={{ padding: 20, alignItems: 'center' }}>
+              <ActivityIndicator color="#4F46E5" size="small" />
+              <Text style={{ marginTop: 8, color: '#64748B', fontFamily: 'Satoshi-Regular', fontSize: 12 }}>
+                {lang === 'hi' ? 'स्थान खोज रहे हैं...' : 'Searching locations...'}
+              </Text>
+            </View>
+          )}
+
+          {/* Results List */}
+          <FlatList
+            data={locationResults}
+            keyExtractor={(item, index) => `${item.place_id || index}`}
+            contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40 }}
+            renderItem={({ item }) => {
+              const parts = (item.display_name || '').split(',');
+              const mainName = parts[0]?.trim() || item.display_name;
+              const subName = parts.slice(1, 3).join(',').trim();
+              return (
+                <TouchableOpacity
+                  onPress={() => handleSelectLocation(item)}
+                  style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 8, borderWidth: 1, borderColor: '#F1F5F9' }}
+                  activeOpacity={0.7}
+                >
+                  <MapPin size={18} color="#4F46E5" style={{ marginRight: 10 }} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 14, fontFamily: 'Satoshi-Bold', color: '#0F172A' }}>{mainName}</Text>
+                    {subName ? <Text style={{ fontSize: 11, fontFamily: 'Satoshi-Regular', color: '#64748B' }}>{subName}</Text> : null}
+                  </View>
+                </TouchableOpacity>
+              );
+            }}
+          />
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -1520,6 +1767,22 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     borderTopWidth: 1,
     borderTopColor: '#F1F5F9',
+  },
+  verifiedRowTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F0FDF4',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#DCFCE7',
+  },
+  verifiedRowTagText: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 10.5,
+    color: '#15803D',
   },
   rateContainer: {
     flexDirection: 'row',
