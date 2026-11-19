@@ -10,6 +10,8 @@ import {
   Alert,
   Dimensions,
   Linking,
+  Platform,
+  StatusBar,
 } from 'react-native';
 import {
   ShieldCheck,
@@ -34,7 +36,7 @@ export default function RazorpayModal({
   bookingData,
   onPaymentSuccess,
 }) {
-  const [showLiveWebView, setShowLiveWebView] = useState(false);
+  const [showLiveWebView, setShowLiveWebView] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [successPaymentId, setSuccessPaymentId] = useState('');
@@ -45,6 +47,7 @@ export default function RazorpayModal({
   // Fetch live credentials from Supabase on mount & whenever modal opens
   useEffect(() => {
     if (visible) {
+      setShowLiveWebView(true);
       getLiveRazorpayConfig().then((cfg) => {
         if (cfg && cfg.KEY_ID) {
           setActiveConfig(cfg);
@@ -376,144 +379,147 @@ export default function RazorpayModal({
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={styles.backdrop}>
-        <View style={styles.sheetContainer}>
-          {/* Header */}
-          <View style={styles.razorpayHeader}>
-            <View style={styles.brandRow}>
-              <View style={styles.logoBadge}>
-                <Text style={styles.logoText}>R</Text>
-              </View>
-              <View>
-                <Text style={styles.razorpayTitle}>Razorpay</Text>
-                <Text style={styles.razorpaySub}>Trusted Payment Gateway</Text>
-              </View>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent={false}
+      presentationStyle="fullScreen"
+      onRequestClose={onClose}
+    >
+      <View style={styles.fullScreenContainer}>
+        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+
+        {/* Header */}
+        <View style={styles.razorpayHeader}>
+          <View style={styles.brandRow}>
+            <View style={styles.logoBadge}>
+              <Text style={styles.logoText}>R</Text>
             </View>
-            <TouchableOpacity
-              onPress={() => {
-                if (showLiveWebView) {
-                  setShowLiveWebView(false);
-                } else {
-                  if (successTimer.current) clearTimeout(successTimer.current);
-                  setIsProcessing(false);
-                  setPaymentSuccess(false);
-                  onClose();
-                }
-              }}
-              style={styles.closeBtn}
-            >
-              <X size={18} color="#94A3B8" />
-            </TouchableOpacity>
+            <View>
+              <Text style={styles.razorpayTitle}>Razorpay</Text>
+              <Text style={styles.razorpaySub}>Official Trusted Payment Gateway</Text>
+            </View>
           </View>
+          <TouchableOpacity
+            onPress={() => {
+              if (successTimer.current) clearTimeout(successTimer.current);
+              setIsProcessing(false);
+              setPaymentSuccess(false);
+              onClose();
+            }}
+            style={styles.closeBtn}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          >
+            <X size={18} color="#64748B" />
+          </TouchableOpacity>
+        </View>
 
-          {/* Secure Verified Gateway Ribbon */}
-          <View style={styles.secureHeaderRibbon}>
-            <ShieldCheck size={14} color="#15803D" />
-            <Text style={styles.secureHeaderText}>
-              Official Razorpay Gateway • 100% Escrow Protection
+        {/* Secure Verified Gateway Ribbon */}
+        <View style={styles.secureHeaderRibbon}>
+          <ShieldCheck size={14} color="#15803D" />
+          <Text style={styles.secureHeaderText}>
+            Official Razorpay Gateway • 100% Escrow Protection
+          </Text>
+        </View>
+
+        {/* SUCCESS SCREEN */}
+        {paymentSuccess ? (
+          <View style={styles.successState}>
+            <View style={styles.successCircle}>
+              <CheckCircle2 size={44} color="#16A34A" />
+            </View>
+            <Text style={styles.successTitle}>Payment Verified via Razorpay!</Text>
+            <Text style={styles.successSub}>
+              ₹{formattedTotal} paid successfully. Mistri assigned.
             </Text>
+            <Text style={styles.successTxn}>Txn ID: {successPaymentId}</Text>
           </View>
-
-          {/* SUCCESS SCREEN */}
-          {paymentSuccess ? (
-            <View style={styles.successState}>
-              <View style={styles.successCircle}>
-                <CheckCircle2 size={44} color="#16A34A" />
+        ) : showLiveWebView ? (
+          /* LIVE WEBVIEW OF OFFICIAL RAZORPAY STANDARD CHECKOUT - FULL SCREEN */
+          <View style={styles.webViewWrap}>
+            <WebView
+              originWhitelist={['*']}
+              source={{ html: razorpayHtml, baseUrl: 'https://checkout.razorpay.com' }}
+              onMessage={handleWebViewMessage}
+              onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
+              javaScriptEnabled={true}
+              domStorageEnabled={true}
+              mixedContentMode="always"
+              startInLoadingState={true}
+              renderLoading={() => (
+                <View style={styles.loadingOverlay}>
+                  <ActivityIndicator size="large" color="#4F46E5" />
+                  <Text style={styles.loadingText}>Loading Razorpay Gateway...</Text>
+                </View>
+              )}
+              style={styles.webView}
+            />
+          </View>
+        ) : (
+          /* STANDARD PAYMENT SUMMARY & LAUNCH BUTTON */
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scrollContent}
+          >
+            {/* Order Card */}
+            <View style={styles.orderCard}>
+              <View style={styles.orderTop}>
+                <Text style={styles.merchantLabel}>Nominal Booking & Inspection Fee</Text>
+                <Text style={styles.amountDisplay}>₹{formattedTotal}</Text>
               </View>
-              <Text style={styles.successTitle}>Payment Verified via Razorpay!</Text>
-              <Text style={styles.successSub}>
-                ₹{formattedTotal} paid successfully. Mistri assigned.
+              <Text style={styles.workerSummaryText}>
+                Worker: {safeWorkerName} • {safeWorkerSkill}
               </Text>
-              <Text style={styles.successTxn}>Txn ID: {successPaymentId}</Text>
-            </View>
-          ) : showLiveWebView ? (
-            /* LIVE WEBVIEW OF OFFICIAL RAZORPAY STANDARD CHECKOUT */
-            <View style={styles.webViewWrap}>
-              <WebView
-                originWhitelist={['*']}
-                source={{ html: razorpayHtml, baseUrl: 'https://checkout.razorpay.com' }}
-                onMessage={handleWebViewMessage}
-                onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
-                javaScriptEnabled={true}
-                domStorageEnabled={true}
-                mixedContentMode="always"
-                startInLoadingState={true}
-                renderLoading={() => (
-                  <View style={styles.loadingOverlay}>
-                    <ActivityIndicator size="large" color="#4F46E5" />
-                    <Text style={styles.loadingText}>Loading Razorpay Gateway...</Text>
-                  </View>
-                )}
-                style={styles.webView}
-              />
-            </View>
-          ) : (
-            /* STANDARD PAYMENT SUMMARY & LAUNCH BUTTON */
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.scrollContent}
-            >
-              {/* Order Card */}
-              <View style={styles.orderCard}>
-                <View style={styles.orderTop}>
-                  <Text style={styles.merchantLabel}>Nominal Booking & Inspection Fee</Text>
-                  <Text style={styles.amountDisplay}>₹{formattedTotal}</Text>
-                </View>
-                <Text style={styles.workerSummaryText}>
-                  Worker: {safeWorkerName} • {safeWorkerSkill}
-                </Text>
 
-                <View style={styles.breakdown}>
-                  <View style={styles.breakdownRow}>
-                    <Text style={styles.breakdownLabel}>
-                      Site Visit & Inspection Fee
-                    </Text>
-                    <Text style={styles.breakdownVal}>₹{formattedTotal}</Text>
-                  </View>
-                  <View style={styles.breakdownRow}>
-                    <Text style={styles.breakdownLabel}>Actual Work Charges</Text>
-                    <Text style={[styles.breakdownVal, { color: '#059669', fontWeight: '700' }]}>Decided On-Site</Text>
-                  </View>
-                </View>
-
-                <View style={{ backgroundColor: '#F0FDF4', padding: 10, borderRadius: 8, marginTop: 10, borderWidth: 1, borderColor: '#DCFCE7' }}>
-                  <Text style={{ fontSize: 11, color: '#166534', lineHeight: 16 }}>
-                    💡 <Text style={{ fontWeight: '700' }}>Direct Pricing:</Text> You only pay ₹{formattedTotal} upfront to schedule the mistri. The mistri visits your site, evaluates the work, and quotes the actual price directly with you.
+              <View style={styles.breakdown}>
+                <View style={styles.breakdownRow}>
+                  <Text style={styles.breakdownLabel}>
+                    Site Visit & Inspection Fee
                   </Text>
+                  <Text style={styles.breakdownVal}>₹{formattedTotal}</Text>
+                </View>
+                <View style={styles.breakdownRow}>
+                  <Text style={styles.breakdownLabel}>Actual Work Charges</Text>
+                  <Text style={[styles.breakdownVal, { color: '#059669', fontWeight: '700' }]}>Decided On-Site</Text>
                 </View>
               </View>
 
-              {/* Security Pill */}
-              <View style={styles.securityPill}>
-                <ShieldCheck size={16} color="#15803D" />
-                <Text style={styles.securityPillText}>
-                  100% Secure Transaction • Razorpay Protected Payment
+              <View style={{ backgroundColor: '#F0FDF4', padding: 10, borderRadius: 8, marginTop: 10, borderWidth: 1, borderColor: '#DCFCE7' }}>
+                <Text style={{ fontSize: 11, color: '#166534', lineHeight: 16 }}>
+                  💡 <Text style={{ fontWeight: '700' }}>Direct Pricing:</Text> You only pay ₹{formattedTotal} upfront to schedule the mistri. The mistri visits your site, evaluates the work, and quotes the actual price directly with you.
                 </Text>
               </View>
+            </View>
 
-              {/* PRIMARY ACTION: Launch Official Razorpay Modal */}
-              <TouchableOpacity
-                style={styles.primaryPayBtn}
-                onPress={() => setShowLiveWebView(true)}
-                activeOpacity={0.88}
-                disabled={isProcessing}
-              >
-                <Text style={styles.primaryPayBtnText}>
-                  Pay Booking Fee • ₹{formattedTotal}
-                </Text>
-                <ArrowRight size={18} color="#FFFFFF" />
-              </TouchableOpacity>
-            </ScrollView>
-          )}
+            {/* Security Pill */}
+            <View style={styles.securityPill}>
+              <ShieldCheck size={16} color="#15803D" />
+              <Text style={styles.securityPillText}>
+                100% Secure Transaction • Razorpay Protected Payment
+              </Text>
+            </View>
 
-          {/* Footer Ribbon */}
-          <View style={styles.footerRow}>
-            <Lock size={12} color="#94A3B8" />
-            <Text style={styles.footerText}>
-              Secured by Razorpay • UPI, Cards, NetBanking & Wallets
-            </Text>
-          </View>
+            {/* PRIMARY ACTION: Launch Official Razorpay Modal */}
+            <TouchableOpacity
+              style={styles.primaryPayBtn}
+              onPress={() => setShowLiveWebView(true)}
+              activeOpacity={0.88}
+              disabled={isProcessing}
+            >
+              <Text style={styles.primaryPayBtnText}>
+                Pay Booking Fee • ₹{formattedTotal}
+              </Text>
+              <ArrowRight size={18} color="#FFFFFF" />
+            </TouchableOpacity>
+          </ScrollView>
+        )}
+
+        {/* Footer Ribbon */}
+        <View style={styles.footerRow}>
+          <Lock size={12} color="#94A3B8" />
+          <Text style={styles.footerText}>
+            Secured by Razorpay • UPI, Cards, NetBanking & Wallets
+          </Text>
         </View>
       </View>
     </Modal>
@@ -521,40 +527,31 @@ export default function RazorpayModal({
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
+  fullScreenContainer: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.65)',
-    justifyContent: 'flex-end',
-  },
-  sheetContainer: {
     backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: Dimensions.get('window').height * 0.88,
-    minHeight: 460,
-    display: 'flex',
-    flexDirection: 'column',
-    overflow: 'hidden',
+    paddingTop: Platform.OS === 'ios' ? 48 : StatusBar.currentHeight || 20,
   },
   razorpayHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 18,
-    paddingBottom: 14,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
+    backgroundColor: '#FFFFFF',
   },
   brandRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
   },
   logoBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    width: 32,
+    height: 32,
+    borderRadius: 8,
     backgroundColor: '#0C2340',
     alignItems: 'center',
     justifyContent: 'center',
@@ -562,12 +559,12 @@ const styles = StyleSheet.create({
   logoText: {
     color: '#00BAF2',
     fontFamily: 'Satoshi-Bold',
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '800',
   },
   razorpayTitle: {
     fontFamily: 'Satoshi-Bold',
-    fontSize: 16,
+    fontSize: 15,
     color: '#0F172A',
   },
   razorpaySub: {
@@ -589,14 +586,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
     backgroundColor: '#F0FDF4',
-    paddingVertical: 7,
+    paddingVertical: 6,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#DCFCE7',
   },
   secureHeaderText: {
     fontFamily: 'Satoshi-Bold',
-    fontSize: 11.5,
+    fontSize: 11,
     color: '#15803D',
   },
   scrollContent: {
@@ -707,12 +704,11 @@ const styles = StyleSheet.create({
   },
   webViewWrap: {
     flex: 1,
-    minHeight: 460,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FFFFFF',
   },
   webView: {
     flex: 1,
-    backgroundColor: 'transparent',
+    backgroundColor: '#FFFFFF',
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
