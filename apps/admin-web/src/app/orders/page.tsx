@@ -293,11 +293,26 @@ export default function OrdersPage() {
                       )}
                     </td>
 
-                    {/* Amount */}
+                    {/* Amount & Direct Quote Model */}
                     <td className="px-6 py-3.5">
                       <span className="font-bold text-slate-900 text-sm">
-                        ₹{Number(b.total_amount || 0).toLocaleString('en-IN')}
+                        ₹{Number(b.total_amount || 99).toLocaleString('en-IN')}
                       </span>
+                      <p className="text-[10px] text-emerald-600 font-semibold mt-0.5">
+                        Booking Fee (Quote On-Site)
+                      </p>
+                      <div className="flex items-center gap-1 mt-1">
+                        {b.arrival_otp && (
+                          <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 font-mono text-[10px] font-bold border border-blue-200" title="Arrival Verification OTP">
+                            Arr: {b.arrival_otp}
+                          </span>
+                        )}
+                        {b.completion_otp && (
+                          <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-mono text-[10px] font-bold border border-emerald-200" title="Completion Verification OTP">
+                            Comp: {b.completion_otp}
+                          </span>
+                        )}
+                      </div>
                     </td>
 
                     {/* Job Step Tracker Override */}

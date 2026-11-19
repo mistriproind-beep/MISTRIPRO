@@ -127,12 +127,24 @@ export default function WorkersPage() {
         .from('profiles')
         .update({
           kyc_status: 'APPROVED',
-          is_verified: true,
           updated_at: new Date().toISOString(),
         })
         .eq('id', workerId);
 
       if (error) throw error;
+
+      // Defensively sync worker_profiles availability
+      try {
+        await supabase
+          .from('worker_profiles')
+          .update({
+            is_available: true,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('user_id', workerId);
+      } catch (wpErr) {
+        console.log('worker_profiles sync notice:', wpErr);
+      }
 
       // Update local state
       setWorkers((prev) =>
@@ -159,7 +171,6 @@ export default function WorkersPage() {
         .from('profiles')
         .update({
           kyc_status: 'REJECTED',
-          is_verified: false,
           rejection_reason: rejectReason || 'Document verification could not be completed.',
           updated_at: new Date().toISOString(),
         })
@@ -308,8 +319,9 @@ export default function WorkersPage() {
                     </div>
 
                     <div className="text-right shrink-0">
-                      <span className="text-sm font-bold text-slate-900">₹{worker.dailyRate}</span>
-                      <span className="text-[11px] text-slate-400">/day</span>
+                      <span className="px-2 py-1 rounded-md bg-emerald-50 text-emerald-700 text-[11px] font-bold border border-emerald-200">
+                        Direct On-Site Quote
+                      </span>
                     </div>
                   </div>
 
@@ -391,8 +403,8 @@ export default function WorkersPage() {
                 <p className="text-xs font-bold text-slate-900 mt-0.5">{selectedWorker.experienceYears} Years</p>
               </div>
               <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase">Daily Rate</p>
-                <p className="text-xs font-bold text-slate-900 mt-0.5">₹{selectedWorker.dailyRate}/day</p>
+                <p className="text-[10px] font-bold text-slate-400 uppercase">Rate Model</p>
+                <p className="text-xs font-bold text-emerald-700 mt-0.5">On-Site Agreement</p>
               </div>
             </div>
 

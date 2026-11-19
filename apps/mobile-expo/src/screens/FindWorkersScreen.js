@@ -1091,7 +1091,7 @@ export default function FindWorkersScreen({
         transparent={false}
         onRequestClose={() => setShowLocationSearch(false)}
       >
-        <View style={{ flex: 1, backgroundColor: '#F8FAFC', paddingTop: Platform.OS === 'ios' ? 44 : 20 }}>
+        <View style={{ flex: 1, backgroundColor: '#F8FAFC', paddingTop: (insets?.top || (Platform?.OS === 'ios' ? 44 : 20)) }}>
           {/* Header */}
           <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#E2E8F0', backgroundColor: '#fff' }}>
             <TouchableOpacity onPress={() => setShowLocationSearch(false)} style={{ padding: 4, marginRight: 10 }}>

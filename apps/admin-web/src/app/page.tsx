@@ -188,12 +188,24 @@ export default function DashboardPage() {
         .from('profiles')
         .update({
           kyc_status: 'APPROVED',
-          is_verified: true,
           updated_at: new Date().toISOString(),
         })
         .eq('id', workerId);
 
       if (!error) {
+        // Also defensively update worker_profiles
+        try {
+          await supabase
+            .from('worker_profiles')
+            .update({
+              is_available: true,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('user_id', workerId);
+        } catch (wpErr) {
+          console.log('worker_profiles sync notice:', wpErr);
+        }
+
         setPendingWorkers((prev) => prev.filter((w) => w.id !== workerId));
         setStats((prev) => ({
           ...prev,

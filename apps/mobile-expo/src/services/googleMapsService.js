@@ -119,12 +119,23 @@ export function generateGoogleMapPickerHtml({
       attributionControl: false
     }).setView([initialLat, initialLng], 16);
 
-    // Official Google Maps Tile Layer
-    L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+    // Official Google Maps Tile Layer with automatic OpenStreetMap fallback
+    var googleLayer = L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
       maxZoom: 20,
       subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
       attribution: '© Google Maps'
     }).addTo(map);
+
+    var osmFallback = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '© OpenStreetMap'
+    });
+
+    googleLayer.on('tileerror', function() {
+      if (!map.hasLayer(osmFallback)) {
+        osmFallback.addTo(map);
+      }
+    });
 
     function reportCenter() {
       var center = map.getCenter();
@@ -281,12 +292,23 @@ export function generateGoogleWorkersMapHtml({
       attributionControl: false
     }).setView([userLat, userLng], 14);
 
-    // Official Google Maps Tile Layer
-    L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+    // Official Google Maps Tile Layer with automatic OpenStreetMap fallback
+    var googleLayer = L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
       maxZoom: 20,
       subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
       attribution: '© Google Maps'
     }).addTo(map);
+
+    var osmFallback = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '© OpenStreetMap'
+    });
+
+    googleLayer.on('tileerror', function() {
+      if (!map.hasLayer(osmFallback)) {
+        osmFallback.addTo(map);
+      }
+    });
 
     // User Location Marker with Blue Pulsing GPS Radar
     var userIcon = L.divIcon({
