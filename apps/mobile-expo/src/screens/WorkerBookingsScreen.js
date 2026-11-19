@@ -356,9 +356,11 @@ export default function WorkerBookingsScreen({
                     </View>
 
                     <View style={styles.payoutBadge}>
-                      <Text style={styles.payoutAmount}>{amount}</Text>
+                      <Text style={[styles.payoutAmount, { fontSize: 13, color: '#15803D' }]}>
+                        {lang === 'hi' ? 'सीधा भुगतान' : 'Direct Payment'}
+                      </Text>
                       <Text style={styles.payoutSub}>
-                        {lang === 'hi' ? 'विजिट शुल्क • ऑन-साइट कोट' : 'Visit Fee • Quote On-Site'}
+                        {lang === 'hi' ? 'ऑन-साइट तय करें' : 'Quote On-Site'}
                       </Text>
                     </View>
                   </View>
@@ -542,8 +544,8 @@ export default function WorkerBookingsScreen({
               const customerColor = item.customerColor || '#10B981';
               const location = item.location || item.site_location || 'Sawai Madhopur, Rajasthan';
               const title = item.title || 'Completed Service';
-              const rawAmt = item.amount || '₹950';
-              const amount = String(rawAmt).startsWith('₹') ? rawAmt : `₹${rawAmt}`;
+              const rawAmt = item.amount;
+              const amount = rawAmt ? (String(rawAmt).startsWith('₹') ? rawAmt : `₹${rawAmt}`) : (lang === 'hi' ? 'ऑन-साइट तय' : 'Direct Quote');
               const customerPhone = item.customerPhone || item.customer_phone || '';
 
               return (

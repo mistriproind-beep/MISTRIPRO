@@ -68,6 +68,7 @@ import {
   DollarSign,
   Award,
   Layers,
+  LocateFixed,
   ChevronDown,
   Smartphone,
   Users,
@@ -623,29 +624,38 @@ export default function App() {
 function MainApp() {
   const insets = useSafeAreaInsets();
 
-  // Instant Image Picker (Gallery Selection with graceful permissions)
+  // Instant Image Picker (Gallery Selection with graceful permissions + Base64 conversion)
   const pickImage = async (setImageUri) => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
-        allowsEditing: false, // Disabling crop removes the 2-3s freeze lag on iOS/Android
-        quality: 0.7,
+        allowsEditing: false,
+        base64: true,
+        quality: 0.5,
       });
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setImageUri(result.assets[0].uri);
+        const asset = result.assets[0];
+        const finalData = asset.base64
+          ? `data:image/jpeg;base64,${asset.base64}`
+          : asset.uri;
+        setImageUri(finalData);
       }
     } catch (err) {
-      // Fallback permission request only if blocked
       try {
         const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (perm.granted) {
           const res = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ['images'],
             allowsEditing: false,
-            quality: 0.7,
+            base64: true,
+            quality: 0.5,
           });
           if (!res.canceled && res.assets && res.assets.length > 0) {
-            setImageUri(res.assets[0].uri);
+            const asset = res.assets[0];
+            const finalData = asset.base64
+              ? `data:image/jpeg;base64,${asset.base64}`
+              : asset.uri;
+            setImageUri(finalData);
           }
         } else {
           Alert.alert('Permission Needed', 'Please allow photo library access from Settings to upload.');
@@ -656,7 +666,7 @@ function MainApp() {
     }
   };
 
-  // Camera Capture with graceful permission handling
+  // Camera Capture with graceful permission handling + Base64 conversion
   const takePhoto = async (setImageUri) => {
     try {
       const perm = await ImagePicker.requestCameraPermissionsAsync();
@@ -666,10 +676,15 @@ function MainApp() {
       }
       const result = await ImagePicker.launchCameraAsync({
         allowsEditing: false,
-        quality: 0.7,
+        base64: true,
+        quality: 0.5,
       });
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setImageUri(result.assets[0].uri);
+        const asset = result.assets[0];
+        const finalData = asset.base64
+          ? `data:image/jpeg;base64,${asset.base64}`
+          : asset.uri;
+        setImageUri(finalData);
       }
     } catch (err) {
       console.log('Camera capture error:', err?.message);
@@ -754,8 +769,62 @@ function MainApp() {
   const [workerAltMobile, setWorkerAltMobile] = useState('');
   const [workerAddress, setWorkerAddress] = useState('');
   const [workerSkills, setWorkerSkills] = useState([]);
+  const [workerExperienceYears, setWorkerExperienceYears] = useState('5');
+  const [workerCoords, setWorkerCoords] = useState(null);
+  const [isFetchingWorkerLocation, setIsFetchingWorkerLocation] = useState(false);
   const [aadhaarFrontUri, setAadhaarFrontUri] = useState(null);
   const [aadhaarBackUri, setAadhaarBackUri] = useState(null);
+
+  // Live GPS Fetch for Worker Profile
+  const fetchWorkerLiveLocation = async () => {
+    setIsFetchingWorkerLocation(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Location Permission Needed',
+          'Please allow location permission in phone settings to automatically detect your work area.'
+        );
+        setIsFetchingWorkerLocation(false);
+        return;
+      }
+
+      const loc = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+
+      if (loc && loc.coords) {
+        const { latitude, longitude } = loc.coords;
+        setWorkerCoords({ lat: latitude, lng: longitude });
+
+        try {
+          const rev = await Location.reverseGeocodeAsync({ latitude, longitude });
+          if (rev && rev.length > 0) {
+            const r = rev[0];
+            const parts = [
+              r.name,
+              r.street,
+              r.subregion || r.district,
+              r.city,
+              r.postalCode,
+              r.region,
+            ].filter(Boolean);
+            const formatted = parts.join(', ');
+            if (formatted) {
+              setWorkerAddress(formatted);
+            }
+          }
+        } catch (revErr) {
+          console.log('Reverse geocode fallback:', revErr);
+        }
+      }
+    } catch (e) {
+      console.log('Error fetching worker live location:', e);
+      Alert.alert('GPS Notice', 'Could not detect live location. Please ensure phone GPS is switched on.');
+    } finally {
+      setIsFetchingWorkerLocation(false);
+    }
+  };
 
   // Dedicated Worker State (Profile, Availability, Alerts, Bookings, Wallet)
   const [workerProfile, setWorkerProfile] = useState(INITIAL_WORKER_PROFILE);
@@ -796,6 +865,38 @@ function MainApp() {
     };
     loadWalletAndMilestones();
   }, []);
+
+  // Auto-poll worker approval status from Supabase when waiting on review screen
+  useEffect(() => {
+    let pollInterval;
+    if (currentScreen === 'WORKER_UNDER_REVIEW' && (workerMobile || phoneInput)) {
+      const targetPhone = workerMobile || phoneInput;
+      pollInterval = setInterval(async () => {
+        try {
+          const res = await LiveBackend.checkWorkerApprovalStatus(targetPhone);
+          if (res?.approved || res?.status === 'APPROVED' || res?.status === 'VERIFIED') {
+            clearInterval(pollInterval);
+            DeviceFeedback.triggerSuccessHaptics();
+            await StorageService.setSession({
+              mobile: targetPhone,
+              phone: targetPhone,
+              name: workerName || 'Mistri',
+              role: 'WORKER',
+              kyc_status: 'APPROVED',
+            });
+            await StorageService.setRole('WORKER');
+            setRole('WORKER');
+            setWorkerProfile((prev) => ({ ...prev, kycStatus: 'APPROVED' }));
+            setActiveTab('HOME');
+            setCurrentScreen('MAIN');
+          }
+        } catch (e) {}
+      }, 3500);
+    }
+    return () => {
+      if (pollInterval) clearInterval(pollInterval);
+    };
+  }, [currentScreen, workerMobile, phoneInput, workerName]);
 
   // Live Worker Radar Polling (Syncs online/offline availability in real-time)
   useEffect(() => {
@@ -1605,7 +1706,21 @@ function MainApp() {
             savedCredentials?.phone ||
             '';
           const userAddr = savedSession?.address || localAcct?.address || '';
-          const userKyc = savedSession?.kyc_status || localAcct?.kyc_status || 'VERIFIED';
+          let userKyc = savedSession?.kyc_status || localAcct?.kyc_status || 'VERIFIED';
+
+          // Check live Supabase Cloud KYC approval status for worker
+          if (effectiveRole === 'WORKER') {
+            try {
+              const liveStatus = await LiveBackend.checkWorkerApprovalStatus(userPhone, savedSession?.id);
+              if (liveStatus && (liveStatus.approved || liveStatus.status === 'APPROVED' || liveStatus.status === 'VERIFIED')) {
+                userKyc = 'APPROVED';
+              } else if (liveStatus && liveStatus.status) {
+                userKyc = liveStatus.status;
+              }
+            } catch (kErr) {
+              console.log('Live worker status check notice:', kErr);
+            }
+          }
 
           setRole(effectiveRole);
           await StorageService.setRole(effectiveRole);
@@ -1632,6 +1747,7 @@ function MainApp() {
                 name: userDisplayName || prev.name,
                 phone: userPhone || prev.phone,
                 location: userAddr || prev.location,
+                kycStatus: userKyc,
               }));
               if (userKyc === 'APPROVED' || userKyc === 'VERIFIED') {
                 setActiveTab('HOME');
@@ -3160,32 +3276,84 @@ function MainApp() {
   // SCREEN 4C: WORKER ONBOARDING FORM
   // -------------------------------------------------------------
   if (currentScreen === 'WORKER_ONBOARDING') {
-    const availableSkillsList = [
-      { name: 'Mason (Raj Mistri)', icon: '🧱' },
-      { name: 'Mason Helper (Beldar)', icon: '👷' },
-      { name: 'General Construction Labour', icon: '🏗️' },
-      { name: 'Shuttering Carpenter', icon: '🪵' },
-      { name: 'Steel Fixer / Bar Bender', icon: '⛓️' },
-      { name: 'Concrete Worker', icon: '🪨' },
-      { name: 'Tile & Marble Installer', icon: '🏛️' },
-      { name: 'Plastering Worker', icon: '🖌️' },
-      { name: 'Bricklayer', icon: '🧱' },
-      { name: 'Waterproofing Worker', icon: '💧' },
-      { name: 'Excavation Labour', icon: '🚜' },
-      { name: 'Electrician', icon: '⚡' },
-      { name: 'Plumber', icon: '🔧' },
-      { name: 'Furniture Carpenter', icon: '🪚' },
-      { name: 'Welder', icon: '🔥' },
-      { name: 'Wall Painter', icon: '🎨' },
-      { name: 'POP Worker', icon: '📐' },
-      { name: 'False Ceiling Installer', icon: '🏢' },
-      { name: 'Metal Fabricator', icon: '⚙️' },
-      { name: 'AC Technician', icon: '❄️' },
-      { name: 'Cleaning Worker', icon: '🧹' },
-      { name: 'Housekeeping Worker', icon: '🏠' },
-      { name: 'Loading & Unloading Labour', icon: '📦' },
-      { name: 'Gardening Worker (Mali)', icon: '🌱' },
-      { name: 'Demolition Worker', icon: '🔨' },
+    const SKILL_CATEGORIES = [
+      {
+        title: lang === 'hi' ? 'भवन निर्माण एवं राजमिस्त्री' : 'Construction & Masonry',
+        icon: '🧱',
+        skills: [
+          { name: 'Mason (Raj Mistri)', icon: '🧱' },
+          { name: 'Mason Helper (Beldar)', icon: '👷' },
+          { name: 'Plastering Worker', icon: '🖌️' },
+          { name: 'Bricklayer', icon: '🧱' },
+          { name: 'Steel Fixer / Bar Bender', icon: '⛓️' },
+          { name: 'Concrete Worker', icon: '🪨' },
+          { name: 'Demolition Worker', icon: '🔨' },
+        ],
+      },
+      {
+        title: lang === 'hi' ? 'बिजली एवं वायरिंग' : 'Electrical & Power',
+        icon: '⚡',
+        skills: [
+          { name: 'Electrician', icon: '⚡' },
+          { name: 'House Wiring Specialist', icon: '💡' },
+          { name: 'Inverter & Solar Electrician', icon: '☀️' },
+        ],
+      },
+      {
+        title: lang === 'hi' ? 'प्लंबिंग एवं सेनेटरी' : 'Plumbing & Sanitary',
+        icon: '🔧',
+        skills: [
+          { name: 'Plumber', icon: '🔧' },
+          { name: 'Pipe Fitting & Leakage Specialist', icon: '🚰' },
+          { name: 'Water Tank Installation', icon: '💧' },
+        ],
+      },
+      {
+        title: lang === 'hi' ? 'पेंटिंग एवं फिनिशिंग' : 'Painting & Finishing',
+        icon: '🎨',
+        skills: [
+          { name: 'Wall Painter', icon: '🎨' },
+          { name: 'Waterproofing Worker', icon: '💧' },
+          { name: 'Polish & Texture Mistri', icon: '✨' },
+        ],
+      },
+      {
+        title: lang === 'hi' ? 'बढ़ई एवं लकड़ी काम' : 'Carpentry & Woodwork',
+        icon: '🪵',
+        skills: [
+          { name: 'Shuttering Carpenter', icon: '🪵' },
+          { name: 'Furniture Carpenter', icon: '🪚' },
+          { name: 'Door & Window Fitting', icon: '🚪' },
+        ],
+      },
+      {
+        title: lang === 'hi' ? 'टाइल, मार्बल एवं पीओपी' : 'Tiles, Marble & POP',
+        icon: '🏛️',
+        skills: [
+          { name: 'Tile & Marble Installer', icon: '🏛️' },
+          { name: 'POP Worker', icon: '📐' },
+          { name: 'False Ceiling Installer', icon: '🏢' },
+        ],
+      },
+      {
+        title: lang === 'hi' ? 'लोहा, वेल्डिंग एवं उपकरण' : 'Welding & Appliances',
+        icon: '🔥',
+        skills: [
+          { name: 'Welder', icon: '🔥' },
+          { name: 'Metal Fabricator', icon: '⚙️' },
+          { name: 'AC Technician', icon: '❄️' },
+        ],
+      },
+      {
+        title: lang === 'hi' ? 'मजदूरी एवं सहायता' : 'General Labour & Helpers',
+        icon: '📦',
+        skills: [
+          { name: 'General Construction Labour', icon: '🏗️' },
+          { name: 'Loading & Unloading Labour', icon: '📦' },
+          { name: 'Cleaning Worker', icon: '🧹' },
+          { name: 'Excavation Labour', icon: '🚜' },
+        ],
+      },
     ];
 
     const toggleSkill = (sk) => {
@@ -3276,45 +3444,134 @@ function MainApp() {
               />
             </View>
 
-            {/* Drag & Multi-Select Skills Section */}
+            {/* Structured & Grouped Work Categories */}
             <View style={styles.inputGroup}>
               <View style={styles.skillSectionTitleRow}>
-                <Text style={styles.formLabel}>Skills & Trade (Select Multiple) *</Text>
+                <Text style={styles.formLabel}>
+                  {lang === 'hi' ? 'कार्य श्रेणी व ट्रेड (एक या अधिक चुनें) *' : 'Work Category & Trades (Select Multiple) *'}
+                </Text>
                 <Text style={styles.skillCountPill}>{workerSkills.length} Selected</Text>
               </View>
-              <View style={styles.skillsChipsWrap}>
-                {availableSkillsList.map((sk) => {
-                  const isChecked = workerSkills.includes(sk.name);
+
+              <View style={{ gap: 14, marginTop: 6 }}>
+                {SKILL_CATEGORIES.map((cat, catIdx) => (
+                  <View key={catIdx} style={{ backgroundColor: '#F8FAFC', borderRadius: 12, padding: 10, borderWidth: 1, borderColor: '#E2E8F0' }}>
+                    <Text style={{ fontSize: 12, fontFamily: 'Satoshi-Bold', color: '#1E293B', marginBottom: 8 }}>
+                      {cat.icon} {cat.title}
+                    </Text>
+                    <View style={styles.skillsChipsWrap}>
+                      {cat.skills.map((sk) => {
+                        const isChecked = workerSkills.includes(sk.name);
+                        return (
+                          <TouchableOpacity
+                            key={sk.name}
+                            style={[styles.skillToggleChip, isChecked && styles.skillToggleChipActive]}
+                            onPress={() => toggleSkill(sk.name)}
+                            activeOpacity={0.75}
+                          >
+                            <Text style={styles.skillEmoji}>{sk.icon}</Text>
+                            <Text style={[styles.skillToggleText, isChecked && styles.skillToggleTextActive]}>
+                              {sk.name}
+                            </Text>
+                            <View style={[styles.skillCheckCircle, isChecked && styles.skillCheckCircleActive]}>
+                              {isChecked && <Check size={10} color="#FFFFFF" strokeWidth={3} />}
+                            </View>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </View>
+
+            {/* Experience in Selected Trade */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.formLabel}>
+                {lang === 'hi' ? 'कार्य में कुल अनुभव (वर्ष) *' : 'Experience in Selected Trade (Years) *'}
+              </Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 6 }}>
+                {[
+                  { label: '1–2 Years', val: '2', hindi: '1–2 वर्ष' },
+                  { label: '3–5 Years', val: '5', hindi: '3–5 वर्ष' },
+                  { label: '6–8 Years', val: '8', hindi: '6–8 वर्ष' },
+                  { label: '9–12 Years', val: '10', hindi: '9–12 वर्ष' },
+                  { label: '12+ Years', val: '15', hindi: '12+ वर्ष (वरिष्ठ)' },
+                ].map((exp) => {
+                  const isSel = workerExperienceYears === exp.val;
                   return (
                     <TouchableOpacity
-                      key={sk.name}
-                      style={[styles.skillToggleChip, isChecked && styles.skillToggleChipActive]}
-                      onPress={() => toggleSkill(sk.name)}
+                      key={exp.val}
+                      onPress={() => setWorkerExperienceYears(exp.val)}
+                      style={{
+                        paddingHorizontal: 12,
+                        paddingVertical: 9,
+                        borderRadius: 10,
+                        borderWidth: 1.5,
+                        borderColor: isSel ? '#16A34A' : '#CBD5E1',
+                        backgroundColor: isSel ? '#DCFCE7' : '#FFFFFF',
+                      }}
                       activeOpacity={0.75}
                     >
-                      <Text style={styles.skillEmoji}>{sk.icon}</Text>
-                      <Text style={[styles.skillToggleText, isChecked && styles.skillToggleTextActive]}>
-                        {sk.name}
+                      <Text style={{ fontSize: 12.5, fontFamily: 'Satoshi-Bold', color: isSel ? '#166534' : '#334155' }}>
+                        {lang === 'hi' ? exp.hindi : exp.label}
                       </Text>
-                      <View style={[styles.skillCheckCircle, isChecked && styles.skillCheckCircleActive]}>
-                        {isChecked && <Check size={10} color="#FFFFFF" strokeWidth={3} />}
-                      </View>
                     </TouchableOpacity>
                   );
                 })}
               </View>
             </View>
 
+            {/* Residential Address with Live GPS Location Fetch */}
             <View style={styles.inputGroup}>
-              <Text style={styles.formLabel}>Complete Residential Address *</Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={styles.formLabel}>
+                  {lang === 'hi' ? 'कार्य क्षेत्र / निवास स्थान का पूरा पता *' : 'Work & Living Location Address *'}
+                </Text>
+                <TouchableOpacity
+                  onPress={fetchWorkerLiveLocation}
+                  disabled={isFetchingWorkerLocation}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 5,
+                    backgroundColor: '#EEF2FF',
+                    paddingHorizontal: 10,
+                    paddingVertical: 5,
+                    borderRadius: 8,
+                    borderWidth: 1,
+                    borderColor: '#C7D2FE',
+                  }}
+                  activeOpacity={0.7}
+                >
+                  {isFetchingWorkerLocation ? (
+                    <ActivityIndicator size="small" color="#4F46E5" />
+                  ) : (
+                    <LocateFixed size={13} color="#4F46E5" />
+                  )}
+                  <Text style={{ fontSize: 11, fontFamily: 'Satoshi-Bold', color: '#4F46E5' }}>
+                    {lang === 'hi' ? 'लाइव GPS खोजें' : 'Fetch Live GPS'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
               <TextInput
-                style={[styles.formTextInput, { height: 75, textAlignVertical: 'top', paddingTop: 10 }]}
-                placeholder="Village / Town, Ward No, District, PIN code"
+                style={[styles.formTextInput, { height: 75, textAlignVertical: 'top', paddingTop: 10, marginTop: 6 }]}
+                placeholder={lang === 'hi' ? 'गली, मोहल्ला, कस्बा, जिला, पिन कोड...' : 'Village / Town, Ward No, District, PIN code'}
                 placeholderTextColor="#94A3B8"
                 multiline
                 value={workerAddress}
                 onChangeText={setWorkerAddress}
               />
+
+              {workerCoords && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 }}>
+                  <CheckCircle2 size={13} color="#16A34A" />
+                  <Text style={{ fontSize: 11, color: '#166534', fontFamily: 'Satoshi-Bold' }}>
+                    GPS Pin: {workerCoords.lat.toFixed(4)}, {workerCoords.lng.toFixed(4)} • {lang === 'hi' ? 'सटीक लोकेशन रिकॉर्डेड' : 'Live Pin Verified'}
+                  </Text>
+                </View>
+              )}
             </View>
 
             {/* Aadhaar Card Verification (Both Sides) */}
@@ -3395,8 +3652,11 @@ function MainApp() {
               await StorageService.setSession({
                 name: workerName.trim(),
                 mobile: workerMobile.trim(),
+                phone: workerMobile.trim(),
                 role: 'WORKER',
                 email: emailInput.trim(),
+                address: workerAddress.trim(),
+                kyc_status: 'PENDING',
               });
               await StorageService.setRole('WORKER');
 
@@ -3408,7 +3668,7 @@ function MainApp() {
                   phone: workerMobile.trim(),
                   address: workerAddress.trim(),
                   email: emailInput.trim(),
-                  kyc_status: 'UNDER_REVIEW',
+                  kyc_status: 'PENDING',
                 });
               }
 
@@ -3419,6 +3679,9 @@ function MainApp() {
                 altMobile: workerAltMobile.trim() || null,
                 address: workerAddress.trim(),
                 skills: workerSkills,
+                experienceYears: Number(workerExperienceYears) || 5,
+                latitude: workerCoords?.lat || null,
+                longitude: workerCoords?.lng || null,
                 aadhaarFrontUri,
                 aadhaarBackUri,
                 photoUri: workerPhotoUri,
@@ -3489,15 +3752,22 @@ function MainApp() {
               setIsCheckingApproval(true);
               DeviceFeedback.triggerSuccessHaptics();
               try {
-                const checkPromise = LiveBackend.checkWorkerApprovalStatus(workerMobile);
-                const timeoutPromise = new Promise((resolve) =>
-                  setTimeout(() => resolve({ status: 'PENDING' }), 1200)
-                );
-                const res = await Promise.race([checkPromise, timeoutPromise]);
+                const targetPhone = workerMobile || phoneInput;
+                const res = await LiveBackend.checkWorkerApprovalStatus(targetPhone);
                 setIsCheckingApproval(false);
 
-                if (res?.status === 'APPROVED' || res?.approved) {
+                if (res?.status === 'APPROVED' || res?.status === 'VERIFIED' || res?.approved) {
                   DeviceFeedback.triggerSuccessHaptics();
+                  await StorageService.setSession({
+                    mobile: targetPhone,
+                    phone: targetPhone,
+                    name: workerName || 'Mistri',
+                    role: 'WORKER',
+                    kyc_status: 'APPROVED',
+                  });
+                  await StorageService.setRole('WORKER');
+                  setRole('WORKER');
+                  setWorkerProfile((prev) => ({ ...prev, kycStatus: 'APPROVED' }));
                   setNotifications((prev) => [
                     {
                       id: `NOTIF-${Date.now()}`,
@@ -3509,12 +3779,13 @@ function MainApp() {
                     ...prev,
                   ]);
                   Alert.alert('Application Approved! 🎉', 'Your Mistri Pro profile has been verified and approved by the admin desk.');
+                  setActiveTab('HOME');
                   setCurrentScreen('MAIN');
                 } else {
                   DeviceFeedback.triggerAlertHaptics();
                   Alert.alert(
                     'Application Under Review ⏳',
-                    'Your Aadhaar and profile details are currently being verified by the compliance desk. You will receive an SMS as soon as approved.'
+                    'Your Aadhaar and profile details are currently being verified by the compliance desk. You will be able to enter as soon as approved.'
                   );
                 }
               } catch (e) {

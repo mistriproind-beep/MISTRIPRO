@@ -567,13 +567,15 @@ export default function DashboardPage() {
                       ))}
                   </div>
 
-                  {/* Aadhaar Photo Indicators */}
+                  {/* Aadhaar Photo Direct Previews */}
                   <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-slate-200/60">
                     <div className="p-2 rounded-lg bg-white border border-slate-200 text-center">
                       <span className="text-[10px] font-bold text-slate-500 block mb-1">
                         Aadhaar Front
                       </span>
-                      {w.aadhaarFront ? (
+                      {w.aadhaarFront && (w.aadhaarFront.startsWith('data:image') || w.aadhaarFront.startsWith('http')) ? (
+                        <img src={w.aadhaarFront} alt="Front" className="w-full h-14 object-cover rounded border border-slate-200" />
+                      ) : w.aadhaarFront ? (
                         <span className="text-[10px] font-semibold text-emerald-600 flex items-center justify-center gap-1">
                           <CheckCircle2 className="w-3 h-3" /> Attached
                         </span>
@@ -585,7 +587,9 @@ export default function DashboardPage() {
                       <span className="text-[10px] font-bold text-slate-500 block mb-1">
                         Aadhaar Back
                       </span>
-                      {w.aadhaarBack ? (
+                      {w.aadhaarBack && (w.aadhaarBack.startsWith('data:image') || w.aadhaarBack.startsWith('http')) ? (
+                        <img src={w.aadhaarBack} alt="Back" className="w-full h-14 object-cover rounded border border-slate-200" />
+                      ) : w.aadhaarBack ? (
                         <span className="text-[10px] font-semibold text-emerald-600 flex items-center justify-center gap-1">
                           <CheckCircle2 className="w-3 h-3" /> Attached
                         </span>

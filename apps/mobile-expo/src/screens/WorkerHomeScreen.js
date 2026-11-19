@@ -326,8 +326,8 @@ export default function WorkerHomeScreen({
             </View>
             <Text style={styles.pricingModelExplanation}>
               {lang === 'hi'
-                ? 'ग्राहक ₹99 बुकिंग शुल्क देकर आपको साइट पर बुलाते हैं। आप साइट देखकर ग्राहक से सीधे वास्तविक कार्य शुल्क तय करते हैं।'
-                : 'Customers book your visit by paying ₹99 upfront. You inspect the work at the customer site and agree on the actual price directly with them.'}
+                ? 'कस्टमर आपको सीधे साइट पर बुलाते हैं। आप काम देखकर ग्राहक से सीधे अपना वास्तविक कार्य शुल्क (मजदूरी या ठेका) तय करते हैं।'
+                : 'Customers book your visit directly to their work site. You inspect the work and agree on your actual job charges directly with the customer.'}
             </Text>
           </View>
         </View>

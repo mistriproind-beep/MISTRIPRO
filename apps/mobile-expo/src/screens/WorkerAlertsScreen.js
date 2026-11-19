@@ -250,11 +250,13 @@ export default function WorkerAlertsScreen({
                     </View>
                   </View>
 
-                  {/* Offered Rate Pill */}
+                  {/* Direct On-Site Agreement Pill */}
                   <View style={styles.ratePill}>
-                    <Text style={styles.ratePillAmount}>₹99</Text>
+                    <Text style={[styles.ratePillAmount, { fontSize: 13, color: '#16A34A' }]}>
+                      {lang === 'hi' ? 'सीधा भुगतान' : 'Direct Pay'}
+                    </Text>
                     <Text style={styles.ratePillUnit}>
-                      {lang === 'hi' ? 'बुकिंग शुल्क' : 'Booking Fee'}
+                      {lang === 'hi' ? 'ऑन-साइट तय करें' : 'Quote On-Site'}
                     </Text>
                   </View>
                 </View>

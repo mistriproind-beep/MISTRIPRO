@@ -619,7 +619,8 @@ export const LiveBackend = {
       const { data: existing } = await supabase
         .from('profiles')
         .select('id, phone, alt_phone')
-        .limit(50);
+        .ilike('phone', `%${cleanDigits}%`)
+        .limit(10);
 
       const found = (existing || []).find((p) => {
         const pClean = (p.phone || '').replace(/[^0-9]/g, '').slice(-10);
@@ -628,32 +629,30 @@ export const LiveBackend = {
       });
 
       let userId;
+      const profilePayload = {
+        full_name: workerProfile.name || workerProfile.fullName,
+        role: 'WORKER',
+        alt_phone: workerProfile.altPhone || workerProfile.altMobile || null,
+        address: workerProfile.address || '',
+        city: workerProfile.city || 'Sawai Madhopur',
+        state: 'Rajasthan',
+        kyc_status: 'PENDING',
+        updated_at: new Date().toISOString(),
+      };
+
       if (found) {
         userId = found.id;
         await supabase
           .from('profiles')
-          .update({
-            full_name: workerProfile.name || workerProfile.fullName,
-            role: 'WORKER',
-            alt_phone: workerProfile.altPhone || null,
-            address: workerProfile.address || '',
-            kyc_status: 'PENDING',
-            updated_at: new Date().toISOString(),
-          })
+          .update(profilePayload)
           .eq('id', userId);
       } else {
         const { data: created, error: pErr } = await supabase
           .from('profiles')
           .insert([
             {
+              ...profilePayload,
               phone: workerProfile.phone || workerProfile.mobile,
-              full_name: workerProfile.name || workerProfile.fullName,
-              role: 'WORKER',
-              alt_phone: workerProfile.altPhone || null,
-              address: workerProfile.address || '',
-              city: 'Sawai Madhopur',
-              state: 'Rajasthan',
-              kyc_status: 'PENDING',
             },
           ])
           .select()
@@ -663,25 +662,35 @@ export const LiveBackend = {
         userId = created.id;
       }
 
-      // Upload Aadhaar Front & Back images to Supabase Storage
+      // Preserve Base64 Data URI or upload to Supabase Storage
       let frontUrl = workerProfile.aadhaarFrontUri || null;
       let backUrl = workerProfile.aadhaarBackUri || null;
+
+      // If user uploaded a local file:// without base64, attempt storage upload
       try {
-        if (workerProfile.aadhaarFrontUri && !workerProfile.aadhaarFrontUri.startsWith('http')) {
-          frontUrl = await LiveBackend.uploadDocumentToStorage(
-            workerProfile.aadhaarFrontUri,
+        if (frontUrl && frontUrl.startsWith('file://')) {
+          const uploadedFront = await LiveBackend.uploadDocumentToStorage(
+            frontUrl,
             `${cleanDigits || 'worker'}_front_${Date.now()}.jpg`
           );
+          if (uploadedFront && !uploadedFront.startsWith('file://')) {
+            frontUrl = uploadedFront;
+          }
         }
-        if (workerProfile.aadhaarBackUri && !workerProfile.aadhaarBackUri.startsWith('http')) {
-          backUrl = await LiveBackend.uploadDocumentToStorage(
-            workerProfile.aadhaarBackUri,
+        if (backUrl && backUrl.startsWith('file://')) {
+          const uploadedBack = await LiveBackend.uploadDocumentToStorage(
+            backUrl,
             `${cleanDigits || 'worker'}_back_${Date.now()}.jpg`
           );
+          if (uploadedBack && !uploadedBack.startsWith('file://')) {
+            backUrl = uploadedBack;
+          }
         }
       } catch (uploadErr) {
-        console.log('Aadhaar upload notice:', uploadErr.message);
+        console.log('Aadhaar storage upload notice:', uploadErr.message);
       }
+
+      const experienceYears = Number(workerProfile.experienceYears || workerProfile.experience_years) || 5;
 
       // Upsert worker details in worker_profiles table
       const { data: wpExisting } = await supabase
@@ -689,28 +698,26 @@ export const LiveBackend = {
         .select('id')
         .eq('user_id', userId);
 
+      const workerData = {
+        skills: workerProfile.skills || ['Master Mason'],
+        experience_years: experienceYears,
+        daily_rate: 0, // Direct On-Site Quote Model
+        aadhaar_front_url: frontUrl,
+        aadhaar_back_url: backUrl,
+        is_available: true,
+        updated_at: new Date().toISOString(),
+      };
+
       if (wpExisting && wpExisting.length > 0) {
         await supabase
           .from('worker_profiles')
-          .update({
-            skills: workerProfile.skills || ['Master Mason'],
-            experience_years: workerProfile.experienceYears || 5,
-            daily_rate: workerProfile.dailyRate || 800,
-            aadhaar_front_url: frontUrl,
-            aadhaar_back_url: backUrl,
-            is_available: true,
-          })
+          .update(workerData)
           .eq('user_id', userId);
       } else {
         await supabase.from('worker_profiles').insert([
           {
+            ...workerData,
             user_id: userId,
-            skills: workerProfile.skills || ['Master Mason'],
-            experience_years: workerProfile.experienceYears || 5,
-            daily_rate: workerProfile.dailyRate || 800,
-            aadhaar_front_url: frontUrl,
-            aadhaar_back_url: backUrl,
-            is_available: true,
             rating: 5,
             reviews_count: 0,
           },
@@ -719,36 +726,52 @@ export const LiveBackend = {
 
       return { success: true, userId, frontUrl, backUrl };
     } catch (err) {
-      console.log('LiveBackend.submitWorkerKYC fallback:', err.message);
+      console.log('LiveBackend.submitWorkerKYC error:', err.message);
       return { success: false, error: err.message };
     }
   },
 
-  // 6. Check Worker KYC Approval Status
-  checkWorkerApprovalStatus: async (phone) => {
+  // 6. Check Worker KYC Approval Status (Live Query by Phone or User ID)
+  checkWorkerApprovalStatus: async (phone, userId = null) => {
     try {
-      if (!phone) return { approved: false, status: 'PENDING' };
-      const cleanDigits = String(phone).replace(/[^0-9]/g, '').slice(-10);
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, phone, alt_phone, kyc_status, role')
-        .limit(50);
+      if (!phone && !userId) return { approved: false, status: 'PENDING' };
 
-      if (error || !data) return { approved: false, status: 'PENDING' };
+      let query = supabase.from('profiles').select('id, phone, alt_phone, kyc_status, role');
+      if (userId) {
+        query = query.eq('id', userId);
+      } else {
+        const cleanDigits = String(phone).replace(/[^0-9]/g, '').slice(-10);
+        query = query.ilike('phone', `%${cleanDigits}%`);
+      }
 
-      const found = data.find((p) => {
-        const pClean = (p.phone || '').replace(/[^0-9]/g, '').slice(-10);
-        const aClean = (p.alt_phone || '').replace(/[^0-9]/g, '').slice(-10);
-        return pClean === cleanDigits || aClean === cleanDigits;
-      });
+      const { data, error } = await query.limit(10);
+
+      let found = data && data.length > 0 ? data[0] : null;
+
+      // Fallback scan if exact match didn't return
+      if (!found && phone) {
+        const cleanDigits = String(phone).replace(/[^0-9]/g, '').slice(-10);
+        const { data: allProfiles } = await supabase
+          .from('profiles')
+          .select('id, phone, alt_phone, kyc_status, role')
+          .limit(100);
+
+        found = (allProfiles || []).find((p) => {
+          const pClean = (p.phone || '').replace(/[^0-9]/g, '').slice(-10);
+          const aClean = (p.alt_phone || '').replace(/[^0-9]/g, '').slice(-10);
+          return pClean === cleanDigits || aClean === cleanDigits;
+        });
+      }
 
       if (!found) return { approved: false, status: 'PENDING' };
       const isApproved = found.kyc_status === 'APPROVED' || found.kyc_status === 'VERIFIED';
       return {
         approved: isApproved,
         status: found.kyc_status || 'PENDING',
+        profile: found,
       };
     } catch (err) {
+      console.log('LiveBackend.checkWorkerApprovalStatus error:', err);
       return { approved: false, status: 'PENDING' };
     }
   },
