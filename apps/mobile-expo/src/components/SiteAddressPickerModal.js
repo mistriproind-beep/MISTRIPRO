@@ -13,6 +13,7 @@ import {
   Alert,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
+import { generateGoogleMapPickerHtml } from '../services/googleMapsService';
 import {
   MapPin,
   CheckCircle2,
@@ -57,84 +58,22 @@ export default function SiteAddressPickerModal({
     if (customerPhone) setContactPhone(customerPhone);
   }, [initialLocation, customerName, customerPhone]);
 
-  // Leaflet HTML map to pick and fine-tune exact site pin
-  const mapHtml = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <style>
-    * { margin:0; padding:0; box-sizing:border-box; }
-    html, body, #map { width:100%; height:100%; background:#f1f5f9; }
-    .center-pin {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -100%);
-      z-index: 1000;
-      pointer-events: none;
-      filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3));
-    }
-    .pin-label {
-      position: absolute;
-      top: 10px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(15, 23, 42, 0.85);
-      color: #fff;
-      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-      font-size: 11px;
-      font-weight: 600;
-      padding: 6px 12px;
-      border-radius: 20px;
-      z-index: 1000;
-      pointer-events: none;
-      white-space: nowrap;
-    }
-  </style>
-</head>
-<body>
-  <div class="pin-label">📍 Drag map to pinpoint work site</div>
-  <svg class="center-pin" width="36" height="44" viewBox="0 0 24 24" fill="none" stroke="#4F46E5" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" fill="#4F46E5"/>
-    <circle cx="12" cy="10" r="3" fill="#FFFFFF"/>
-  </svg>
-  <div id="map"></div>
-  <script>
-    var lat = ${selectedCoords.lat};
-    var lng = ${selectedCoords.lng};
-    var map = L.map('map', { zoomControl: false }).setView([lat, lng], 16);
-    
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '© OpenStreetMap'
-    }).addTo(map);
-
-    function reportCenter() {
-      var center = map.getCenter();
-      if (window.ReactNativeWebView) {
-        window.ReactNativeWebView.postMessage(JSON.stringify({
-          type: 'MOVE',
-          lat: center.lat,
-          lng: center.lng
-        }));
-      }
-    }
-
-    map.on('moveend', reportCenter);
-  </script>
-</body>
-</html>
-  `;
+  // Official Google Maps HTML Map with interactive pinpointing
+  const mapHtml = generateGoogleMapPickerHtml({
+    lat: selectedCoords.lat,
+    lng: selectedCoords.lng,
+    label: lang === 'hi' ? 'साइट की सटीक स्थिति चुनने के लिए मैप खिसकाएं' : 'Drag map to pinpoint work site',
+  });
 
   const handleMessage = (event) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
       if (data.type === 'MOVE') {
         setSelectedCoords({ lat: data.lat, lng: data.lng });
+      } else if (data.type === 'GEOCODE_ADDRESS' && data.formatted_address) {
+        if (!houseStreet) {
+          setAreaCity(data.formatted_address);
+        }
       }
     } catch (e) {}
   };

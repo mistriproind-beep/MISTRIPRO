@@ -41,6 +41,7 @@ import { CATEGORIES, translateWorkerSkill } from '../data/categories';
 import LiveBackend, { getDistanceKm } from '../services/liveBackend';
 import RazorpayModal from '../components/RazorpayModal';
 import SiteAddressPickerModal from '../components/SiteAddressPickerModal';
+import { generateGoogleWorkersMapHtml, searchLocationsWithGoogle } from '../services/googleMapsService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -331,12 +332,8 @@ export default function FindWorkersScreen({
     }
     setLocationSearchLoading(true);
     try {
-      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query.trim())}&format=json&countrycodes=IN&limit=7&addressdetails=1`;
-      const resp = await fetch(url, {
-        headers: { 'User-Agent': 'MistriPro-MobileApp/2.0' },
-      });
-      const data = await resp.json();
-      setLocationResults(Array.isArray(data) ? data : []);
+      const results = await searchLocationsWithGoogle(query);
+      setLocationResults(results);
     } catch (e) {
       setLocationResults([]);
     } finally {
@@ -495,7 +492,7 @@ export default function FindWorkersScreen({
 
   const allChips = ['All', ...CATEGORIES.map((c) => c.name)];
 
-  // Live Colorful Clear Map (Google Roadmap or Apple-like Voyager)
+  // Live Colorful Clear Google Maps with Live Mistri Radar Markers
   const mapHtml = useMemo(() => {
     const workersData = JSON.stringify(
       liveWorkers.map((w) => ({
@@ -513,218 +510,17 @@ export default function FindWorkersScreen({
         lat: w.lat,
         lng: w.lng,
         available: Boolean(w.available),
+        bookingFee: 99,
       }))
     );
 
-    const tileUrl =
-      mapStyle === 'google'
-        ? 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}'
-        : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
-
-    const tileAttr =
-      mapStyle === 'google'
-        ? '© Google Maps'
-        : '© OpenStreetMap, © CARTO';
-
-    return `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body, #map {
-      width: 100%;
-      height: 100%;
-      background: #E8F4F8;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    }
-
-    /* Vibrant User Marker: Google Blue with pulsing live GPS radar */
-    .user-marker {
-      width: 22px;
-      height: 22px;
-      border-radius: 50%;
-      background: #2563EB;
-      border: 3px solid #FFFFFF;
-      box-shadow: 0 0 0 5px rgba(37, 99, 235, 0.4);
-      animation: pulseRadar 2s infinite;
-    }
-    @keyframes pulseRadar {
-      0% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.6); }
-      70% { box-shadow: 0 0 0 12px rgba(37, 99, 235, 0); }
-      100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); }
-    }
-
-    /* Colorful Apple-Style Worker Marker Pin */
-    .worker-marker-wrap {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      cursor: pointer;
-    }
-    .worker-circle {
-      width: 34px;
-      height: 34px;
-      border-radius: 17px;
-      color: #FFFFFF;
-      font-weight: 800;
-      font-size: 11px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 3px 10px rgba(0,0,0,0.3);
-      border: 2.5px solid #FFFFFF;
-    }
-    .worker-pill {
-      background: #0F172A;
-      color: #FFFFFF;
-      font-size: 9px;
-      font-weight: 700;
-      padding: 2px 7px;
-      border-radius: 6px;
-      margin-top: 2px;
-      white-space: nowrap;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.25);
-    }
-
-    /* Vibrant Callout Popup */
-    .leaflet-popup-content-wrapper {
-      border-radius: 14px;
-      padding: 4px;
-      background: #FFFFFF;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.2);
-    }
-    .popup-box {
-      font-size: 12px;
-      padding: 4px;
-      color: #0F172A;
-    }
-    .popup-name {
-      font-weight: 800;
-      font-size: 14px;
-      color: #0F172A;
-      margin-bottom: 2px;
-    }
-    .popup-skill {
-      font-weight: 600;
-      color: #4F46E5;
-      font-size: 11px;
-      margin-bottom: 4px;
-    }
-    .popup-rate {
-      font-weight: 800;
-      color: #059669;
-      font-size: 13px;
-      margin-top: 4px;
-    }
-    .popup-btn {
-      display: block;
-      width: 100%;
-      background: #16A34A;
-      color: #FFFFFF;
-      text-align: center;
-      padding: 8px 12px;
-      border-radius: 8px;
-      text-decoration: none;
-      font-weight: 700;
-      font-size: 12px;
-      margin-top: 8px;
-      border: none;
-      cursor: pointer;
-    }
-  </style>
-</head>
-<body>
-  <div id="map"></div>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script>
-    var map = L.map('map', {
-      zoomControl: true,
-      attributionControl: false
-    }).setView([${userLat}, ${userLng}], 13);
-
-    // Live Crystal-Clear Map Layer
-    L.tileLayer('${tileUrl}', {
-      maxZoom: 20,
-      subdomains: ['mt0', 'mt1', 'mt2', 'mt3', 'a', 'b', 'c', 'd'],
-      attribution: '${tileAttr}'
-    }).addTo(map);
-
-    // Real Live GPS User Location Marker
-    var userIcon = L.divIcon({
-      className: '',
-      html: '<div class="user-marker"></div>',
-      iconSize: [22, 22],
-      iconAnchor: [11, 11]
+    return generateGoogleWorkersMapHtml({
+      userLat,
+      userLng,
+      areaLabel,
+      workersData,
     });
-    L.marker([${userLat}, ${userLng}], { icon: userIcon })
-      .addTo(map)
-      .bindPopup('<b>📍 Your Live Location</b><br/>${areaLabel}')
-      .openPopup();
-
-    // Worker Markers scattered around user's live position
-    var workers = ${workersData};
-    workers.forEach(function(w) {
-      if (!w.lat || !w.lng) return;
-      var circleColor = w.available ? (w.color || '#4F46E5') : '#94A3B8';
-      var pillBg = w.available ? '#0F172A' : '#64748B';
-      var availTag = w.available ? '' : ' (Offline)';
-      var icon = L.divIcon({
-        className: '',
-        html: '<div class="worker-marker-wrap">' +
-                '<div class="worker-circle" style="background-color:' + circleColor + ';">' + (w.avatar || 'W') + '</div>' +
-                '<div class="worker-pill" style="background-color:' + pillBg + ';">' + (w.skill ? w.skill.split(' ')[0] : 'Mistri') + availTag + '</div>' +
-              '</div>',
-        iconSize: [36, 44],
-        iconAnchor: [18, 22]
-      });
-
-      var statusBadge = w.available
-        ? '<div style="display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:4px;background:#F0FDF4;color:#15803D;font-weight:700;font-size:10px;margin-bottom:4px;"><span style=\\"width:6px;height:6px;border-radius:50%;background:#16A34A;display:inline-block;\\"></span> Online</div>'
-        : '<div style="display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:4px;background:#FEF2F2;color:#DC2626;font-weight:700;font-size:10px;border:1px solid #FECACA;margin-bottom:4px;"><span style=\\"width:6px;height:6px;border-radius:50%;background:#EF4444;display:inline-block;\\"></span> Offline</div>';
-
-      var actionBtn = w.available
-        ? '<button class="popup-btn" onclick="sendMsg(\\'' + (w.phone || '') + '\\')">📞 Call Mistri</button>'
-        : '<button class="popup-btn" style="background:#94A3B8;" onclick="alertOffline(\\'' + (w.name || 'Worker').replace(/\'/g, \"\\\\'\") + '\\')">Worker Offline</button>';
-
-      var popupHtml = '<div class="popup-box">' +
-        '<div class="popup-name">' + (w.name || 'Verified Mistri') + '</div>' +
-        '<div class="popup-skill">' + (w.skill || 'Labour') + '</div>' +
-        statusBadge +
-        '<div>⭐ ' + (w.rating || 5.0) + ' (' + (w.reviews || 0) + ' reviews)</div>' +
-        '<div class="popup-rate">₹' + (w.bookingFee || 99) + ' Visit Fee • ' + (w.distance || '2.0') + ' km away • Quote on-site</div>' +
-        actionBtn +
-      '</div>';
-
-      L.marker([w.lat, w.lng], { icon: icon })
-        .addTo(map)
-        .bindPopup(popupHtml)
-        .on('click', function() {
-          if (window.ReactNativeWebView) {
-            window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'SELECT_WORKER', id: w.id }));
-          }
-        });
-    });
-
-    function sendMsg(phone) {
-      if (window.ReactNativeWebView) {
-        window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'CALL', phone: phone }));
-      }
-    }
-
-    function alertOffline(name) {
-      if (window.ReactNativeWebView) {
-        window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'OFFLINE_ALERT', name: name }));
-      }
-    }
-  </script>
-</body>
-</html>
-`;
-  }, [liveWorkers, userLat, userLng, areaLabel, mapStyle]);
+  }, [liveWorkers, userLat, userLng, areaLabel]);
 
   const handleWebViewMessage = (event) => {
     try {

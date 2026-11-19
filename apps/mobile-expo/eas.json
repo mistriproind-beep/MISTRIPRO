@@ -17,7 +17,8 @@
         "EXPO_PUBLIC_SUPABASE_URL": "https://jmdijseowvqvldlhhwsp.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_I-_tRn1OpP7mijyP1kjtlA_DtyTGJej",
         "EXPO_PUBLIC_RAZORPAY_KEY_ID": "rzp_test_U1wrThfCLVtNL9",
-        "EXPO_PUBLIC_RAZORPAY_KEY_SECRET": "dihnHCgzXlEPswRiIPZ2GoeG"
+        "EXPO_PUBLIC_RAZORPAY_KEY_SECRET": "dihnHCgzXlEPswRiIPZ2GoeG",
+        "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "AIzaSyD9Waw124X0qILg7C_OnIZ7ManSwl_wT50"
       }
     },
     "production": {
@@ -28,7 +29,8 @@
         "EXPO_PUBLIC_SUPABASE_URL": "https://jmdijseowvqvldlhhwsp.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_I-_tRn1OpP7mijyP1kjtlA_DtyTGJej",
         "EXPO_PUBLIC_RAZORPAY_KEY_ID": "rzp_test_U1wrThfCLVtNL9",
-        "EXPO_PUBLIC_RAZORPAY_KEY_SECRET": "dihnHCgzXlEPswRiIPZ2GoeG"
+        "EXPO_PUBLIC_RAZORPAY_KEY_SECRET": "dihnHCgzXlEPswRiIPZ2GoeG",
+        "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "AIzaSyD9Waw124X0qILg7C_OnIZ7ManSwl_wT50"
       }
     }
   },

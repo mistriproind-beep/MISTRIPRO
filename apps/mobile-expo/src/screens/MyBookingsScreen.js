@@ -50,6 +50,8 @@ export default function MyBookingsScreen({
   onSubmitReview,
   onOpenNotifications,
   notificationsCount,
+  lang = 'en',
+  t = {},
 }) {
   const [activeTab, setActiveTab] = useState('active'); // 'active' | 'completed' | 'cancelled'
   

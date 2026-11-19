@@ -3665,6 +3665,8 @@ function MainApp() {
           {activeTab === 'ALERTS' && (
             <WorkerAlertsScreen
               insets={insets}
+              lang={lang}
+              t={t}
               alerts={workerAlerts}
               onApproveAlert={handleApproveAlert}
               onRejectAlert={handleRejectAlert}
@@ -3675,6 +3677,8 @@ function MainApp() {
           {activeTab === 'BOOKINGS' && (
             <WorkerBookingsScreen
               insets={insets}
+              lang={lang}
+              t={t}
               bookings={workerBookings}
               onUpdateBookingStep={handleUpdateWorkerBookingStep}
               onCompleteBooking={handleCompleteWorkerBooking}
@@ -3685,6 +3689,8 @@ function MainApp() {
           {activeTab === 'EARNINGS' && (
             <WorkerEarningsScreen
               insets={insets}
+              lang={lang}
+              t={t}
               walletData={workerWallet}
               workerProfile={workerProfile}
               onWithdrawSuccess={handleWithdrawSuccess}

@@ -27,6 +27,8 @@ export default function WorkerAlertsScreen({
   onApproveAlert,
   onRejectAlert,
   onNavigateTab,
+  lang = 'en',
+  t = {},
 }) {
   const [filter, setFilter] = useState('ALL'); // 'ALL' | 'TODAY' | 'UPCOMING'
   const [localAlerts, setLocalAlerts] = useState(alerts);

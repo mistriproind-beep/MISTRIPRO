@@ -33,6 +33,8 @@ export default function WorkerEarningsScreen({
   walletData,
   workerProfile,
   onWithdrawSuccess,
+  lang = 'en',
+  t = {},
 }) {
   const [balance, setBalance] = useState(walletData?.availableBalance || 4850);
   const [transactions, setTransactions] = useState(walletData?.transactions || []);

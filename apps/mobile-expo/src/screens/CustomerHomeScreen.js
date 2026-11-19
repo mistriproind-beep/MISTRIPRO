@@ -41,6 +41,7 @@ import {
 } from '../data/categories';
 import RazorpayModal from '../components/RazorpayModal';
 import SiteAddressPickerModal from '../components/SiteAddressPickerModal';
+import { searchLocationsWithGoogle } from '../services/googleMapsService';
 
 /* ─── helpers ─── */
 function getDistanceKm(lat1, lon1, lat2, lon2) {
@@ -202,7 +203,7 @@ export default function CustomerHomeScreen({
       ? CATEGORIES
       : CATEGORIES.filter((c) => c.group === activeGroup);
 
-  // Location search via Nominatim
+  // Location search via Google Maps Service
   const searchLocationByName = async (query) => {
     if (!query || query.trim().length < 3) {
       setLocationResults([]);
@@ -210,13 +211,8 @@ export default function CustomerHomeScreen({
     }
     setLocationSearchLoading(true);
     try {
-      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query.trim())}&format=json&countrycodes=IN&limit=7&addressdetails=1`;
-      const resp = await fetch(url, {
-        headers: { 'User-Agent': 'MistriProApp/1.0 (contact@mistripro.com)' },
-      });
-      if (!resp.ok) throw new Error('Network error');
-      const data = await resp.json();
-      setLocationResults(Array.isArray(data) ? data : []);
+      const results = await searchLocationsWithGoogle(query);
+      setLocationResults(results);
     } catch (e) {
       console.log('Location search error:', e?.message);
       setLocationResults([]);

@@ -10,6 +10,9 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.mistripro.app",
+      "config": {
+        "googleMapsApiKey": "AIzaSyD9Waw124X0qILg7C_OnIZ7ManSwl_wT50"
+      },
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Mistri Pro needs your GPS location to connect you with verified skilled mistris and contractors near you.",
         "NSCameraUsageDescription": "Mistri Pro needs camera access to capture Aadhaar verification documents and profile photos.",
@@ -17,6 +20,11 @@
       }
     },
     "android": {
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyD9Waw124X0qILg7C_OnIZ7ManSwl_wT50"
+        }
+      },
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -60,7 +68,8 @@
     "extra": {
       "eas": {
         "projectId": "5320c82e-3b9d-46a5-b6df-cd443ec17d96"
-      }
+      },
+      "googleMapsApiKey": "AIzaSyD9Waw124X0qILg7C_OnIZ7ManSwl_wT50"
     },
     "owner": "yashendrajain030205"
   }

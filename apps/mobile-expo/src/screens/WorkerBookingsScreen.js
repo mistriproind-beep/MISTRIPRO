@@ -45,6 +45,8 @@ export default function WorkerBookingsScreen({
   onUpdateBookingStep,
   onCompleteBooking,
   onNavigateTab,
+  lang = 'en',
+  t = {},
 }) {
   const [tab, setTab] = useState('ACTIVE'); // 'ACTIVE' | 'HISTORY'
   const [localBookings, setLocalBookings] = useState(Array.isArray(bookings) ? bookings : []);
