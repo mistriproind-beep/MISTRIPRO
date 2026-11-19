@@ -30,12 +30,59 @@ export default function WorkerAlertsScreen({
 }) {
   const [filter, setFilter] = useState('ALL'); // 'ALL' | 'TODAY' | 'UPCOMING'
   const [localAlerts, setLocalAlerts] = useState(alerts);
+  const [countdowns, setCountdowns] = useState({});
 
   useEffect(() => {
+    setLocalAlerts(alerts);
+    setCountdowns((prev) => {
+      const next = { ...prev };
+      (alerts || []).forEach((a) => {
+        if (next[a.id] === undefined) {
+          next[a.id] = a.expiresInSeconds || 300; // 5-minute countdown (300s)
+        }
+      });
+      return next;
+    });
+
     if (alerts && alerts.length > 0) {
       DeviceFeedback.triggerAlertHaptics();
     }
-  }, []);
+  }, [alerts]);
+
+  // Live 5-Minute Countdown Timer & Ring/Buzz Alert Interval
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCountdowns((prev) => {
+        let hasChanges = false;
+        const next = { ...prev };
+
+        Object.keys(next).forEach((id) => {
+          if (next[id] > 0) {
+            next[id] -= 1;
+            hasChanges = true;
+
+            // Trigger ring/buzz vibration every 30 seconds to alert worker like Uber
+            if (next[id] % 30 === 0 && next[id] > 0) {
+              DeviceFeedback.triggerAlertHaptics();
+            }
+          } else if (next[id] === 0) {
+            // 5 Minutes Elapsed: Automatically decline & forward to next worker
+            next[id] = -1;
+            hasChanges = true;
+            DeviceFeedback.triggerAlertHaptics();
+            setLocalAlerts((prevAlerts) => prevAlerts.filter((item) => item.id !== id));
+            if (onRejectAlert) {
+              onRejectAlert(id, true); // true = timed out
+            }
+          }
+        });
+
+        return hasChanges ? next : prev;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [onRejectAlert]);
 
   const filteredAlerts = localAlerts.filter((a) => {
     if (filter === 'TODAY') return a.date.toLowerCase().includes('today');
@@ -149,52 +196,73 @@ export default function WorkerAlertsScreen({
             </TouchableOpacity>
           </View>
         ) : (
-          filteredAlerts.map((alertItem) => (
-            <View key={alertItem.id} style={styles.alertCard}>
-              {/* Card Header */}
-              <View style={styles.cardTopRow}>
-                <View style={styles.customerRow}>
-                  <View style={[styles.customerAvatar, { backgroundColor: alertItem.customerColor || '#0284C7' }]}>
-                    <Text style={styles.avatarText}>{alertItem.customerAvatar || 'CU'}</Text>
-                  </View>
-                  <View style={styles.customerMeta}>
-                    <View style={styles.customerNameRow}>
-                      <Text style={styles.customerName} numberOfLines={1}>
-                        {alertItem.customerName}
+          filteredAlerts.map((alertItem) => {
+            const sec = countdowns[alertItem.id] ?? 300;
+            const min = Math.floor(sec / 60);
+            const remainSec = String(sec % 60).padStart(2, '0');
+
+            return (
+              <View key={alertItem.id} style={styles.alertCard}>
+                {/* Uber-Style 5-Minute Countdown & Auto-Forward Banner */}
+                <View style={styles.countdownBanner}>
+                  <View style={styles.countdownHeaderRow}>
+                    <View style={styles.countdownPill}>
+                      <Clock size={12} color="#DC2626" />
+                      <Text style={styles.countdownPillText}>
+                        समय शेष: {min}:{remainSec}
                       </Text>
-                      <View style={styles.clientBadge}>
-                        <Text style={styles.clientBadgeText}>Customer</Text>
+                    </View>
+                    <Text style={styles.countdownNotice}>5 मिनट में अगले मिस्त्री को ट्रांसफर होगा</Text>
+                  </View>
+                </View>
+
+                {/* Card Header */}
+                <View style={styles.cardTopRow}>
+                  <View style={styles.customerRow}>
+                    <View style={[styles.customerAvatar, { backgroundColor: alertItem.customerColor || '#0284C7' }]}>
+                      <Text style={styles.avatarText}>{alertItem.customerAvatar || 'CU'}</Text>
+                    </View>
+                    <View style={styles.customerMeta}>
+                      <View style={styles.customerNameRow}>
+                        <Text style={styles.customerName} numberOfLines={1}>
+                          {alertItem.customerName}
+                        </Text>
+                        <View style={styles.clientBadge}>
+                          <Text style={styles.clientBadgeText}>Customer</Text>
+                        </View>
+                      </View>
+                      <View style={styles.locRow}>
+                        <MapPin size={11} color="#64748B" />
+                        <Text style={styles.locText} numberOfLines={1}>
+                          {alertItem.location} • {alertItem.distance}
+                        </Text>
                       </View>
                     </View>
-                    <View style={styles.locRow}>
-                      <MapPin size={11} color="#64748B" />
-                      <Text style={styles.locText} numberOfLines={1}>
-                        {alertItem.location} • {alertItem.distance}
-                      </Text>
-                    </View>
+                  </View>
+
+                  {/* Offered Rate Pill */}
+                  <View style={styles.ratePill}>
+                    <Text style={styles.ratePillAmount}>₹99</Text>
+                    <Text style={styles.ratePillUnit}>विजिट शुल्क</Text>
                   </View>
                 </View>
 
-                {/* Offered Rate Pill */}
-                <View style={styles.ratePill}>
-                  <Text style={styles.ratePillAmount}>{alertItem.offeredRate}</Text>
-                  <Text style={styles.ratePillUnit}>/{alertItem.offeredType || 'day'}</Text>
-                </View>
-              </View>
-
-              {/* Job Title & Details */}
-              <View style={styles.jobBox}>
-                <View style={styles.categoryBadge}>
-                  <Briefcase size={10} color="#4F46E5" />
-                  <Text style={styles.categoryBadgeText}>{alertItem.category}</Text>
-                </View>
-                <Text style={styles.jobTitle}>{alertItem.title}</Text>
-                {alertItem.description ? (
-                  <Text style={styles.jobDesc} numberOfLines={2}>
-                    "{alertItem.description}"
+                {/* Job Title & Details */}
+                <View style={styles.jobBox}>
+                  <View style={styles.categoryBadge}>
+                    <Briefcase size={10} color="#4F46E5" />
+                    <Text style={styles.categoryBadgeText}>{alertItem.category}</Text>
+                  </View>
+                  <Text style={styles.jobTitle}>{alertItem.title}</Text>
+                  <Text style={{ fontSize: 11, color: '#059669', fontWeight: '700', marginTop: 3 }}>
+                    • वास्तविक काम का रेट आप साइट विजिट करके तय करेंगे
                   </Text>
-                ) : null}
-              </View>
+                  {alertItem.description ? (
+                    <Text style={styles.jobDesc} numberOfLines={2}>
+                      "{alertItem.description}"
+                    </Text>
+                  ) : null}
+                </View>
 
               {/* Timing & Escrow Guarantee */}
               <View style={styles.metaRow}>
@@ -232,9 +300,10 @@ export default function WorkerAlertsScreen({
                 </TouchableOpacity>
               </View>
             </View>
-          ))
-        )}
-      </ScrollView>
+          );
+        })
+      )}
+    </ScrollView>
     </View>
   );
 }
@@ -322,6 +391,42 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.04,
     shadowRadius: 6,
     elevation: 2,
+  },
+  countdownBanner: {
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginBottom: 12,
+  },
+  countdownHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 6,
+  },
+  countdownPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FEE2E2',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  countdownPillText: {
+    fontFamily: 'Satoshi-Black',
+    fontSize: 12,
+    color: '#DC2626',
+  },
+  countdownNotice: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 10,
+    color: '#B91C1C',
+    flexShrink: 1,
+    textAlign: 'right',
   },
   cardTopRow: {
     flexDirection: 'row',

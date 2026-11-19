@@ -769,6 +769,28 @@ function MainApp() {
   const [customerBookings, setCustomerBookings] = useState([]);
   const [findInitialCategory, setFindInitialCategory] = useState('All');
 
+  // Customer Virtual Wallet (Pre-arrival cancellation refunds; strictly non-withdrawable)
+  const [customerWalletBalance, setCustomerWalletBalance] = useState(0);
+
+  useEffect(() => {
+    const loadWalletAndMilestones = async () => {
+      try {
+        const bal = await StorageService.getCustomerWallet();
+        if (bal) setCustomerWalletBalance(Number(bal));
+        const ms = await StorageService.getWorkerMilestones();
+        if (ms) {
+          setWorkerWallet((prev) => ({
+            ...prev,
+            milestoneTier: ms.tier || 1,
+            tierCompletedCount: ms.currentCount || 0,
+            totalMilestoneBonus: ms.totalBonus || 0,
+          }));
+        }
+      } catch (e) {}
+    };
+    loadWalletAndMilestones();
+  }, []);
+
   // Live Worker Radar Polling (Syncs online/offline availability in real-time)
   useEffect(() => {
     let isCancelled = false;
@@ -854,13 +876,85 @@ function MainApp() {
     Alert.alert('100% Refund Initiated! 💳', `Amount of ${booking.amount || '₹1,097'} has been refunded to your original payment method via Razorpay. It will reflect within 2-4 hours.`);
   };
 
+  // Pre-Arrival Customer Cancellation (Instant ₹99 Refund to Virtual Wallet)
+  const handleCancelPreVisit = async (booking) => {
+    const refundAmount = 99;
+    const updated = {
+      ...booking,
+      status: 'cancelled',
+      cancellationReason: 'Cancelled before worker arrival (Pre-arrival refund)',
+      refundedToWallet: refundAmount,
+      progress_step: 0,
+    };
+
+    setCustomerBookings((prev) =>
+      prev.map((b) => (b.id === booking.id ? updated : b))
+    );
+    await StorageService.setBookings(
+      customerBookings.map((b) => (b.id === booking.id ? updated : b))
+    );
+    await LiveBackend.updateBookingStatus(booking.id, {
+      status: 'cancelled_pre_visit',
+      progress_step: 0,
+    });
+
+    // Credit ₹99 to Customer Virtual Wallet
+    const nextWallet = (customerWalletBalance || 0) + refundAmount;
+    setCustomerWalletBalance(nextWallet);
+    await StorageService.setCustomerWallet(nextWallet);
+
+    DeviceFeedback.triggerSuccessHaptics();
+
+    setNotifications((prev) => [
+      {
+        id: `NOTIF-${Date.now()}`,
+        title: '₹99 Refunded to Wallet 💰',
+        message: 'Booking cancelled before mistri arrival. ₹99 has been added to your MistriPro Virtual Wallet for future bookings.',
+        time: 'Just now',
+        type: 'booking',
+      },
+      ...prev,
+    ]);
+
+    Alert.alert(
+      '₹99 वॉलेट में रिफंड! 🎉',
+      `कारीगर के साइट पर पहुंचने से पहले बुकिंग रद्द कर दी गई है।\n\nआपका ₹99 बुकिंग शुल्क आपके MistriPro वर्चुअल वॉलेट में जोड़ दिया गया है।\n\nवर्तमान वॉलेट बैलेंस: ₹${nextWallet}\n(यह राशि केवल अन्य कारीगर को बुक करने के लिए मान्य है, निकासी उपलब्ध नहीं)`
+    );
+  };
+
   const handleCustomerBookWorker = async (bookingDetails) => {
     try {
+      // 1. Strict 20km Geographic Bound Check (No requests outside 20km)
+      const eligibleIn20km = (realWorkers || []).filter((w) => {
+        const isOnline = Boolean(w.available);
+        const dist = parseFloat(w.distance || w.computedDistance || '2.0');
+        return isOnline && dist <= 20;
+      }).sort((a, b) => {
+        const distA = parseFloat(a.distance || a.computedDistance || '2.0');
+        const distB = parseFloat(b.distance || b.computedDistance || '2.0');
+        return distA - distB;
+      });
+
+      if (eligibleIn20km.length === 0) {
+        Alert.alert(
+          'Worker not available in your current location right now',
+          'वर्तमान स्थान पर 20 किमी के दायरे में कोई कारीगर उपलब्ध नहीं है।\n\nMistriPro केवल 20 किमी के स्थानीय दायरे में बुकिंग स्वीकार करता है ताकि कारीगर समय पर पहुंच सकें।'
+        );
+        return;
+      }
+
       const bookingCharge = 99;
       const arrivalOtp = String(bookingDetails.arrivalOtp || Math.floor(1000 + Math.random() * 9000));
       const completionOtp = String(bookingDetails.completionOtp || Math.floor(1000 + Math.random() * 9000));
       const cancellationOtp = String(bookingDetails.cancellationOtp || Math.floor(1000 + Math.random() * 9000));
       const companyPhone = '+91 98290 12345'; // Protected Company Helpline Number
+
+      // 2. Handle Virtual Wallet Payment deduction if user selected wallet
+      if (bookingDetails.paidViaWallet) {
+        const nextBal = Math.max(0, (customerWalletBalance || 0) - bookingCharge);
+        setCustomerWalletBalance(nextBal);
+        await StorageService.setCustomerWallet(nextBal);
+      }
 
       const savedBooking = await LiveBackend.createBooking({
         ...bookingDetails,
@@ -877,14 +971,23 @@ function MainApp() {
 
       const newBookingId = savedBooking?.booking?.id || savedBooking?.id || `B-${Date.now().toString().slice(-4)}`;
 
-      // 1. Add to Customer Bookings List
+      // 3. Add to Customer Bookings List
       const isSpecific = bookingDetails.workerName && !bookingDetails.workerName.includes('Searching');
+      const firstWorker = eligibleIn20km[0];
+      const remainingWorkersQueue = eligibleIn20km.slice(1).map((w) => ({
+        name: w.name,
+        distance: w.distance || w.computedDistance,
+        phone: w.phone,
+        avatar: w.avatar,
+        skill: w.skill,
+      }));
+
       const newCustBooking = {
         id: newBookingId,
         booking_code: `BK-${Date.now().toString().slice(-4)}`,
-        workerName: isSpecific ? bookingDetails.workerName : 'Searching Nearby Workers...',
+        workerName: isSpecific ? bookingDetails.workerName : (firstWorker?.name || 'Nearby Mistri'),
         requestedWorkerName: bookingDetails.workerName,
-        workerAvatar: isSpecific ? (bookingDetails.workerAvatar || bookingDetails.workerName.slice(0, 2).toUpperCase()) : '⏳',
+        workerAvatar: isSpecific ? (bookingDetails.workerAvatar || bookingDetails.workerName.slice(0, 2).toUpperCase()) : (firstWorker?.avatar || '👷‍♂️'),
         workerColor: bookingDetails.workerColor || '#4F46E5',
         workerPhone: companyPhone, // Mask worker personal phone: show Company Helpline to customer
         worker_phone: companyPhone,
@@ -910,13 +1013,14 @@ function MainApp() {
         cancellation_otp: cancellationOtp,
         cancellationOtp,
         pricingModel: 'ON_SITE_QUOTE',
-        razorpay_payment_id: bookingDetails.paymentId || `pay_live_${Date.now().toString().slice(-8)}`,
+        paymentMethod: bookingDetails.paidViaWallet ? 'MistriPro Virtual Wallet' : 'Razorpay UPI / Cards',
+        razorpay_payment_id: bookingDetails.paymentId || (bookingDetails.paidViaWallet ? `wallet_paid_${Date.now()}` : `pay_live_${Date.now().toString().slice(-8)}`),
       };
 
       setCustomerBookings((prev) => [newCustBooking, ...prev]);
       await StorageService.setBookings([newCustBooking, ...customerBookings]);
 
-      // 2. Add alert for worker
+      // 4. Uber-Style Sequential Dispatch (Nearest worker gets first alert with 5-min timer & buzz)
       const custInitials = (custName || 'CU').split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
       const newAlert = {
         id: `ALT-${Date.now().toString().slice(-4)}`,
@@ -928,7 +1032,7 @@ function MainApp() {
         category: bookingDetails.workerSkill,
         title: `${bookingDetails.workerSkill} Site Inspection Request`,
         location: 'Sawai Madhopur, Rajasthan',
-        distance: '1.2 km',
+        distance: `${firstWorker.distance || firstWorker.computedDistance || '1.2'} km`,
         date: 'Today, Immediate',
         timing: 'Immediate Site Visit',
         offeredRate: '₹99 Visit Fee (Quote On-Site)',
@@ -938,10 +1042,13 @@ function MainApp() {
         arrivalOtp,
         completionOtp,
         cancellationOtp,
+        assignedWorkerName: firstWorker.name,
+        remainingWorkerQueue: remainingWorkersQueue,
+        expiresInSeconds: 300,
       };
       setWorkerAlerts((prev) => [newAlert, ...prev]);
 
-      // 3. Add to worker bookings
+      // 5. Add to worker bookings
       const newWorkerBooking = {
         id: newBookingId,
         customerName: custName || 'Customer',
@@ -951,7 +1058,7 @@ function MainApp() {
         category: bookingDetails.workerSkill,
         title: `${bookingDetails.workerSkill} Site Inspection`,
         location: 'Sawai Madhopur, Rajasthan',
-        distance: '1.2 km',
+        distance: `${firstWorker.distance || firstWorker.computedDistance || '1.2'} km`,
         date: 'Today, Immediate',
         timing: 'Immediate Site Visit',
         amount: '₹99 Visit Fee (Quote On-Site)',
@@ -965,16 +1072,16 @@ function MainApp() {
         completionOtp,
         cancellation_otp: cancellationOtp,
         cancellationOtp,
-        paymentStatus: 'PAID_VIA_RAZORPAY',
+        paymentStatus: bookingDetails.paidViaWallet ? 'PAID_VIA_WALLET' : 'PAID_VIA_RAZORPAY',
       };
       setWorkerBookings((prev) => [newWorkerBooking, ...prev]);
 
-      // 4. Notifications & Haptics
+      // 6. Notifications & Haptics
       setNotifications((prev) => [
         {
           id: `NOTIF-${Date.now()}`,
-          title: 'Booking Sent & Inspection Fee Paid',
-          message: `Site visit request sent to ${bookingDetails.workerName}. Inspection fee ₹${bookingCharge} secured via Razorpay. Your Arrival OTP is ${arrivalOtp}.`,
+          title: 'Booking Dispatched (Uber-Style)',
+          message: `Request offered to nearest mistri (${firstWorker.name}) within 20km with a 5-minute response window. Arrival OTP is ${arrivalOtp}.`,
           time: 'Just now',
           type: 'booking',
         },
@@ -1062,30 +1169,77 @@ function MainApp() {
     ]);
   };
 
-  const handleRejectAlert = async (alertItem) => {
+  // Uber-Style Sequential Reject / Timeout (Forwards to next worker in 20km range)
+  const handleRejectAlert = async (alertItem, isTimedOut = false) => {
     const alertId = alertItem?.id || alertItem;
-    const bookingId = alertItem?.bookingId;
+    const targetAlert = workerAlerts.find((a) => a.id === alertId);
+    const bookingId = targetAlert?.bookingId || alertItem?.bookingId;
+
     setWorkerAlerts((prev) => prev.filter((a) => a.id !== alertId));
 
+    // Check if there are other workers in the 20km sequential queue
+    const remaining = targetAlert?.remainingWorkerQueue || [];
+    if (remaining.length > 0) {
+      const nextWorker = remaining[0];
+      const newQueue = remaining.slice(1);
+
+      const nextAlert = {
+        ...targetAlert,
+        id: `ALT-${Date.now().toString().slice(-4)}`,
+        assignedWorkerName: nextWorker.name,
+        distance: nextWorker.distance ? `${nextWorker.distance} km` : '2.1 km',
+        remainingWorkerQueue: newQueue,
+        expiresInSeconds: 300,
+      };
+
+      setWorkerAlerts((prev) => [nextAlert, ...prev]);
+      DeviceFeedback.triggerAlertHaptics();
+
+      setNotifications((prev) => [
+        {
+          id: `NOTIF-${Date.now()}`,
+          title: 'Request Auto-Forwarded (Uber-Style)',
+          message: `Previous mistri ${isTimedOut ? 'timed out (5m)' : 'declined'}. Request sent to next nearest mistri (${nextWorker.name}) within 20km.`,
+          time: 'Just now',
+          type: 'info',
+        },
+        ...prev,
+      ]);
+      return;
+    }
+
+    // Queue exhausted -> Notify customer & auto-refund ₹99 to virtual wallet
     if (bookingId) {
       setWorkerBookings((prev) =>
         prev.map((b) => (b.id === bookingId ? { ...b, status: 'rejected' } : b))
       );
+      setCustomerBookings((prev) =>
+        prev.map((b) =>
+          b.id === bookingId
+            ? { ...b, status: 'cancelled', cancellationReason: 'No workers available within 20km' }
+            : b
+        )
+      );
       await LiveBackend.updateBookingStatus(bookingId, 'rejected');
+
+      // Auto-refund to customer virtual wallet
+      const nextBal = (customerWalletBalance || 0) + 99;
+      setCustomerWalletBalance(nextBal);
+      await StorageService.setCustomerWallet(nextBal);
+
+      setNotifications((prev) => [
+        {
+          id: `NOTIF-${Date.now()}`,
+          title: '₹99 Refunded to Wallet 💰',
+          message: 'All nearby mistris within 20km were occupied. ₹99 has been refunded to your MistriPro Virtual Wallet.',
+          time: 'Just now',
+          type: 'alert',
+        },
+        ...prev,
+      ]);
     }
 
     DeviceFeedback.triggerAlertHaptics();
-
-    setNotifications((prev) => [
-      {
-        id: `NOTIF-${Date.now()}`,
-        title: 'Booking Declined',
-        message: 'The mistri declined your booking. Choose "Auto-Assign Another Mistri" or "Instant Refund".',
-        time: 'Just now',
-        type: 'alert',
-      },
-      ...prev,
-    ]);
   };
 
   const handleUpdateWorkerBookingStep = (bookingId, nextStep) => {
@@ -1094,6 +1248,10 @@ function MainApp() {
     );
   };
 
+  // 3-Tier Milestone System:
+  // Tier 1: 10 new bookings -> ₹200 bonus -> Count resets to 0
+  // Tier 2: 20 new bookings -> ₹500 bonus -> Count resets to 0
+  // Tier 3: 30 new bookings -> ₹1,000 bonus -> Count resets to 0
   const handleCompleteWorkerBooking = (booking) => {
     // 1. Mark booking completed in worker's bookings
     setWorkerBookings((prev) =>
@@ -1113,39 +1271,62 @@ function MainApp() {
       )
     );
 
-    // 3. Increment completed jobs count & check 10-Jobs Milestone Bonus (₹200)
+    // 3. Increment Tier counter & calculate bonus
     setWorkerWallet((prev) => {
-      const currentCompletedCount = (prev?.completedJobsCount || 0) + 1;
-      const isMilestoneReached = currentCompletedCount % 10 === 0;
-      const bonusEarned = isMilestoneReached ? 200 : 0;
-      const newBalance = (prev?.availableBalance || 0) + bonusEarned;
+      const activeTier = prev?.milestoneTier || 1;
+      const currentTierCount = (prev?.tierCompletedCount || 0) + 1;
+      const tierTarget = activeTier === 1 ? 10 : activeTier === 2 ? 20 : 30;
+      const tierBonus = activeTier === 1 ? 200 : activeTier === 2 ? 500 : 1000;
+      const isTierUnlocked = currentTierCount >= tierTarget;
 
-      const newTransactions = [...(prev?.transactions || [])];
-      if (isMilestoneReached) {
-        newTransactions.unshift({
-          id: `BONUS-${Date.now().toString().slice(-4)}`,
-          title: `🏆 10-Jobs Milestone Bonus (${currentCompletedCount}th Job Milestone)`,
-          customer: 'MistriPro Platform Reward',
-          type: 'CREDIT',
-          amount: 200,
-          date: 'Today, Just now',
-          status: 'COMPLETED',
-          method: 'Platform Milestone Cash Bonus',
-        });
+      let nextTier = activeTier;
+      let nextTierCount = currentTierCount;
+      let bonusEarned = 0;
+
+      if (isTierUnlocked) {
+        bonusEarned = tierBonus;
+        nextTierCount = 0; // Counter resets for next tier!
+        nextTier = Math.min(3, activeTier + 1);
       }
 
-      if (isMilestoneReached) {
+      const totalBonus = (prev?.totalMilestoneBonus || 0) + bonusEarned;
+      const totalJobs = (prev?.completedJobsCount || 0) + 1;
+      const newBalance = (prev?.availableBalance || 0) + bonusEarned;
+
+      // Persist to storage
+      StorageService.setWorkerMilestones({
+        tier: nextTier,
+        currentCount: nextTierCount,
+        totalBonus,
+      });
+
+      const newTransactions = [...(prev?.transactions || [])];
+      if (isTierUnlocked) {
+        newTransactions.unshift({
+          id: `BONUS-${Date.now().toString().slice(-4)}`,
+          title: `🏆 Tier ${activeTier} Milestone Bonus Unlocked!`,
+          customer: 'MistriPro Platform Reward',
+          type: 'CREDIT',
+          amount: tierBonus,
+          date: 'Today, Just now',
+          status: 'COMPLETED',
+          method: `Tier ${activeTier} (${tierTarget} Jobs) Completed`,
+        });
+
         setTimeout(() => {
           Alert.alert(
-            'बधाई हो! 🏆 10 काम पूरे होने पर ₹200 बोनस',
-            `शानदार उपलब्धि! आपने MistriPro पर ${currentCompletedCount} काम सफलतापूर्वक पूरे कर लिए हैं।\n\n₹200 का कैश कमीशन/बोनस इनाम आपके वॉलेट में तुरंत जोड़ दिया गया है!`
+            `बधाई हो! 🏆 Tier ${activeTier} बोनस अनलॉक!`,
+            `शानदार उपलब्धि! आपने ${tierTarget} नए काम सफलतापूर्वक पूरे किए हैं।\n\n₹${tierBonus} का बोनस आपके वॉलेट में तुरंत जोड़ दिया गया है!\n\nअब काउंटर रीसेट होकर अगला Tier शुरू हो गया है।`
           );
         }, 300);
       }
 
       return {
         ...prev,
-        completedJobsCount: currentCompletedCount,
+        milestoneTier: nextTier,
+        tierCompletedCount: nextTierCount,
+        totalMilestoneBonus: totalBonus,
+        completedJobsCount: totalJobs,
         availableBalance: newBalance,
         totalLifetimeEarnings: (prev?.totalLifetimeEarnings || 0) + bonusEarned,
         transactions: newTransactions,
@@ -3299,6 +3480,7 @@ function MainApp() {
               userName={custName}
               lang={lang}
               t={t}
+              customerWalletBalance={customerWalletBalance}
               onNavigateTab={(tab, category) => {
                 if (category) setFindInitialCategory(category);
                 const normalizedTab = String(tab || '').trim().toUpperCase();
@@ -3316,6 +3498,7 @@ function MainApp() {
               insets={insets}
               lang={lang}
               t={t}
+              customerWalletBalance={customerWalletBalance}
               initialCategory={findInitialCategory}
               onNavigateTab={(tab) => setActiveTab(tab)}
               onBookWorker={(details) => handleCustomerBookWorker(details)}
@@ -3332,6 +3515,7 @@ function MainApp() {
               bookings={customerBookings}
               onAutoAssignAnother={handleAutoAssignAnother}
               onRefundBooking={handleRefundBooking}
+              onCancelPreVisit={handleCancelPreVisit}
               onOpenNotifications={() => setShowNotifModal(true)}
               notificationsCount={notifications.length}
             />
@@ -3425,6 +3609,7 @@ function MainApp() {
               userName={custName}
               userContact={custMobile}
               userAddress={custAddress}
+              customerWalletBalance={customerWalletBalance}
               onSaveProfile={handleSaveProfile}
               onSelectLang={handleSelectLanguage}
               onOpenInvoices={() => setShowInvoicesModal(true)}
@@ -4426,6 +4611,7 @@ function ProfileScreen({
   userName,
   userContact,
   userAddress,
+  customerWalletBalance = 0,
   onSaveProfile,
   onSelectLang,
   onSwitchLang,
@@ -4504,6 +4690,35 @@ function ProfileScreen({
             <Text style={styles.editProfilePillText}>Edit Profile</Text>
           </TouchableOpacity>
         </View>
+
+        {/* MistriPro Customer Virtual Wallet (Pre-arrival refund balance) */}
+        {role === 'CUSTOMER' && (
+          <View style={styles.customerWalletCard}>
+            <View style={styles.walletHeaderRow}>
+              <View style={styles.walletBadge}>
+                <Wallet size={16} color="#4F46E5" />
+                <Text style={styles.walletBadgeTitle}>MistriPro Virtual Wallet (वर्चुअल वॉलेट)</Text>
+              </View>
+              <View style={styles.walletStatusTag}>
+                <Text style={styles.walletStatusText}>Non-Withdrawable</Text>
+              </View>
+            </View>
+
+            <View style={styles.walletBalanceRow}>
+              <Text style={styles.walletCurrency}>₹</Text>
+              <Text style={styles.walletBalanceNumber}>{customerWalletBalance || 0}</Text>
+            </View>
+
+            <View style={styles.walletUsageNotice}>
+              <ShieldCheck size={14} color="#059669" />
+              <Text style={styles.walletUsageNoticeText}>
+                {customerWalletBalance > 0
+                  ? 'यह राशि केवल किसी अन्य मिस्त्री को बुक करने के लिए मान्य है। अगली बुकिंग पर यह स्वतः इस्तेमाल हो जाएगी (निकासी उपलब्ध नहीं)।'
+                  : 'कारीगर के साइट पर पहुंचने से पहले बुकिंग रद्द करने पर ₹99 का रिफंड तुरंत इस वर्चुअल वॉलेट में क्रेडिट होगा।'}
+              </Text>
+            </View>
+          </View>
+        )}
 
         {/* ChoosingHer Invite Friends / Promo Banner */}
         <View style={styles.profilePromoCard}>
@@ -6219,6 +6434,84 @@ const styles = StyleSheet.create({
     fontFamily: 'Satoshi-Bold',
     fontSize: 12,
     color: '#4F46E5',
+  },
+
+  // CUSTOMER VIRTUAL WALLET CARD
+  customerWalletCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1.5,
+    borderColor: '#C7D2FE',
+    shadowColor: '#4F46E5',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  walletHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  walletBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  walletBadgeTitle: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 13,
+    color: '#1E1B4B',
+  },
+  walletStatusTag: {
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  walletStatusText: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 10,
+    color: '#B45309',
+  },
+  walletBalanceRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 4,
+    marginVertical: 4,
+  },
+  walletCurrency: {
+    fontFamily: 'Satoshi-Black',
+    fontSize: 22,
+    color: '#4F46E5',
+  },
+  walletBalanceNumber: {
+    fontFamily: 'Satoshi-Black',
+    fontSize: 32,
+    color: '#0F172A',
+  },
+  walletUsageNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#F0FDF4',
+    padding: 10,
+    borderRadius: 10,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#DCFCE7',
+  },
+  walletUsageNoticeText: {
+    flex: 1,
+    fontFamily: 'Satoshi-Medium',
+    fontSize: 11,
+    color: '#166534',
+    lineHeight: 15,
   },
 
   // PROMO / INVITE CARD (ChoosingHer)

@@ -12,6 +12,8 @@ const KEYS = {
   CREDENTIALS: '@mistri_credentials',
   BOOKINGS: '@mistri_bookings',
   ACCOUNT_REGISTRY: '@mistri_accounts_registry',
+  CUSTOMER_WALLET: '@mistri_customer_wallet',
+  WORKER_MILESTONES: '@mistri_worker_milestones',
 };
 
 export const StorageService = {
@@ -191,6 +193,36 @@ export const StorageService = {
   setBookings: async (bookings) => {
     try {
       await AsyncStorage.setItem(KEYS.BOOKINGS, JSON.stringify(bookings));
+    } catch (e) {}
+  },
+
+  // 7. Customer Virtual Wallet (Pre-visit cancellation refunds)
+  getCustomerWallet: async () => {
+    try {
+      const data = await AsyncStorage.getItem(KEYS.CUSTOMER_WALLET);
+      return data ? Number(data) : 0;
+    } catch (e) {
+      return 0;
+    }
+  },
+  setCustomerWallet: async (amount) => {
+    try {
+      await AsyncStorage.setItem(KEYS.CUSTOMER_WALLET, String(amount));
+    } catch (e) {}
+  },
+
+  // 8. Worker Tiered Milestone System (Tier 1: 10->200, Tier 2: 20->500, Tier 3: 30->1000)
+  getWorkerMilestones: async () => {
+    try {
+      const data = await AsyncStorage.getItem(KEYS.WORKER_MILESTONES);
+      return data ? JSON.parse(data) : { tier: 1, currentCount: 0, totalBonus: 0 };
+    } catch (e) {
+      return { tier: 1, currentCount: 0, totalBonus: 0 };
+    }
+  },
+  setWorkerMilestones: async (milestoneData) => {
+    try {
+      await AsyncStorage.setItem(KEYS.WORKER_MILESTONES, JSON.stringify(milestoneData));
     } catch (e) {}
   },
 };

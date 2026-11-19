@@ -132,9 +132,11 @@ export default function ContractorScreen({
   });
 
   const subtotal = Math.round(baseCrewCost);
-  const platformFee = Math.round(subtotal * 0.05);
-  const gst = Math.round(platformFee * 0.18);
-  const grandTotal = subtotal + platformFee + gst;
+  // Contractor Booking Fee (Fixed ₹599 upfront booking & dispatch fee)
+  const contractorBookingFee = 599;
+  const platformFee = 599;
+  const gst = 0;
+  const grandTotal = contractorBookingFee;
 
   // Confirm booking
   const handleConfirmBooking = () => {
@@ -148,20 +150,12 @@ export default function ContractorScreen({
     }
 
     Alert.alert(
-      'Confirm Group Booking',
-      `Crew: ${totalWorkers} Workers\nDuration: ${
-        durationType === 'hourly'
-          ? `${hoursCount} Hours`
-          : durationType === 'half'
-          ? 'Half Day (4 hrs)'
-          : durationType === 'full'
-          ? 'Full Day (8 hrs)'
-          : `${daysCount} Days`
-      }\nSite: ${siteLocation}\nTotal: ₹${grandTotal.toLocaleString('en-IN')}`,
+      'Confirm Contractor Crew Booking 🏗️',
+      `Crew: ${totalWorkers} Workers\nSite: ${siteLocation}\n\nBooking & Mobilization Fee: ₹599\n(Actual crew labor rates will be settled with the contractor directly on-site)`,
       [
         { text: 'Modify', style: 'cancel' },
         {
-          text: 'Proceed to Payment →',
+          text: 'Proceed to Pay ₹599 →',
           onPress: () => {
             DeviceFeedback.triggerSuccessHaptics();
             const liveList = Array.isArray(workers) ? workers : [];
@@ -191,25 +185,28 @@ export default function ContractorScreen({
               assignedWorkers: assigned,
               siteLocation,
               duration: durationText,
-              subtotal,
-              platformFee,
-              gst,
-              transactionFee: gst,
-              totalAmount: grandTotal,
+              subtotal: 599,
+              platformFee: 599,
+              gst: 0,
+              transactionFee: 0,
+              totalAmount: 599,
+              bookingFee: 599,
+              pricingModel: 'CONTRACTOR_ON_SITE_QUOTE',
               paymentMethod: payMethod === 'card' ? 'Razorpay Cards / NetBanking' : 'Razorpay UPI / QR',
             };
 
             const bookingData = {
               workerName: `${totalWorkers} Worker Crew`,
               workerSkill: 'Contractor Crew Deployment',
-              workerFee: subtotal,
-              platformFee,
-              txnFee: gst,
-              totalAmount: grandTotal,
+              workerFee: 0,
+              platformFee: 599,
+              bookingFee: 599,
+              txnFee: 0,
+              totalAmount: 599,
               customerName: userName || 'Customer',
               customerPhone: userContact || '',
-              wageLabel: `Crew Wage (${totalWorkers} workers, ${durationText})`,
-              txnFeeLabel: 'GST (18% on fee)',
+              wageLabel: `Contractor Mobilization Fee (${totalWorkers} workers)`,
+              txnFeeLabel: 'GST Included',
               contractorPayload,
             };
 
@@ -512,27 +509,27 @@ export default function ContractorScreen({
 
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>
-              Crew Wage ({totalWorkers} workers ×{' '}
-              {durationType === 'multi' ? `${daysCount}d` : durationType})
+              Crew Mobilization & Booking Fee ({totalWorkers} workers)
             </Text>
-            <Text style={styles.summaryVal}>₹{subtotal.toLocaleString('en-IN')}</Text>
+            <Text style={styles.summaryVal}>₹599</Text>
           </View>
 
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Platform Service Fee (5%)</Text>
-            <Text style={styles.summaryVal}>₹{platformFee.toLocaleString('en-IN')}</Text>
+            <Text style={styles.summaryLabel}>Actual Crew Labor Wages</Text>
+            <Text style={[styles.summaryVal, { color: '#059669', fontWeight: '700' }]}>Decided On-Site</Text>
           </View>
 
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>GST (18% on fee)</Text>
-            <Text style={styles.summaryVal}>₹{gst.toLocaleString('en-IN')}</Text>
+          <View style={{ backgroundColor: '#F0FDF4', padding: 10, borderRadius: 8, marginTop: 8, marginBottom: 8, borderWidth: 1, borderColor: '#DCFCE7' }}>
+            <Text style={{ fontSize: 11, color: '#166534', lineHeight: 16 }}>
+              💡 <Text style={{ fontWeight: '700' }}>Direct Contractor Rate:</Text> You only pay ₹599 upfront to mobilize the crew to your site. Actual labor rates will be settled with the contractor directly after inspecting the project site.
+            </Text>
           </View>
 
           <View style={styles.summaryDivider} />
 
           <View style={styles.summaryTotalRow}>
-            <Text style={styles.summaryTotalLabel}>Total Payable</Text>
-            <Text style={styles.summaryTotalVal}>₹{grandTotal.toLocaleString('en-IN')}</Text>
+            <Text style={styles.summaryTotalLabel}>Total Payable Now</Text>
+            <Text style={styles.summaryTotalVal}>₹599</Text>
           </View>
 
           {/* Payment Method Pills */}
@@ -574,7 +571,7 @@ export default function ContractorScreen({
             activeOpacity={0.85}
           >
             <Text style={styles.confirmBtnText}>
-              Deploy Crew Now • ₹{grandTotal.toLocaleString('en-IN')}
+              Deploy Crew Now • ₹599
             </Text>
           </TouchableOpacity>
         </View>

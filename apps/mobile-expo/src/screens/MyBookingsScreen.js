@@ -46,6 +46,7 @@ export default function MyBookingsScreen({
   bookings = [],
   onAutoAssignAnother,
   onRefundBooking,
+  onCancelPreVisit,
   onSubmitReview,
   onOpenNotifications,
   notificationsCount,
@@ -387,6 +388,35 @@ export default function MyBookingsScreen({
                         <Text style={styles.otpExplainerText}>
                           📍 जब मिस्त्री आपकी साइट पर पहुंचे, तो उन्हें यह 4-अंकीय कोड दें ताकि वे उपस्थिति दर्ज कर सकें।
                         </Text>
+
+                        {/* Pre-Arrival Cancellation (Instant ₹99 Wallet Refund) */}
+                        <TouchableOpacity
+                          style={styles.cancelPreArrivalBtn}
+                          onPress={() => {
+                            Alert.alert(
+                              'बुकिंग रद्द करें? (Cancel Booking)',
+                              'कारीगर के साइट पर पहुंचने से पहले रद्द करने पर आपका ₹99 बुकिंग शुल्क आपके MistriPro वर्चुअल वॉलेट में तुरंत रिफंड कर दिया जाएगा।\n\nइस वॉलेट बैलेंस का उपयोग आप अगली किसी भी बुकिंग के लिए कर सकते हैं। (निकासी उपलब्ध नहीं)',
+                              [
+                                { text: 'वापस जाएं (Back)', style: 'cancel' },
+                                {
+                                  text: 'हाँ, रद्द करें और ₹99 रिफंड पाएं',
+                                  style: 'destructive',
+                                  onPress: () => {
+                                    if (onCancelPreVisit) {
+                                      onCancelPreVisit(booking);
+                                    }
+                                  },
+                                },
+                              ]
+                            );
+                          }}
+                          activeOpacity={0.8}
+                        >
+                          <XCircle size={13} color="#DC2626" />
+                          <Text style={styles.cancelPreArrivalText}>
+                            रद्द करें और ₹99 वॉलेट रिफंड पाएं (Instant ₹99 Wallet Refund)
+                          </Text>
+                        </TouchableOpacity>
                       </View>
                     ) : (
                       /* Completion OTP: Show once worker is at site (step >= 2) */
@@ -1074,6 +1104,25 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     color: '#475569',
     lineHeight: 16,
+  },
+  cancelPreArrivalBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 8,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+    backgroundColor: '#FEF2F2',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    alignSelf: 'stretch',
+  },
+  cancelPreArrivalText: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 11.5,
+    color: '#DC2626',
   },
   cancelVisitRow: {
     flexDirection: 'row',

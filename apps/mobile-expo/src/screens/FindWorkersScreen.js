@@ -161,6 +161,7 @@ export default function FindWorkersScreen({
   workers = [],
   lang = 'en',
   t,
+  customerWalletBalance = 0,
 }) {
   const [selectedCategory, setSelectedCategory] = useState(initialCategory || 'All');
   const [searchQuery, setSearchQuery] = useState('');
@@ -380,7 +381,9 @@ export default function FindWorkersScreen({
         longitude: lng,
         distance,
       };
-    }).filter(Boolean);
+    })
+      .filter(Boolean)
+      .filter((w) => parseFloat(w.distance || '0') <= 20); // Under 20km range limit only
 
     // Strictly sort: ALL online workers first (nearest distance first), ALL offline workers strictly at the end
     return list.sort((a, b) => {
@@ -1012,60 +1015,103 @@ export default function FindWorkersScreen({
 
             <View style={styles.billBox}>
               <View style={styles.billRow}>
-                <Text style={styles.billItem}>Worker Fee (1 Day)</Text>
-                <Text style={styles.billVal}>₹{Number(checkoutWorker?.rate) || 950}</Text>
-              </View>
-              <View style={styles.billRow}>
-                <Text style={styles.billItem}>Mistri Pro Platform Fee</Text>
+                <Text style={styles.billItem}>Site Visit & Inspection Fee</Text>
                 <Text style={styles.billVal}>₹99</Text>
               </View>
               <View style={styles.billRow}>
-                <Text style={styles.billItem}>Gateway & Service Processing (5%)</Text>
-                <Text style={styles.billVal}>₹{Math.round((Number(checkoutWorker?.rate) || 950) * 0.05)}</Text>
+                <Text style={styles.billItem}>Actual Labor & Material Wages</Text>
+                <Text style={[styles.billVal, { color: '#059669', fontWeight: '700' }]}>Decided On-Site</Text>
               </View>
               <View style={styles.billDivider} />
               <View style={styles.billRowGrand}>
-                <Text style={styles.billTotalLabel}>Total to Pay</Text>
-                <Text style={styles.billTotalVal}>
-                  ₹{(Number(checkoutWorker?.rate) || 950) + 99 + Math.round((Number(checkoutWorker?.rate) || 950) * 0.05)}
-                </Text>
+                <Text style={styles.billTotalLabel}>Total Booking Fee</Text>
+                <Text style={styles.billTotalVal}>₹99</Text>
               </View>
             </View>
 
             <View style={styles.escrowNotice}>
               <ShieldCheck size={16} color="#15803D" />
               <Text style={styles.escrowNoticeText}>
-                100% Protected Payment: Processed securely via Razorpay. Money is transferred to mistri only after you confirm work completion.
+                100% Protected: You only pay ₹99 inspection booking fee. The mistri visits your site and quotes work price directly.
               </Text>
             </View>
 
+            {/* Virtual Wallet 1-Tap Option */}
+            {customerWalletBalance >= 99 ? (
+              <TouchableOpacity
+                style={[styles.payBtn, { backgroundColor: '#059669', marginBottom: 10 }]}
+                onPress={() => {
+                  Alert.alert(
+                    'वर्चुअल वॉलेट से भुगतान करें? 💰',
+                    `आपके पास MistriPro वर्चुअल वॉलेट में ₹${customerWalletBalance} शेष हैं।\n\nइस बुकिंग के लिए ₹99 वॉलेट से कटेंगे (अतिरिक्त कोई ऑनलाइन भुगतान नहीं करना होगा)।`,
+                    [
+                      { text: 'रद्द करें (Cancel)', style: 'cancel' },
+                      {
+                        text: 'हाँ, वॉलेट से बुक करें (₹0)',
+                        onPress: () => {
+                          const worker = checkoutWorker;
+                          setCheckoutWorker(null);
+                          if (onBookWorker) {
+                            onBookWorker({
+                              workerId: worker.id,
+                              workerName: worker.name || 'Verified Mistri',
+                              workerAvatar: worker.avatar || 'W',
+                              workerColor: worker.color || '#4F46E5',
+                              workerPhone: '+91 98290 12345',
+                              workerSkill: worker.skill || 'Labour Service',
+                              category: worker.category || worker.skill || 'Labour Service',
+                              title: `${worker.skill || 'Labour'} Site Inspection`,
+                              siteLocation: areaLabel,
+                              scheduledDate: 'Today, Immediate',
+                              duration: 'Site Inspection & On-site Quote',
+                              bookingFee: 99,
+                              workerFee: 0,
+                              platformFee: 99,
+                              txnFee: 0,
+                              totalAmount: 99,
+                              pricingModel: 'ON_SITE_QUOTE',
+                              paidViaWallet: true,
+                            });
+                          }
+                        },
+                      },
+                    ]
+                  );
+                }}
+                activeOpacity={0.85}
+              >
+                <CheckCircle2 size={18} color="#FFFFFF" />
+                <Text style={styles.payBtnText}>
+                  {lang === 'hi'
+                    ? `वर्चुअल वॉलेट से बुक करें (₹${customerWalletBalance} उपलब्ध)`
+                    : `Pay via Virtual Wallet (₹${customerWalletBalance} Avail)`}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+
             <TouchableOpacity
-              style={styles.payBtn}
+              style={[styles.payBtn, customerWalletBalance >= 99 && { backgroundColor: '#4F46E5' }]}
               onPress={() => {
                 if (!checkoutWorker) return;
                 const worker = checkoutWorker;
-                const workerFee = Number(worker.rate || 950);
-                const platformFee = 99;
-                const txnFee = Math.round(workerFee * 0.05);
-                const totalAmount = workerFee + platformFee + txnFee;
-
                 const bookingDetails = {
                   workerId: worker.id,
                   workerName: worker.name || 'Verified Mistri',
                   workerAvatar: worker.avatar || 'W',
                   workerColor: worker.color || '#4F46E5',
-                  workerPhone: worker.phone || '',
+                  workerPhone: '+91 98290 12345',
                   workerSkill: worker.skill || 'Labour Service',
                   category: worker.category || worker.skill || 'Labour Service',
-                  title: `${worker.skill || 'Labour'} Service`,
+                  title: `${worker.skill || 'Labour'} Site Inspection`,
                   siteLocation: areaLabel,
                   scheduledDate: 'Today, Immediate',
-                  duration: '1 Day',
-                  workerFee,
-                  platformFee,
-                  txnFee,
-                  transactionFee: txnFee,
-                  totalAmount,
+                  duration: 'Site Inspection & On-site Quote',
+                  bookingFee: 99,
+                  workerFee: 0,
+                  platformFee: 99,
+                  txnFee: 0,
+                  totalAmount: 99,
+                  pricingModel: 'ON_SITE_QUOTE',
                 };
 
                 setCheckoutWorker(null);
@@ -1075,7 +1121,9 @@ export default function FindWorkersScreen({
               activeOpacity={0.85}
             >
               <CheckCircle2 size={18} color="#FFFFFF" />
-              <Text style={styles.payBtnText}>Pay & Request Booking</Text>
+              <Text style={styles.payBtnText}>
+                {customerWalletBalance >= 99 ? 'Pay via Razorpay' : 'Pay ₹99 Booking Fee'}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>

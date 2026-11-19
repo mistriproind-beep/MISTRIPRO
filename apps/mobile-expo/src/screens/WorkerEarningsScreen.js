@@ -48,23 +48,21 @@ export default function WorkerEarningsScreen({
     }
   }, [walletData]);
 
-  // 10-Job Milestone Reward Calculations (₹200 bonus for every 10 completed jobs)
-  const completedJobsCount = Number(
-    walletData?.completedJobsCount ??
-    workerProfile?.completed_jobs ??
-    workerProfile?.completedJobs ??
-    (transactions ? transactions.filter((t) => t.type === 'CREDIT').length : 0)
-  );
-  const milestoneTarget = 10;
-  const milestoneBonusAmount = 200;
-  const milestonesCompleted = Math.floor(completedJobsCount / milestoneTarget);
-  const totalMilestoneBonusEarned = milestonesCompleted * milestoneBonusAmount;
-  const currentProgress = completedJobsCount % milestoneTarget;
-  const jobsRemaining = milestoneTarget - currentProgress;
-  const progressPercent = Math.round((currentProgress / milestoneTarget) * 100);
+  // Tiered Milestone System:
+  // Tier 1: 10 new bookings -> ₹200 bonus (then count resets)
+  // Tier 2: 20 new bookings -> ₹500 bonus (then count resets)
+  // Tier 3: 30 new bookings -> ₹1,000 bonus (then count resets)
+  const activeTier = walletData?.milestoneTier || 1;
+  const currentTierCount = Number(walletData?.tierCompletedCount || 0);
+  const tierTarget = activeTier === 1 ? 10 : activeTier === 2 ? 20 : 30;
+  const tierReward = activeTier === 1 ? 200 : activeTier === 2 ? 500 : 1000;
+  const tierProgressPercent = Math.min(100, Math.round((currentTierCount / tierTarget) * 100));
+  const tierJobsRemaining = Math.max(0, tierTarget - currentTierCount);
+  const totalLifetimeMilestoneEarned = Number(walletData?.totalMilestoneBonus || 0);
+  const lifetimeCompletedJobs = Number(walletData?.completedJobsCount || currentTierCount);
 
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
-  const [withdrawAmount, setWithdrawAmount] = useState('1000');
+  const [withdrawAmount, setWithdrawAmount] = useState('100');
   const [payoutMethod, setPayoutMethod] = useState('UPI'); // 'UPI' | 'BANK'
   
   // UPI Form
@@ -79,11 +77,14 @@ export default function WorkerEarningsScreen({
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Submit Withdrawal Request to Supabase & Admin Panel
+  // Submit Withdrawal Request to Supabase & Admin Panel (Minimum ₹100)
   const handleSubmitWithdrawal = async () => {
     const num = parseInt(withdrawAmount, 10);
-    if (isNaN(num) || num <= 0) {
-      Alert.alert('Invalid Amount', 'Please enter a valid withdrawal amount.');
+    if (isNaN(num) || num < 100) {
+      Alert.alert(
+        'Minimum Withdrawal ₹100',
+        'The minimum withdrawal amount is ₹100 (न्यूनतम निकासी राशि ₹100 है).'
+      );
       return;
     }
     if (num > balance) {
@@ -237,56 +238,80 @@ export default function WorkerEarningsScreen({
           </TouchableOpacity>
         </View>
 
-        {/* 1b. Worker 10-Job Milestone Reward Card (₹200 Platform Bonus) */}
+        {/* 1b. Worker 3-Tier Milestone Reward Card (Tier 1: 10->₹200, Tier 2: 20->₹500, Tier 3: 30->₹1,000) */}
         <View style={styles.milestoneCard}>
           <View style={styles.milestoneTopRow}>
             <View style={styles.milestoneBadge}>
               <Award size={16} color="#D97706" />
-              <Text style={styles.milestoneBadgeText}>10-Jobs Milestone Bonus</Text>
+              <Text style={styles.milestoneBadgeText}>Tier {activeTier} Milestone Challenge</Text>
             </View>
             <View style={styles.milestoneBonusBadge}>
-              <Text style={styles.milestoneBonusBadgeText}>+₹200 Reward</Text>
+              <Text style={styles.milestoneBonusBadgeText}>+₹{tierReward} Bonus</Text>
             </View>
           </View>
 
           <Text style={styles.milestoneTitle}>
-            हर 10 काम पूरा करने पर ₹200 इनाम (Earn ₹200 for 10 Jobs)
+            {activeTier === 1
+              ? '10 नए काम पूरे करें और पाएं ₹200 बोनस'
+              : activeTier === 2
+              ? '20 नए काम पूरे करें और पाएं ₹500 बोनस'
+              : '30 नए काम पूरे करें और पाएं ₹1,000 बोनस'}
           </Text>
           <Text style={styles.milestoneSub}>
-            MistriPro पर प्रत्येक 10 काम सफलतापूर्वक पूरा करने पर ₹200 का कैश कमीशन/बोनस इनाम सीधे आपके वॉलेट में क्रेडिट होगा।
+            {activeTier === 1
+              ? 'चरण 1: 10 नए काम पूरा करने पर ₹200 बोनस मिलेगा। इसके बाद काउंटर रीसेट होकर चरण 2 (20 नए काम) शुरू होगा।'
+              : activeTier === 2
+              ? 'चरण 2: 20 नए काम पूरा करने पर ₹500 बोनस मिलेगा। इसके बाद काउंटर रीसेट होकर चरण 3 (30 नए काम) शुरू होगा।'
+              : 'चरण 3: 30 नए काम पूरा करने पर ₹1,000 का महा-बोनस आपके वॉलेट में क्रेडिट होगा!'}
           </Text>
+
+          {/* Tier Tracker Pills */}
+          <View style={{ flexDirection: 'row', gap: 6, marginVertical: 10 }}>
+            <View style={{ flex: 1, paddingVertical: 6, paddingHorizontal: 8, borderRadius: 8, backgroundColor: activeTier === 1 ? '#EEF2FF' : '#F1F5F9', borderWidth: 1, borderColor: activeTier === 1 ? '#6366F1' : '#E2E8F0', alignItems: 'center' }}>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: activeTier === 1 ? '#4F46E5' : '#64748B' }}>Tier 1</Text>
+              <Text style={{ fontSize: 10, color: activeTier === 1 ? '#4338CA' : '#94A3B8' }}>10 काम • ₹200</Text>
+            </View>
+            <View style={{ flex: 1, paddingVertical: 6, paddingHorizontal: 8, borderRadius: 8, backgroundColor: activeTier === 2 ? '#EEF2FF' : '#F1F5F9', borderWidth: 1, borderColor: activeTier === 2 ? '#6366F1' : '#E2E8F0', alignItems: 'center' }}>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: activeTier === 2 ? '#4F46E5' : '#64748B' }}>Tier 2</Text>
+              <Text style={{ fontSize: 10, color: activeTier === 2 ? '#4338CA' : '#94A3B8' }}>20 काम • ₹500</Text>
+            </View>
+            <View style={{ flex: 1, paddingVertical: 6, paddingHorizontal: 8, borderRadius: 8, backgroundColor: activeTier === 3 ? '#EEF2FF' : '#F1F5F9', borderWidth: 1, borderColor: activeTier === 3 ? '#6366F1' : '#E2E8F0', alignItems: 'center' }}>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: activeTier === 3 ? '#4F46E5' : '#64748B' }}>Tier 3</Text>
+              <Text style={{ fontSize: 10, color: activeTier === 3 ? '#4338CA' : '#94A3B8' }}>30 काम • ₹1000</Text>
+            </View>
+          </View>
 
           {/* Progress Track */}
           <View style={styles.milestoneProgressWrap}>
             <View style={styles.milestoneProgressHeader}>
               <Text style={styles.milestoneProgressLabel}>
-                प्रगति: <Text style={{ color: '#4F46E5', fontWeight: '800' }}>{currentProgress} / 10</Text> काम पूरे हुए
+                प्रगति: <Text style={{ color: '#4F46E5', fontWeight: '800' }}>{currentTierCount} / {tierTarget}</Text> नए काम
               </Text>
               <Text style={styles.milestoneRemainingLabel}>
-                {jobsRemaining === 1 ? 'बस 1 काम बाकी!' : `${jobsRemaining} काम और बाकी`}
+                {tierJobsRemaining === 0 ? '🎉 बोनस तैयार है!' : tierJobsRemaining === 1 ? 'बस 1 काम बाकी!' : `${tierJobsRemaining} काम और बाकी`}
               </Text>
             </View>
 
             <View style={styles.milestoneTrack}>
-              <View style={[styles.milestoneFill, { width: `${Math.max(progressPercent, 6)}%` }]} />
+              <View style={[styles.milestoneFill, { width: `${Math.max(tierProgressPercent, 6)}%` }]} />
             </View>
           </View>
 
           {/* Milestone Stats Row */}
           <View style={styles.milestoneStatsRow}>
             <View style={styles.milestoneStatItem}>
-              <Text style={styles.milestoneStatLabel}>कुल पूरा काम</Text>
-              <Text style={styles.milestoneStatValue}>{completedJobsCount}</Text>
+              <Text style={styles.milestoneStatLabel}>वर्तमान चरण</Text>
+              <Text style={styles.milestoneStatValue}>Tier {activeTier}</Text>
             </View>
             <View style={styles.milestoneStatDivider} />
             <View style={styles.milestoneStatItem}>
-              <Text style={styles.milestoneStatLabel}>अनलॉक बोनस</Text>
-              <Text style={styles.milestoneStatValue}>{milestonesCompleted} बार</Text>
+              <Text style={styles.milestoneStatLabel}>कुल पूरा काम</Text>
+              <Text style={styles.milestoneStatValue}>{lifetimeCompletedJobs}</Text>
             </View>
             <View style={styles.milestoneStatDivider} />
             <View style={styles.milestoneStatItem}>
               <Text style={styles.milestoneStatLabel}>कुल बोनस कमाई</Text>
-              <Text style={[styles.milestoneStatValue, { color: '#15803D' }]}>₹{totalMilestoneBonusEarned}</Text>
+              <Text style={[styles.milestoneStatValue, { color: '#15803D' }]}>₹{totalLifetimeMilestoneEarned}</Text>
             </View>
           </View>
         </View>

@@ -85,6 +85,7 @@ export default function CustomerHomeScreen({
   userName = 'User',
   lang = 'en',
   t,
+  customerWalletBalance = 0,
 }) {
   const [locationText, setLocationText] = useState('Sawai Madhopur, Rajasthan');
   const [locationLoading, setLocationLoading] = useState(true);
@@ -377,15 +378,14 @@ export default function CustomerHomeScreen({
     });
   }, [searchQuery, selectedCategory, workers, userLat, userLon]);
 
-  // Filtered by distance range: 10km (default), 50km, or 'all'
+  // Filtered by strict 20km perimeter (Requests never go to other cities/states beyond 20km)
   const nearbyWorkers10km = useMemo(() => {
+    // Only workers strictly within 20km are eligible
+    const within20km = nearbyWorkersWithDist.filter((w) => (w.computedDistance ?? 0) <= 20);
     if (distanceRange === 10) {
-      return nearbyWorkersWithDist.filter((w) => (w.computedDistance ?? 0) <= 10);
+      return within20km.filter((w) => (w.computedDistance ?? 0) <= 10);
     }
-    if (distanceRange === 50) {
-      return nearbyWorkersWithDist.filter((w) => (w.computedDistance ?? 0) <= 50);
-    }
-    return nearbyWorkersWithDist;
+    return within20km;
   }, [nearbyWorkersWithDist, distanceRange]);
 
   const handleProceedToBooking = (worker) => {
@@ -806,7 +806,7 @@ export default function CustomerHomeScreen({
           )}
         </View>
 
-        {/* Distance Range Filter Selector (<10km / <50km / All) */}
+        {/* Distance Range Filter Selector (<10km / <20km Local Perimeter) */}
         <View style={styles.rangeSelectorRow}>
           <TouchableOpacity
             style={[styles.rangePill, distanceRange === 10 && styles.rangePillActive]}
@@ -820,34 +820,29 @@ export default function CustomerHomeScreen({
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.rangePill, distanceRange === 50 && styles.rangePillActive]}
-            onPress={() => setDistanceRange(50)}
+            style={[styles.rangePill, distanceRange === 20 && styles.rangePillActive]}
+            onPress={() => setDistanceRange(20)}
             activeOpacity={0.8}
           >
-            <Navigation size={11} color={distanceRange === 50 ? '#FFFFFF' : '#4F46E5'} />
-            <Text style={[styles.rangePillText, distanceRange === 50 && styles.rangePillTextActive]}>
-              {lang === 'hi' ? '50 किमी दायरा' : lang === 'gu' ? '50 કિમી સુધી' : lang === 'mr' ? '50 किमी पर्यंत' : '< 50 km'}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.rangePill, distanceRange === 'all' && styles.rangePillActive]}
-            onPress={() => setDistanceRange('all')}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.rangePillText, distanceRange === 'all' && styles.rangePillTextActive]}>
-              {lang === 'hi' ? 'सभी दूरी' : lang === 'gu' ? 'બધી રેન્જ' : lang === 'mr' ? 'सर्व अंतर' : 'All Range'}
+            <Navigation size={11} color={distanceRange === 20 ? '#FFFFFF' : '#4F46E5'} />
+            <Text style={[styles.rangePillText, distanceRange === 20 && styles.rangePillTextActive]}>
+              {lang === 'hi' ? '20 किमी (अधिकतम सीमा)' : lang === 'gu' ? '20 કિમી (મહત્તમ)' : lang === 'mr' ? '20 किमी (मर्यादा)' : '< 20 km (Max Limit)'}
             </Text>
           </TouchableOpacity>
         </View>
 
         {nearbyWorkers10km.length === 0 ? (
           <View style={styles.emptyCard}>
-            <Text style={{ fontSize: 30, marginBottom: 8 }}>👷‍♂️</Text>
+            <Text style={{ fontSize: 32, marginBottom: 8 }}>📍</Text>
             <Text style={styles.emptyTitle}>
-              {isManualLocation
-                ? (lang === 'hi' ? `${translateLocationName(locationText, lang)} में कोई ऑनलाइन कारीगर नहीं मिला` : lang === 'gu' ? `${translateLocationName(locationText, lang)} માં કોઈ ઑનલાઇન કારીગર મળ્યા નથી` : lang === 'mr' ? `${translateLocationName(locationText, lang)} मध्ये कोणताही ऑनलाइन कारागीर आढळला नाही` : `No Online Workers in ${locationText}`)
-                : (lang === 'hi' ? `आपके पास कोई ऑनलाइन ${translateWorkerSkill(selectedCategory || searchQuery, lang)} नहीं मिला` : lang === 'gu' ? `તમારી નજીક કોઈ ઑનલાઇન ${translateWorkerSkill(selectedCategory || searchQuery, lang)} મળ્યા નથી` : lang === 'mr' ? `तुमच्याजवळ कोणताही ऑनलाइन ${translateWorkerSkill(selectedCategory || searchQuery, lang)} आढळला नाही` : `No Online ${selectedCategory || searchQuery} Near You`)}
+              {lang === 'hi'
+                ? 'वर्तमान स्थान पर 20 किमी में कोई कारीगर उपलब्ध नहीं है'
+                : 'Worker not available in your current location right now'}
+            </Text>
+            <Text style={styles.emptySub}>
+              {lang === 'hi'
+                ? 'MistriPro केवल 20 किमी के स्थानीय दायरे में बुकिंग स्वीकार करता है ताकि कारीगर समय पर पहुंच सकें। आपके वर्तमान क्षेत्र में अभी कोई कारीगर ऑनलाइन नहीं है।'
+                : 'No workers are available within 20km of your current location. MistriPro strictly operates within a 20km perimeter to guarantee rapid arrival.'}
             </Text>
             <Text style={styles.emptySub}>
               {isManualLocation && distanceRange === 10
@@ -1014,13 +1009,70 @@ export default function CustomerHomeScreen({
               </Text>
             </View>
 
+            {/* Virtual Wallet 1-Tap Option (Usable strictly for booking) */}
+            {customerWalletBalance >= 99 ? (
+              <TouchableOpacity
+                style={[styles.payBtn, { backgroundColor: '#059669', marginBottom: 10 }]}
+                onPress={() => {
+                  Alert.alert(
+                    'वर्चुअल वॉलेट से भुगतान करें? 💰',
+                    `आपके पास MistriPro वर्चुअल वॉलेट में ₹${customerWalletBalance} शेष हैं।\n\nइस बुकिंग के लिए ₹99 वॉलेट से कटेंगे (अतिरिक्त कोई ऑनलाइन भुगतान नहीं करना होगा)।`,
+                    [
+                      { text: 'रद्द करें (Cancel)', style: 'cancel' },
+                      {
+                        text: 'हाँ, वॉलेट से बुक करें (₹0)',
+                        onPress: () => {
+                          const worker = checkoutWorker;
+                          setCheckoutWorker(null);
+                          if (onBookWorker) {
+                            onBookWorker({
+                              workerId: worker.id,
+                              workerName: worker.name,
+                              workerAvatar: worker.avatar,
+                              workerColor: worker.color,
+                              workerPhone: '+91 98290 12345',
+                              workerSkill: worker.skill,
+                              category: worker.category || worker.skill,
+                              title: `${worker.skill} Site Inspection`,
+                              siteLocation: locationText,
+                              scheduledDate: 'Today, Immediate',
+                              duration: 'Site Inspection & On-site Quote',
+                              bookingFee: 99,
+                              workerFee: 0,
+                              platformFee: 99,
+                              txnFee: 0,
+                              totalAmount: 99,
+                              pricingModel: 'ON_SITE_QUOTE',
+                              paidViaWallet: true,
+                            });
+                          }
+                        },
+                      },
+                    ]
+                  );
+                }}
+                activeOpacity={0.85}
+              >
+                <CheckCircle2 size={18} color="#FFFFFF" />
+                <Text style={styles.payBtnText}>
+                  {lang === 'hi'
+                    ? `वर्चुअल वॉलेट से बुक करें (₹${customerWalletBalance} उपलब्ध)`
+                    : `Pay via Virtual Wallet (₹${customerWalletBalance} Avail)`}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+
             <TouchableOpacity
-              style={styles.payBtn}
+              style={[styles.payBtn, customerWalletBalance >= 99 && { backgroundColor: '#4F46E5' }]}
               onPress={handleConfirmBooking}
               activeOpacity={0.85}
             >
               <CheckCircle2 size={18} color="#FFFFFF" />
-              <Text style={styles.payBtnText}>{lang === 'hi' ? 'भुगतान करें और बुक करें' : lang === 'gu' ? 'ચુકવણી કરો અને બુક કરો' : lang === 'mr' ? 'पेमेंट करा आणि बुक करा' : 'Pay & Request Booking'}</Text>
+              <Text style={styles.payBtnText}>
+                {customerWalletBalance >= 99
+                  ? (lang === 'hi' ? 'रेज़रपे ऑनलाइन भुगतान' : 'Pay via Razorpay')
+                  : (lang === 'hi' ? 'भुगतान करें और बुक करें' : 'Pay & Request Booking')}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
