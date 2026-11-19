@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
+  AppState,
 } from 'react-native';
 import {
   MapPin,
@@ -179,9 +180,17 @@ export default function FindWorkersScreen({
   const [showRazorpayModal, setShowRazorpayModal] = useState(false);
   const [razorpayBookingData, setRazorpayBookingData] = useState(null);
 
-  // Auto fetch user's real live GPS coordinates on mount
+  // Auto fetch user's real live GPS coordinates on mount & app re-open
   useEffect(() => {
     fetchLiveLocation();
+    const sub = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        fetchLiveLocation();
+      }
+    });
+    return () => {
+      if (sub && sub.remove) sub.remove();
+    };
   }, []);
 
   const fetchLiveLocation = async () => {

@@ -13,6 +13,7 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  AppState,
 } from 'react-native';
 import {
   Bell,
@@ -95,6 +96,7 @@ export default function CustomerHomeScreen({
   const [userLat, setUserLat] = useState(25.9928);
   const [userLon, setUserLon] = useState(76.3712);
   const [distanceRange, setDistanceRange] = useState(10);
+  const [isManualLocation, setIsManualLocation] = useState(false);
   const [showLocationSearch, setShowLocationSearch] = useState(false);
   const [locationSearchQuery, setLocationSearchQuery] = useState('');
   const [locationResults, setLocationResults] = useState([]);
@@ -109,36 +111,60 @@ export default function CustomerHomeScreen({
     return clean.slice(0, 2).toUpperCase() || 'US';
   }, [userName]);
 
-  /* GPS Location */
-  useEffect(() => {
-    (async () => {
-      try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') {
-          setLocationLoading(false);
-          return;
-        }
+  /* Live GPS Detection Function - Always called on app launch and app re-open */
+  const detectAndApplyCurrentGpsLocation = useCallback(async () => {
+    try {
+      setLocationLoading(true);
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        setLocationLoading(false);
+        return;
+      }
 
-        const loc = await Location.getCurrentPositionAsync({});
-        const [address] = await Location.reverseGeocodeAsync({
+      const loc = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+
+      if (loc && loc.coords) {
+        setUserLat(loc.coords.latitude);
+        setUserLon(loc.coords.longitude);
+        setIsManualLocation(false);
+
+        const rev = await Location.reverseGeocodeAsync({
           latitude: loc.coords.latitude,
           longitude: loc.coords.longitude,
         });
-        setUserLat(loc.coords.latitude);
-        setUserLon(loc.coords.longitude);
 
-        if (address) {
-          const area = address.subregion || address.district || address.city || address.name || 'Sawai Madhopur';
-          const st = address.region || 'Rajasthan';
+        if (rev && rev.length > 0) {
+          const place = rev[0];
+          const area = place.subregion || place.district || place.city || place.name || 'Sawai Madhopur';
+          const st = place.region || 'Rajasthan';
           setLocationText(`${area}, ${st}`);
         }
-      } catch (err) {
-        // fallback
-      } finally {
-        setLocationLoading(false);
       }
-    })();
+    } catch (err) {
+      console.log('GPS error:', err);
+    } finally {
+      setLocationLoading(false);
+    }
   }, []);
+
+  // 1. Initial Launch / Mount: Always detect and apply current device GPS location
+  useEffect(() => {
+    detectAndApplyCurrentGpsLocation();
+  }, [detectAndApplyCurrentGpsLocation]);
+
+  // 2. App Re-open / Foreground Resume: Automatically reset to current live GPS location
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        detectAndApplyCurrentGpsLocation();
+      }
+    });
+    return () => {
+      if (sub && sub.remove) sub.remove();
+    };
+  }, [detectAndApplyCurrentGpsLocation]);
 
   const filteredCategories =
     activeGroup === 'all'
@@ -546,13 +572,20 @@ export default function CustomerHomeScreen({
 
         {/* ─── 2. Location Picker ─── */}
         <TouchableOpacity style={styles.locationPill} activeOpacity={0.75} onPress={() => setShowLocationSearch(true)}>
-          <MapPin size={16} color="#4F46E5" />
+          <MapPin size={16} color={isManualLocation ? '#4F46E5' : '#16A34A'} />
           {locationLoading ? (
             <ActivityIndicator size="small" color="#4F46E5" style={{ marginLeft: 6 }} />
           ) : (
             <Text style={styles.locationText} numberOfLines={1}>
               {translateLocationName(locationText, lang)}
             </Text>
+          )}
+          {isManualLocation && (
+            <View style={{ backgroundColor: '#EEF2FF', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, marginLeft: 2 }}>
+              <Text style={{ fontSize: 9.5, fontFamily: 'Satoshi-Bold', color: '#4F46E5' }}>
+                {lang === 'hi' ? 'चुना हुआ' : lang === 'gu' ? 'પસંદ કરેલ' : lang === 'mr' ? 'निवडलेले' : 'Selected'}
+              </Text>
+            </View>
           )}
           <ChevronDown size={16} color="#64748B" />
         </TouchableOpacity>
@@ -721,11 +754,25 @@ export default function CustomerHomeScreen({
                 ? `${translateWorkerSkill(selectedCategory, lang)} (${nearbyWorkers10km.length})`
                 : searchQuery
                 ? `${lang === 'hi' ? 'खोज' : lang === 'gu' ? 'શોધ' : lang === 'mr' ? 'शोध' : 'Search'}: "${searchQuery}" (${nearbyWorkers10km.length})`
+                : isManualLocation
+                ? (lang === 'hi' ? `${translateLocationName(locationText, lang)} में कारीगर (${nearbyWorkers10km.length})` : lang === 'gu' ? `${translateLocationName(locationText, lang)} માં કારીગરો (${nearbyWorkers10km.length})` : lang === 'mr' ? `${translateLocationName(locationText, lang)} मधील कामगार (${nearbyWorkers10km.length})` : `Workers in ${locationText} (${nearbyWorkers10km.length})`)
                 : (lang === 'hi' ? `आपके पास उपलब्ध कारीगर (${nearbyWorkers10km.length})` : lang === 'gu' ? `તમારી નજીકના ઉપલબ્ધ કારીગરો (${nearbyWorkers10km.length})` : lang === 'mr' ? `तुमच्या जवळील उपलब्ध कामगार (${nearbyWorkers10km.length})` : `Workers near you (${nearbyWorkers10km.length})`)}
             </Text>
-            <View style={styles.rangeBadge}>
-              <Text style={styles.rangeBadgeText}>{lang === 'hi' ? 'लाइव GPS' : lang === 'gu' ? 'લાઈવ GPS' : lang === 'mr' ? 'लाइव्ह GPS' : 'Live GPS'}</Text>
-            </View>
+            {isManualLocation ? (
+              <TouchableOpacity
+                style={[styles.rangeBadge, { backgroundColor: '#FEF3C7' }]}
+                onPress={detectAndApplyCurrentGpsLocation}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.rangeBadgeText, { color: '#B45309' }]}>
+                  {lang === 'hi' ? 'GPS पर लौटें ↺' : lang === 'gu' ? 'GPS પર પાછા જાઓ ↺' : lang === 'mr' ? 'GPS वर जा ↺' : 'Reset GPS ↺'}
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.rangeBadge}>
+                <Text style={styles.rangeBadgeText}>{lang === 'hi' ? 'लाइव GPS' : lang === 'gu' ? 'લાઈવ GPS' : lang === 'mr' ? 'लाइव्ह GPS' : 'Live GPS'}</Text>
+              </View>
+            )}
           </View>
           {(selectedCategory || searchQuery) ? (
             <TouchableOpacity onPress={() => { setSelectedCategory(null); setSearchQuery(''); }}>
@@ -781,19 +828,37 @@ export default function CustomerHomeScreen({
           <View style={styles.emptyCard}>
             <Text style={{ fontSize: 30, marginBottom: 8 }}>👷‍♂️</Text>
             <Text style={styles.emptyTitle}>
-              {lang === 'hi' ? `आपके पास कोई ऑनलाइन ${translateWorkerSkill(selectedCategory || searchQuery, lang)} नहीं मिला` : lang === 'gu' ? `તમારી નજીક કોઈ ઑનલાઇન ${translateWorkerSkill(selectedCategory || searchQuery, lang)} મળ્યા નથી` : lang === 'mr' ? `तुमच्याजवळ कोणताही ऑनलाइन ${translateWorkerSkill(selectedCategory || searchQuery, lang)} आढळला नाही` : `No Online ${selectedCategory || searchQuery} Near You`}
+              {isManualLocation
+                ? (lang === 'hi' ? `${translateLocationName(locationText, lang)} में कोई ऑनलाइन कारीगर नहीं मिला` : lang === 'gu' ? `${translateLocationName(locationText, lang)} માં કોઈ ઑનલાઇન કારીગર મળ્યા નથી` : lang === 'mr' ? `${translateLocationName(locationText, lang)} मध्ये कोणताही ऑनलाइन कारागीर आढळला नाही` : `No Online Workers in ${locationText}`)
+                : (lang === 'hi' ? `आपके पास कोई ऑनलाइन ${translateWorkerSkill(selectedCategory || searchQuery, lang)} नहीं मिला` : lang === 'gu' ? `તમારી નજીક કોઈ ઑનલાઇન ${translateWorkerSkill(selectedCategory || searchQuery, lang)} મળ્યા નથી` : lang === 'mr' ? `तुमच्याजवळ कोणताही ऑनलाइन ${translateWorkerSkill(selectedCategory || searchQuery, lang)} आढळला नाही` : `No Online ${selectedCategory || searchQuery} Near You`)}
             </Text>
             <Text style={styles.emptySub}>
-              {lang === 'hi' ? 'इस ट्रेड के सभी कारीगर अभी ऑफलाइन हैं या अन्य काम में व्यस्त हैं। कृपया थोड़ी देर बाद देखें।' : lang === 'gu' ? 'આ ટ્રેડના બધા કારીગરો હાલમાં ઑફલાઇન છે અથવા અન્ય કામમાં વ્યસ્ત છે. કૃપા કરીને થોડી વાર પછી તપાસો.' : lang === 'mr' ? 'या कामाचे सर्व कारागीर सध्या ऑफलाइन आहेत किंवा इतर कामात व्यस्त आहेत. कृपया काही वेळाने तपासा.' : 'All workers in this trade are currently offline or engaged in active contracts. Please check back shortly or explore another skill.'}
+              {isManualLocation && distanceRange === 10
+                ? (lang === 'hi' ? 'इस चुने हुए स्थान के 10 किमी में कोई कारीगर नहीं मिला। 50 किमी दायरा देखें या अपने वर्तमान GPS स्थान पर लौटें।' : lang === 'gu' ? 'આ પસંદ કરેલા સ્થાનના 10 કિમીમાં કોઈ કારીગર મળ્યા નથી. 50 કિમી સુધી જુઓ અથવા વર્તમાન GPS પર પાછા જાઓ.' : lang === 'mr' ? 'या निवडलेल्या स्थानाच्या 10 किमीमध्ये कोणताही कामगार आढळला नाही. 50 किमी पहा किंवा चालू GPS स्थानावर परत जा.' : 'No workers found within 10 km of this selected location. Expand to 50 km or reset to your live GPS location.')
+                : (lang === 'hi' ? 'इस ट्रेड के सभी कारीगर अभी ऑफलाइन हैं या अन्य काम में व्यस्त हैं। कृपया थोड़ी देर बाद देखें।' : lang === 'gu' ? 'આ ટ્રેડના બધા કારીગરો હાલમાં ઑફલાઇન છે અથવા અન્ય કામમાં વ્યસ્ત છે. કૃપા કરીને થોડી વાર પછી તપાસો.' : lang === 'mr' ? 'या कामाचे सर्व कारागीर सध्या ऑफलाइन आहेत किंवा इतर कामात व्यस्त आहेत. कृपया काही वेळाने तपासा.' : 'All workers in this trade are currently offline or engaged in active contracts. Please check back shortly or explore another skill.')}
             </Text>
-            <TouchableOpacity
-              style={styles.clearBtn}
-              onPress={() => { setSelectedCategory(null); setSearchQuery(''); }}
-            >
-              <Text style={styles.clearBtnText}>
-                {lang === 'hi' ? 'सभी उपलब्ध मिस्त्री देखें' : lang === 'gu' ? 'બધા ઉપલબ્ધ મિસ્ત્રી જુઓ' : lang === 'mr' ? 'सर्व उपलब्ध मिस्त्री पहा' : 'Show All Available Mistris'}
-              </Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 12, width: '100%' }}>
+              {isManualLocation && (
+                <TouchableOpacity
+                  style={[styles.clearBtn, { backgroundColor: '#DCFCE7', borderColor: '#86EFAC', borderWidth: 1, flex: 1 }]}
+                  onPress={detectAndApplyCurrentGpsLocation}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.clearBtnText, { color: '#15803D' }]}>
+                    {lang === 'hi' ? 'लाइव GPS पर लौटें ↺' : lang === 'gu' ? 'લાઇવ GPS પર પાછા જાઓ ↺' : lang === 'mr' ? 'थेट GPS वर परत जा ↺' : 'Reset to Live GPS ↺'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                style={[styles.clearBtn, { flex: 1 }]}
+                onPress={() => { setSelectedCategory(null); setSearchQuery(''); setDistanceRange(50); }}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.clearBtnText}>
+                  {lang === 'hi' ? 'सभी उपलब्ध मिस्त्री देखें' : lang === 'gu' ? 'બધા ઉપલબ્ધ મિસ્ત્રી જુઓ' : lang === 'mr' ? 'सर्व उपलब्ध मिस्त्री पहा' : 'Show All Available Mistris'}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         ) : (
           nearbyWorkers10km.slice(0, 8).map((worker, wIdx) => (
@@ -1030,6 +1095,42 @@ export default function CustomerHomeScreen({
             </View>
           </View>
 
+          {/* Quick Action: Use My Current Live GPS Location */}
+          <TouchableOpacity
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              backgroundColor: '#EEF2FF',
+              marginHorizontal: 20,
+              marginBottom: 12,
+              paddingHorizontal: 16,
+              paddingVertical: 12,
+              borderRadius: 12,
+              borderWidth: 1,
+              borderColor: '#C7D2FE',
+              gap: 12,
+            }}
+            onPress={() => {
+              setShowLocationSearch(false);
+              setLocationSearchQuery('');
+              setLocationResults([]);
+              detectAndApplyCurrentGpsLocation();
+            }}
+            activeOpacity={0.8}
+          >
+            <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#4F46E5', alignItems: 'center', justifyContent: 'center' }}>
+              <Navigation size={16} color="#FFFFFF" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 13, fontFamily: 'Satoshi-Bold', color: '#312E81' }}>
+                {lang === 'hi' ? 'मेरे वर्तमान GPS स्थान पर जाएं' : lang === 'gu' ? 'મારા વર્તમાન GPS સ્થાનનો ઉપયોગ કરો' : lang === 'mr' ? 'माझ्या चालू GPS स्थानावर जा' : 'Use My Current Live GPS Location'}
+              </Text>
+              <Text style={{ fontSize: 11, fontFamily: 'Satoshi-Regular', color: '#4F46E5' }}>
+                {lang === 'hi' ? 'डिवाइस का लाइव स्थान चालू करें' : lang === 'gu' ? 'ડિવાઇસનું લાઈવ લોકેશન મેળવો' : lang === 'mr' ? 'डिव्हाइसचे थेट स्थान मिळवा' : 'Detect live GPS coordinates from device'}
+              </Text>
+            </View>
+          </TouchableOpacity>
+
           {/* Loading */}
           {locationSearchLoading && (
             <View style={{ alignItems: 'center', paddingTop: 20 }}>
@@ -1056,6 +1157,8 @@ export default function CustomerHomeScreen({
                     setLocationText(shortLocationName || item.display_name);
                     setUserLat(parseFloat(item.lat));
                     setUserLon(parseFloat(item.lon));
+                    setIsManualLocation(true);
+                    setDistanceRange(10);
                     setShowLocationSearch(false);
                     setLocationSearchQuery('');
                     setLocationResults([]);
