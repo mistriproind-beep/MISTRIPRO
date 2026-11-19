@@ -474,12 +474,14 @@ export default function FindWorkersScreen({
         longitude: lng,
         distance,
       };
-    })
-      .filter(Boolean)
-      .filter((w) => parseFloat(w.distance || '0') <= 20); // Under 20km range limit only
+    }).filter(Boolean);
+
+    // If workers are within 25km, show them. Otherwise show all available workers sorted by closest distance
+    const withinRange = list.filter((w) => parseFloat(w.distance || '0') <= 25);
+    const finalList = withinRange.length > 0 ? withinRange : list;
 
     // Strictly sort: ALL online workers first (nearest distance first), ALL offline workers strictly at the end
-    return list.sort((a, b) => {
+    return finalList.sort((a, b) => {
       const aAvail = Boolean(a.available);
       const bAvail = Boolean(b.available);
       if (aAvail && !bAvail) return -1;

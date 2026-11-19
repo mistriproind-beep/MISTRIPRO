@@ -314,7 +314,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 href="/settings"
                 className="px-3 py-1.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-white text-xs font-semibold shadow-sm transition"
               >
-                Commission Rates
+                Settings & Rates
               </Link>
             </div>
           </div>

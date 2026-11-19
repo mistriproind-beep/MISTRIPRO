@@ -18,11 +18,18 @@ export function getDistanceKm(lat1, lon1, lat2, lon2) {
 }
 
 export function resolveWorkerCoordinates(p, index = 0) {
-  const address = (p?.address || '').toLowerCase();
-  const city = (p?.city || '').toLowerCase();
-  const combined = `${address} ${city}`;
+  const wp = (p?.worker_profiles && p?.worker_profiles[0]) || {};
 
-  // 1. Explicit GEO tag in address e.g. "[GEO:25.9928,76.3712]"
+  // 1. Exact GPS coordinates stored directly in worker_profiles table
+  if (wp.latitude && wp.longitude) {
+    const lat = parseFloat(wp.latitude);
+    const lng = parseFloat(wp.longitude);
+    if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+      return { latitude: lat, longitude: lng };
+    }
+  }
+
+  // 2. Explicit GEO tag in address e.g. "[GEO:26.4715,76.7214]"
   const geoMatch = (p?.address || '').match(/\[GEO:([0-9.-]+),([0-9.-]+)\]/i);
   if (geoMatch) {
     const lat = parseFloat(geoMatch[1]);
@@ -32,7 +39,14 @@ export function resolveWorkerCoordinates(p, index = 0) {
     }
   }
 
-  // 2. Specific neighborhoods in Sawai Madhopur
+  const address = (p?.address || '').toLowerCase();
+  const city = (p?.city || '').toLowerCase();
+  const combined = `${address} ${city}`;
+
+  // 3. Known cities / towns in Rajasthan
+  if (combined.includes('gangapur') || combined.includes('jiyapur')) {
+    return { latitude: 26.4715, longitude: 76.7214 }; // Gangapur City, Rajasthan
+  }
   if (combined.includes('kargil')) {
     return { latitude: 25.9950, longitude: 76.3725 };
   }
@@ -58,8 +72,7 @@ export function resolveWorkerCoordinates(p, index = 0) {
     return { latitude: 26.5610, longitude: 76.3210 }; // ~45 km
   }
   if (combined.includes('mansarovar') || (combined.includes('jaipur') && !combined.includes('sawai'))) {
-    // Registered in Jaipur Mansarovar, operating within Rajasthan ~28.5km corridor
-    return { latitude: 26.2410, longitude: 76.1210 }; // ~28.5 km
+    return { latitude: 26.8520, longitude: 75.7620 }; // Jaipur Mansarovar
   }
 
   // Default: Authentic neighborhood scatter around Sawai Madhopur center (1.2 km to 5.5 km)
@@ -147,7 +160,12 @@ export const LiveBackend = {
       const { data: p } = await supabase.from('profiles').select('address').eq('id', targetUserId).maybeSingle();
       const currentAddr = (p?.address || '').replace(/\[GEO:[0-9.,-]+\]/g, '').trim();
       const taggedAddr = currentAddr ? `${currentAddr} [GEO:${lat.toFixed(6)},${lng.toFixed(6)}]` : `[GEO:${lat.toFixed(6)},${lng.toFixed(6)}]`;
-      await supabase.from('profiles').update({ address: taggedAddr, updated_at: new Date().toISOString() }).eq('id', targetUserId);
+
+      await Promise.all([
+        supabase.from('profiles').update({ address: taggedAddr, updated_at: new Date().toISOString() }).eq('id', targetUserId),
+        supabase.from('worker_profiles').update({ latitude: lat, longitude: lng, is_available: true, updated_at: new Date().toISOString() }).eq('user_id', targetUserId)
+      ]);
+
       return { success: true, latitude: lat, longitude: lng };
     } catch (e) {
       console.log('updateWorkerLiveLocation error:', e.message);
@@ -830,36 +848,86 @@ export const LiveBackend = {
     }
   },
 
-  // 6. Check Worker KYC Approval Status (Live Query by Phone or User ID)
+  // 6. Check Worker KYC Approval Status (Live Query by Phone, User ID, or Auth User)
   checkWorkerApprovalStatus: async (phone, userId = null) => {
     try {
-      if (!phone && !userId) return { approved: false, status: 'PENDING' };
+      let found = null;
 
-      let query = supabase.from('profiles').select('id, full_name, phone, alt_phone, address, kyc_status, role');
-      if (userId) {
-        query = query.eq('id', userId);
-      } else {
-        const cleanDigits = String(phone).replace(/[^0-9]/g, '').slice(-10);
-        query = query.ilike('phone', `%${cleanDigits}%`);
-      }
-
-      const { data, error } = await query.limit(10);
-
-      let found = data && data.length > 0 ? data[0] : null;
-
-      // Fallback scan if exact match didn't return
-      if (!found && phone) {
-        const cleanDigits = String(phone).replace(/[^0-9]/g, '').slice(-10);
-        const { data: allProfiles } = await supabase
+      // A. Try exact UUID match if provided
+      if (userId && UUID_REGEX.test(String(userId).trim())) {
+        const { data: byId } = await supabase
           .from('profiles')
           .select('id, full_name, phone, alt_phone, address, kyc_status, role')
-          .limit(100);
+          .eq('id', String(userId).trim())
+          .maybeSingle();
+        if (byId) found = byId;
+      }
 
-        found = (allProfiles || []).find((p) => {
-          const pClean = (p.phone || '').replace(/[^0-9]/g, '').slice(-10);
-          const aClean = (p.alt_phone || '').replace(/[^0-9]/g, '').slice(-10);
-          return pClean === cleanDigits || aClean === cleanDigits;
-        });
+      // B. Try matching phone number (last 10 digits)
+      if (!found && phone) {
+        const cleanDigits = String(phone).replace(/[^0-9]/g, '').slice(-10);
+        if (cleanDigits.length >= 8) {
+          const { data: byPhone } = await supabase
+            .from('profiles')
+            .select('id, full_name, phone, alt_phone, address, kyc_status, role')
+            .or(`phone.ilike.%${cleanDigits}%,alt_phone.ilike.%${cleanDigits}%`)
+            .limit(10);
+
+          if (byPhone && byPhone.length > 0) {
+            // Prioritize APPROVED profile if multiple rows exist
+            found = byPhone.find((p) => p.kyc_status === 'APPROVED' || p.kyc_status === 'VERIFIED') || byPhone[0];
+          }
+        }
+      }
+
+      // C. Fallback to active Supabase Auth user session
+      if (!found) {
+        try {
+          const { data: authData } = await supabase.auth.getUser();
+          if (authData?.user) {
+            const authId = authData.user.id;
+            const authEmail = (authData.user.email || '').toLowerCase().trim();
+            const authPhone = (authData.user.phone || '').replace(/[^0-9]/g, '').slice(-10);
+
+            const { data: byAuth } = await supabase
+              .from('profiles')
+              .select('id, full_name, phone, alt_phone, address, kyc_status, role')
+              .or(`id.eq.${authId}${authEmail ? `,alt_phone.ilike.%${authEmail}%` : ''}${authPhone.length >= 8 ? `,phone.ilike.%${authPhone}%` : ''}`)
+              .limit(5);
+
+            if (byAuth && byAuth.length > 0) {
+              found = byAuth.find((p) => p.kyc_status === 'APPROVED' || p.kyc_status === 'VERIFIED') || byAuth[0];
+            }
+          }
+        } catch (authErr) {}
+      }
+
+      // D. Fallback to locally stored session info
+      if (!found) {
+        try {
+          const sess = await StorageService.getSession();
+          if (sess?.id && UUID_REGEX.test(sess.id)) {
+            const { data: bySessId } = await supabase
+              .from('profiles')
+              .select('id, full_name, phone, alt_phone, address, kyc_status, role')
+              .eq('id', sess.id)
+              .maybeSingle();
+            if (bySessId) found = bySessId;
+          }
+          if (!found && (sess?.phone || sess?.mobile)) {
+            const sDigits = String(sess.phone || sess.mobile).replace(/[^0-9]/g, '').slice(-10);
+            if (sDigits.length >= 8) {
+              const { data: bySessPhone } = await supabase
+                .from('profiles')
+                .select('id, full_name, phone, alt_phone, address, kyc_status, role')
+                .or(`phone.ilike.%${sDigits}%,alt_phone.ilike.%${sDigits}%`)
+                .limit(5);
+              if (bySessPhone && bySessPhone.length > 0) {
+                found = bySessPhone.find((p) => p.kyc_status === 'APPROVED' || p.kyc_status === 'VERIFIED') || bySessPhone[0];
+              }
+            }
+          }
+        } catch (sessErr) {}
       }
 
       if (!found) return { approved: false, status: 'PENDING' };
@@ -873,6 +941,27 @@ export const LiveBackend = {
           .eq('user_id', found.id)
           .maybeSingle();
         if (wp) workerProfileData = wp;
+
+        // If worker_profiles wasn't attached to this ID, search by phone
+        if (!workerProfileData && found.phone) {
+          const cPhone = found.phone.replace(/[^0-9]/g, '').slice(-10);
+          if (cPhone.length >= 8) {
+            const { data: altProfs } = await supabase
+              .from('profiles')
+              .select('id')
+              .or(`phone.ilike.%${cPhone}%,alt_phone.ilike.%${cPhone}%`);
+            const altIds = (altProfs || []).map((p) => p.id);
+            if (altIds.length > 0) {
+              const { data: wpAlt } = await supabase
+                .from('worker_profiles')
+                .select('id, skills, experience_years, aadhaar_front_url, aadhaar_back_url, is_available')
+                .in('user_id', altIds)
+                .limit(1)
+                .maybeSingle();
+              if (wpAlt) workerProfileData = wpAlt;
+            }
+          }
+        }
       } catch (wpErr) {
         console.log('Worker profile fetch note:', wpErr.message);
       }
@@ -883,7 +972,7 @@ export const LiveBackend = {
         status: found.kyc_status || 'PENDING',
         profile: found,
         workerProfile: workerProfileData,
-        skills: workerProfileData?.skills || [],
+        skills: Array.isArray(workerProfileData?.skills) && workerProfileData.skills.length > 0 ? workerProfileData.skills : [],
       };
     } catch (err) {
       console.log('LiveBackend.checkWorkerApprovalStatus error:', err);
@@ -949,6 +1038,7 @@ export const LiveBackend = {
     const completionOtp = String(booking.completionOtp || Math.floor(1000 + Math.random() * 9000));
     const cancellationOtp = String(booking.cancellationOtp || Math.floor(1000 + Math.random() * 9000));
     const companyPhone = booking.companyPhone || '+91 98290 12345';
+    const assignedWorkerPhone = booking.workerPhone || booking.workerMobile || (booking.workerDetails?.phone) || companyPhone;
 
     const otpPayload = {
       arrival_otp: arrivalOtp,
@@ -969,8 +1059,8 @@ export const LiveBackend = {
       customer_name: booking.customerName,
       customer_phone: booking.customerPhone,
       worker_id: booking.workerId || null,
-      worker_name: booking.workerName,
-      worker_phone: companyPhone, // Protect worker personal number - show company helpline to customer
+      worker_name: booking.workerName || 'Nearby Mistri',
+      worker_phone: assignedWorkerPhone,
       worker_skill: booking.workerSkill,
       category: booking.category,
       title: booking.title || `${booking.workerSkill} Site Inspection`,
@@ -996,8 +1086,8 @@ export const LiveBackend = {
             customer_name: booking.customerName,
             customer_phone: booking.customerPhone,
             worker_id: booking.workerId || null,
-            worker_name: booking.workerName,
-            worker_phone: companyPhone,
+            worker_name: booking.workerName || 'Nearby Mistri',
+            worker_phone: assignedWorkerPhone,
             worker_skill: booking.workerSkill,
             category: booking.category,
             title: booking.title || `${booking.workerSkill} Site Inspection`,
@@ -1150,16 +1240,30 @@ export const LiveBackend = {
     }
   },
 
-  // 9. Fetch Worker Bookings from Supabase
-  fetchWorkerBookings: async (workerPhone) => {
+  // 9. Fetch Worker Bookings from Supabase (Assigned or Waiting Confirmation)
+  fetchWorkerBookings: async (workerPhone, workerId = null) => {
     try {
-      if (!workerPhone) return [];
-      const clean = workerPhone.replace(/[^0-9]/g, '');
-      const last10 = clean.slice(-10);
+      let orFilters = [];
+      if (workerPhone) {
+        const clean = workerPhone.replace(/[^0-9]/g, '');
+        const last10 = clean.slice(-10);
+        if (last10.length >= 8) {
+          orFilters.push(`worker_phone.ilike.%${last10}%`);
+        }
+      }
+      if (workerId && UUID_REGEX.test(String(workerId).trim())) {
+        orFilters.push(`worker_id.eq.${String(workerId).trim()}`);
+      }
+
+      // Also include any incoming bookings waiting for confirmation so nearby worker gets alerted
+      orFilters.push('status.eq.waiting_confirmation');
+
+      const filterStr = orFilters.length > 0 ? orFilters.join(',') : 'status.eq.waiting_confirmation';
+
       const { data, error } = await supabase
         .from('bookings')
         .select('*')
-        .or(`worker_phone.ilike.%${last10}%`)
+        .or(filterStr)
         .order('created_at', { ascending: false });
 
       if (error) throw error;

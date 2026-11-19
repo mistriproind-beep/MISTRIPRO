@@ -37,6 +37,89 @@ export default function WorkersPage() {
   const [rejectReason, setRejectReason] = useState('');
   const [showRejectModal, setShowRejectModal] = useState(false);
 
+  const formatPhotoSrc = (raw: string | null) => {
+    if (!raw) return null;
+    if (raw.startsWith('data:image') || raw.startsWith('http')) return raw;
+    if (raw.startsWith('/9j/') || raw.startsWith('iVBOR') || raw.length > 300) {
+      return `data:image/jpeg;base64,${raw}`;
+    }
+    return raw;
+  };
+
+  // Fetch full Aadhaar photos for a specific worker on demand
+  const loadWorkerAadhaarDocs = async (workerItem: any) => {
+    if (!workerItem?.id) return;
+    try {
+      // 1. Try finding by user_id
+      let { data: docData } = await supabase
+        .from('worker_profiles')
+        .select('id, skills, experience_years, aadhaar_front_url, aadhaar_back_url')
+        .eq('user_id', workerItem.id)
+        .maybeSingle();
+
+      // 2. Fallback: match by phone digits if user_id didn't link
+      if (!docData?.aadhaar_front_url && workerItem.phone) {
+        const cleanDigits = workerItem.phone.replace(/[^0-9]/g, '').slice(-10);
+        if (cleanDigits.length >= 8) {
+          const { data: altProfiles } = await supabase
+            .from('profiles')
+            .select('id')
+            .or(`phone.ilike.%${cleanDigits}%,alt_phone.ilike.%${cleanDigits}%`);
+
+          const altIds = (altProfiles || []).map((p) => p.id);
+          if (altIds.length > 0) {
+            const { data: altWp } = await supabase
+              .from('worker_profiles')
+              .select('id, skills, experience_years, aadhaar_front_url, aadhaar_back_url')
+              .in('user_id', altIds)
+              .not('aadhaar_front_url', 'is', null)
+              .limit(1)
+              .maybeSingle();
+
+            if (altWp) docData = altWp;
+          }
+        }
+      }
+
+      if (docData) {
+        const front = formatPhotoSrc(docData.aadhaar_front_url);
+        const back = formatPhotoSrc(docData.aadhaar_back_url);
+        const resolvedSkills = Array.isArray(docData.skills) && docData.skills.length > 0 ? docData.skills : workerItem.skills;
+
+        setSelectedWorker((prev: any) => {
+          if (!prev || prev.id !== workerItem.id) return prev;
+          return {
+            ...prev,
+            aadhaarFront: front || prev.aadhaarFront,
+            aadhaarBack: back || prev.aadhaarBack,
+            skills: resolvedSkills,
+            experienceYears: docData.experience_years || prev.experienceYears,
+          };
+        });
+
+        setWorkers((prev) =>
+          prev.map((w) =>
+            w.id === workerItem.id
+              ? {
+                  ...w,
+                  aadhaarFront: front || w.aadhaarFront,
+                  aadhaarBack: back || w.aadhaarBack,
+                  skills: resolvedSkills,
+                }
+              : w
+          )
+        );
+      }
+    } catch (err: any) {
+      console.log('loadWorkerAadhaarDocs error:', err?.message);
+    }
+  };
+
+  const handleSelectWorker = (worker: any) => {
+    setSelectedWorker(worker);
+    loadWorkerAadhaarDocs(worker);
+  };
+
   const handleUploadAadhaarAdmin = async (side: 'front' | 'back', e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !selectedWorker) return;
@@ -79,13 +162,13 @@ export default function WorkersPage() {
 
       const { data: workerProfiles, error: wpErr } = await supabase
         .from('worker_profiles')
-        .select('*');
+        .select('id, user_id, skills, experience_years, daily_rate, is_available, rating');
 
       if (wpErr) throw wpErr;
 
       // Merge data
-      const merged = (profiles || []).map((p) => {
-        const wp = (workerProfiles || []).find((item) => item.user_id === p.id) || {};
+      const merged = (profiles || []).map((p: any) => {
+        const wp: any = (workerProfiles || []).find((item: any) => item.user_id === p.id) || {};
         return {
           id: p.id,
           workerProfileId: wp.id,
@@ -99,8 +182,8 @@ export default function WorkersPage() {
           skills: wp.skills || ['General Labour'],
           experienceYears: wp.experience_years || 5,
           dailyRate: wp.daily_rate || 800,
-          aadhaarFront: wp.aadhaar_front_url || null,
-          aadhaarBack: wp.aadhaar_back_url || null,
+          aadhaarFront: null,
+          aadhaarBack: null,
           rating: wp.rating || 5.0,
           isAvailable: wp.is_available ?? true,
         };
@@ -113,7 +196,10 @@ export default function WorkersPage() {
       const targetId = urlParams.get('id');
       if (targetId) {
         const found = merged.find((w) => w.id === targetId);
-        if (found) setSelectedWorker(found);
+        if (found) {
+          setSelectedWorker(found);
+          loadWorkerAadhaarDocs(found);
+        }
       }
     } catch (err: any) {
       console.log('Error fetching workers:', err?.message);
@@ -152,6 +238,10 @@ export default function WorkersPage() {
   const handleApprove = async (workerId: string) => {
     setActionLoading(true);
     try {
+      const targetWorker = workers.find((w) => w.id === workerId) || selectedWorker;
+      const targetPhone = targetWorker?.phone ? targetWorker.phone.replace(/[^0-9]/g, '').slice(-10) : '';
+
+      // 1. Update this specific profile
       const { error } = await supabase
         .from('profiles')
         .update({
@@ -161,6 +251,17 @@ export default function WorkersPage() {
         .eq('id', workerId);
 
       if (error) throw error;
+
+      // 2. Also update any duplicate profile rows with the same phone to prevent review loop
+      if (targetPhone.length >= 8) {
+        await supabase
+          .from('profiles')
+          .update({
+            kyc_status: 'APPROVED',
+            updated_at: new Date().toISOString(),
+          })
+          .ilike('phone', `%${targetPhone}%`);
+      }
 
       // Defensively sync worker_profiles availability
       try {
@@ -309,7 +410,7 @@ export default function WorkersPage() {
               return (
                 <div
                   key={worker.id}
-                  onClick={() => setSelectedWorker(worker)}
+                  onClick={() => handleSelectWorker(worker)}
                   className={`p-4 rounded-2xl border transition cursor-pointer ${
                     isSelected
                       ? 'bg-orange-50/40 border-orange-400 ring-1 ring-orange-300 shadow-md'
@@ -488,15 +589,15 @@ export default function WorkersPage() {
 
                   <div className="aspect-[16/10] bg-slate-200 rounded-lg overflow-hidden border border-slate-200 flex items-center justify-center relative group">
                     {selectedWorker.aadhaarFront ? (
-                      selectedWorker.aadhaarFront.startsWith('data:image') || selectedWorker.aadhaarFront.startsWith('http') ? (
+                      formatPhotoSrc(selectedWorker.aadhaarFront)?.startsWith('data:image') || formatPhotoSrc(selectedWorker.aadhaarFront)?.startsWith('http') ? (
                         <>
                           <img
-                            src={selectedWorker.aadhaarFront}
+                            src={formatPhotoSrc(selectedWorker.aadhaarFront)!}
                             alt="Aadhaar Front"
                             className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
                           />
                           <button
-                            onClick={() => setPreviewImage(selectedWorker.aadhaarFront)}
+                            onClick={() => setPreviewImage(formatPhotoSrc(selectedWorker.aadhaarFront)!)}
                             className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-2 text-white font-bold text-xs"
                           >
                             <Maximize2 className="w-4 h-4" />
@@ -549,15 +650,15 @@ export default function WorkersPage() {
 
                   <div className="aspect-[16/10] bg-slate-200 rounded-lg overflow-hidden border border-slate-200 flex items-center justify-center relative group">
                     {selectedWorker.aadhaarBack ? (
-                      selectedWorker.aadhaarBack.startsWith('data:image') || selectedWorker.aadhaarBack.startsWith('http') ? (
+                      formatPhotoSrc(selectedWorker.aadhaarBack)?.startsWith('data:image') || formatPhotoSrc(selectedWorker.aadhaarBack)?.startsWith('http') ? (
                         <>
                           <img
-                            src={selectedWorker.aadhaarBack}
+                            src={formatPhotoSrc(selectedWorker.aadhaarBack)!}
                             alt="Aadhaar Back"
                             className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
                           />
                           <button
-                            onClick={() => setPreviewImage(selectedWorker.aadhaarBack)}
+                            onClick={() => setPreviewImage(formatPhotoSrc(selectedWorker.aadhaarBack)!)}
                             className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-2 text-white font-bold text-xs"
                           >
                             <Maximize2 className="w-4 h-4" />

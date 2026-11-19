@@ -109,6 +109,8 @@ import NotificationCenterModal from './src/components/NotificationCenterModal';
 import WorkerManageSkillsModal from './src/components/WorkerManageSkillsModal';
 import EditProfileModal from './src/components/EditProfileModal';
 import HelpCenterModal from './src/components/HelpCenterModal';
+import InAppSoundBridge from './src/components/InAppSoundBridge';
+import { SoundAlertService } from './src/services/soundAlertService';
 
 const { width } = Dimensions.get('window');
 
@@ -927,13 +929,15 @@ function MainApp() {
   // Auto-poll worker approval status from Supabase when waiting on review screen
   useEffect(() => {
     let pollInterval;
-    if (currentScreen === 'WORKER_UNDER_REVIEW' && (workerMobile || phoneInput)) {
+    if (currentScreen === 'WORKER_UNDER_REVIEW') {
       const targetPhone = workerMobile || phoneInput;
-      pollInterval = setInterval(async () => {
+      const targetUserId = workerProfile?.id || workerProfile?.user_id;
+
+      const checkLiveStatus = async () => {
         try {
-          const res = await LiveBackend.checkWorkerApprovalStatus(targetPhone);
+          const res = await LiveBackend.checkWorkerApprovalStatus(targetPhone, targetUserId);
           if (res?.approved || res?.status === 'APPROVED' || res?.status === 'VERIFIED') {
-            clearInterval(pollInterval);
+            if (pollInterval) clearInterval(pollInterval);
             DeviceFeedback.triggerSuccessHaptics();
             const activeSkills = (res?.skills && res.skills.length > 0)
               ? res.skills
@@ -943,6 +947,7 @@ function MainApp() {
             if (activeSkills.length > 0) setWorkerSkills(activeSkills);
 
             await StorageService.setSession({
+              id: res?.profile?.id || targetUserId,
               mobile: targetPhone,
               phone: targetPhone,
               name: workerName || 'Mistri',
@@ -963,12 +968,82 @@ function MainApp() {
             setCurrentScreen('MAIN');
           }
         } catch (e) {}
-      }, 3500);
+      };
+
+      checkLiveStatus();
+      pollInterval = setInterval(checkLiveStatus, 3000);
     }
     return () => {
       if (pollInterval) clearInterval(pollInterval);
     };
-  }, [currentScreen, workerMobile, phoneInput, workerName]);
+  }, [currentScreen, workerMobile, phoneInput, workerName, workerProfile?.id]);
+
+  // Real-time Worker Incoming Booking Listener & Sound Engine (Ring & Buzz on New Request)
+  useEffect(() => {
+    let bookingPollInterval;
+    if (role === 'WORKER' && currentScreen === 'MAIN') {
+      const activePhone = workerMobile || phoneInput;
+      const activeWorkerId = workerProfile?.id || workerProfile?.user_id;
+
+      const checkIncomingBookings = async () => {
+        try {
+          const liveBookings = await LiveBackend.fetchWorkerBookings(activePhone, activeWorkerId);
+          if (liveBookings && Array.isArray(liveBookings)) {
+            const incomingWaiting = liveBookings.filter(
+              (b) => b && (b.status === 'waiting_confirmation' || b.status === 'WAITING_CONFIRMATION')
+            );
+
+            if (incomingWaiting.length > 0) {
+              setWorkerAlerts((prev) => {
+                const existingIds = new Set(prev.map((a) => a.bookingId || a.id));
+                const newAlerts = [];
+
+                incomingWaiting.forEach((b) => {
+                  if (!existingIds.has(b.id)) {
+                    // Trigger continuous Telephone Ringing & Pulsing Vibration Buzz
+                    SoundAlertService.ringIncomingBookingRequest();
+
+                    newAlerts.push({
+                      id: `ALT-${b.id.toString().slice(-4)}`,
+                      bookingId: b.id,
+                      customerName: b.customer_name || 'Customer',
+                      customerAvatar: (b.customer_name || 'CU').slice(0, 2).toUpperCase(),
+                      customerPhone: b.customer_phone || '',
+                      category: b.worker_skill || b.category || 'Inspection',
+                      title: b.title || `${b.worker_skill || 'Mistri'} Site Inspection`,
+                      location: b.site_location || 'Local Site, Rajasthan',
+                      distance: '1.5 km',
+                      date: b.scheduled_date || 'Today, Immediate',
+                      timing: 'Immediate Site Visit',
+                      offeredRate: 'Direct Customer Payment',
+                      platformFee: 99,
+                      paymentLocked: true,
+                      timestamp: 'Just now',
+                      arrivalOtp: b.arrival_otp || '1234',
+                      completionOtp: b.completion_otp || '5678',
+                      expiresInSeconds: 300,
+                    });
+                  }
+                });
+
+                if (newAlerts.length > 0) {
+                  return [...newAlerts, ...prev];
+                }
+                return prev;
+              });
+            }
+          }
+        } catch (e) {}
+      };
+
+      checkIncomingBookings();
+      bookingPollInterval = setInterval(checkIncomingBookings, 4000);
+    }
+
+    return () => {
+      if (bookingPollInterval) clearInterval(bookingPollInterval);
+    };
+  }, [role, currentScreen, workerMobile, phoneInput, workerProfile?.id]);
 
   // Live Worker Radar Polling (Syncs online/offline availability in real-time)
   useEffect(() => {
@@ -1126,21 +1201,23 @@ function MainApp() {
 
   const handleCustomerBookWorker = async (bookingDetails) => {
     try {
-      // 1. Strict 20km Geographic Bound Check (No requests outside 20km)
-      const eligibleIn20km = (realWorkers || []).filter((w) => {
-        const isOnline = Boolean(w.available);
+      // 1. Coverage & Proximity Check (Regional radius up to 50km + available fallback)
+      const onlineWorkers = (realWorkers || []).filter((w) => Boolean(w.available));
+      const nearbyWorkers = onlineWorkers.filter((w) => {
         const dist = parseFloat(w.distance || w.computedDistance || '2.0');
-        return isOnline && dist <= 20;
+        return dist <= 50;
       }).sort((a, b) => {
         const distA = parseFloat(a.distance || a.computedDistance || '2.0');
         const distB = parseFloat(b.distance || b.computedDistance || '2.0');
         return distA - distB;
       });
 
-      if (eligibleIn20km.length === 0) {
+      const candidatePool = nearbyWorkers.length > 0 ? nearbyWorkers : (onlineWorkers.length > 0 ? onlineWorkers : realWorkers || []);
+
+      if (candidatePool.length === 0) {
         Alert.alert(
-          'Worker not available in your current location right now',
-          'वर्तमान स्थान पर 20 किमी के दायरे में कोई कारीगर उपलब्ध नहीं है।\n\nMistriPro केवल 20 किमी के स्थानीय दायरे में बुकिंग स्वीकार करता है ताकि कारीगर समय पर पहुंच सकें।'
+          'Worker not available right now',
+          'वर्तमान में कोई कारीगर ऑनलाइन नहीं है। कृपया कुछ देर बाद पुनः प्रयास करें।'
         );
         return;
       }
@@ -1151,6 +1228,12 @@ function MainApp() {
       const cancellationOtp = String(bookingDetails.cancellationOtp || Math.floor(1000 + Math.random() * 9000));
       const companyPhone = '+91 98290 12345'; // Protected Company Helpline Number
 
+      // Resolve targeted worker details
+      const firstWorker = candidatePool[0];
+      const targetWorker = bookingDetails.workerId
+        ? ((realWorkers || []).find((w) => w.id === bookingDetails.workerId) || firstWorker)
+        : firstWorker;
+
       // 2. Handle Virtual Wallet Payment deduction if user selected wallet
       if (bookingDetails.paidViaWallet) {
         const nextBal = Math.max(0, (customerWalletBalance || 0) - bookingCharge);
@@ -1160,9 +1243,12 @@ function MainApp() {
 
       const savedBooking = await LiveBackend.createBooking({
         ...bookingDetails,
+        workerId: targetWorker?.id || bookingDetails.workerId || null,
+        workerName: targetWorker?.name || bookingDetails.workerName || 'Nearby Mistri',
+        workerPhone: targetWorker?.phone || bookingDetails.workerPhone || null,
         customerName: custName || 'Customer',
         customerPhone: custMobile || '',
-        siteLocation: 'Sawai Madhopur, Rajasthan',
+        siteLocation: bookingDetails.siteLocation || sessionLocation.text || 'Rajasthan, India',
         status: 'WAITING_CONFIRMATION',
         arrivalOtp,
         completionOtp,
@@ -1175,8 +1261,7 @@ function MainApp() {
 
       // 3. Add to Customer Bookings List
       const isSpecific = bookingDetails.workerName && !bookingDetails.workerName.includes('Searching');
-      const firstWorker = eligibleIn20km[0];
-      const remainingWorkersQueue = eligibleIn20km.slice(1).map((w) => ({
+      const remainingWorkersQueue = candidatePool.slice(1).map((w) => ({
         name: w.name,
         distance: w.distance || w.computedDistance,
         phone: w.phone,
@@ -1298,6 +1383,7 @@ function MainApp() {
   };
 
   const handleApproveAlert = async (alertItem) => {
+    SoundAlertService.stopAlert();
     const approvingWorkerName = workerProfile?.name || workerName || '';
     const approvingWorkerPhone = workerMobile || '';
     const bookingId = alertItem.bookingId;
@@ -1373,6 +1459,7 @@ function MainApp() {
 
   // Uber-Style Sequential Reject / Timeout (Forwards to next worker in 20km range)
   const handleRejectAlert = async (alertItem, isTimedOut = false) => {
+    SoundAlertService.stopAlert();
     const alertId = alertItem?.id || alertItem;
     const targetAlert = workerAlerts.find((a) => a.id === alertId);
     const bookingId = targetAlert?.bookingId || alertItem?.bookingId;
@@ -1873,15 +1960,32 @@ function MainApp() {
                 experienceYears: liveWorkerExp,
               }));
 
-              if (userPhone || user?.id) {
-                LiveBackend.checkWorkerApprovalStatus(userPhone, user?.id || profile?.id).then((liveStatus) => {
+              let isApproved = userKyc === 'APPROVED' || userKyc === 'VERIFIED';
+              if (!isApproved && (userPhone || user?.id || profile?.id)) {
+                try {
+                  const liveStatus = await LiveBackend.checkWorkerApprovalStatus(userPhone, user?.id || profile?.id);
                   if (liveStatus && (liveStatus.approved || liveStatus.status === 'APPROVED' || liveStatus.status === 'VERIFIED')) {
-                    if (isMounted) setCurrentScreen('MAIN');
+                    isApproved = true;
+                    userKyc = 'APPROVED';
+                    if (liveStatus.skills && liveStatus.skills.length > 0) {
+                      liveWorkerSkills = liveStatus.skills;
+                      setWorkerSkills(liveWorkerSkills);
+                    }
+                    await StorageService.setSession({
+                      id: profile?.id || user?.id,
+                      role: 'WORKER',
+                      name: userDisplayName,
+                      phone: userPhone,
+                      mobile: userPhone,
+                      kyc_status: 'APPROVED',
+                      skills: liveWorkerSkills,
+                      experienceYears: liveWorkerExp,
+                    });
                   }
-                }).catch(() => {});
+                } catch (e) {}
               }
 
-              if (userKyc === 'APPROVED' || userKyc === 'VERIFIED') {
+              if (isApproved) {
                 setActiveTab('HOME');
                 setCurrentScreen('MAIN');
               } else {
@@ -3873,6 +3977,7 @@ function MainApp() {
   if (currentScreen === 'WORKER_UNDER_REVIEW') {
     return (
       <View style={styles.loaderCenterScreen}>
+        <InAppSoundBridge />
         <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
         <View style={styles.loaderCardContent}>
           <LottieView
@@ -3997,6 +4102,7 @@ function MainApp() {
   // -------------------------------------------------------------
   return (
     <View style={styles.mainContainer}>
+      <InAppSoundBridge />
       <StatusBar barStyle="dark-content" backgroundColor="#F6F7FB" />
 
       {/* RENDER ACTIVE TAB */}

@@ -108,6 +108,40 @@ export default function WorkerHomeScreen({
     };
   }, [workerProfile?.id, workerProfile?.user_id, workerProfile?.phone]);
 
+  // Auto-detect & broadcast live worker GPS location to Supabase on mount and periodically
+  useEffect(() => {
+    let isMounted = true;
+    const syncLiveGps = async () => {
+      try {
+        let target = resolveWorkerTarget(workerProfile);
+        if (!target) {
+          try {
+            const sess = await StorageService.getSession();
+            target = sess?.id || sess?.mobile || sess?.phone;
+          } catch (_) {}
+        }
+        if (!target) return;
+
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === 'granted') {
+          const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+          if (loc?.coords?.latitude && loc?.coords?.longitude && isMounted) {
+            await LiveBackend.updateWorkerLiveLocation(target, loc.coords.latitude, loc.coords.longitude);
+          }
+        }
+      } catch (e) {
+        console.log('Worker auto GPS broadcast notice:', e?.message);
+      }
+    };
+
+    syncLiveGps();
+    const interval = setInterval(syncLiveGps, 20000); // refresh every 20s
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [workerProfile?.id, workerProfile?.user_id, workerProfile?.phone]);
+
   // Toggle Availability
   const handleToggleAvailability = async (val) => {
     if (isSyncingAvailability) return;

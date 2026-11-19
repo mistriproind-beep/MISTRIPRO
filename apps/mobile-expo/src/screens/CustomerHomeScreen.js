@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   FlatList,
   ScrollView,
+  RefreshControl,
   StyleSheet,
   ActivityIndicator,
   StatusBar,
@@ -108,12 +109,48 @@ export default function CustomerHomeScreen({
 
   const [userLat, setUserLat] = useState(sessionLocation?.lat || 25.9928);
   const [userLon, setUserLon] = useState(sessionLocation?.lng || 76.3712);
-  const [distanceRange, setDistanceRange] = useState(10);
+  const [distanceRange, setDistanceRange] = useState(25);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [liveWorkersList, setLiveWorkersList] = useState(workers || []);
   const [isManualLocation, setIsManualLocation] = useState(Boolean(sessionLocation?.isManual));
   const [showLocationSearch, setShowLocationSearch] = useState(false);
   const [locationSearchQuery, setLocationSearchQuery] = useState('');
   const [locationResults, setLocationResults] = useState([]);
   const [locationSearchLoading, setLocationSearchLoading] = useState(false);
+
+  // Sync when workers prop updates
+  useEffect(() => {
+    if (Array.isArray(workers) && workers.length > 0) {
+      setLiveWorkersList(workers);
+    }
+  }, [workers]);
+
+  // Periodic Auto-Refresh: Real-time discovery of newly online workers every 10 seconds
+  const handleRefreshWorkers = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      const live = await LiveBackend.fetchRealWorkers();
+      if (live && Array.isArray(live)) {
+        setLiveWorkersList(live);
+        if (onUpdateWorkers) onUpdateWorkers(live);
+      }
+    } catch (_) {}
+    finally {
+      setIsRefreshing(false);
+    }
+  }, [onUpdateWorkers]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      LiveBackend.fetchRealWorkers().then((live) => {
+        if (live && live.length > 0) {
+          setLiveWorkersList(live);
+          if (onUpdateWorkers) onUpdateWorkers(live);
+        }
+      }).catch(() => {});
+    }, 10000);
+    return () => clearInterval(timer);
+  }, [onUpdateWorkers]);
 
   // Sync when sessionLocation changes from outside (e.g., from FindWorkersScreen)
   useEffect(() => {
@@ -396,16 +433,23 @@ export default function CustomerHomeScreen({
       if (aAvail !== bAvail) return aAvail ? -1 : 1;
       return (a.computedDistance || 0) - (b.computedDistance || 0);
     });
-  }, [searchQuery, selectedCategory, workers, userLat, userLon]);
+  }, [searchQuery, selectedCategory, liveWorkersList, userLat, userLon]);
 
-  // Filtered by strict 20km perimeter (Requests never go to other cities/states beyond 20km)
+  // Filtered by user distance range with intelligent nearest-fallback so customers always find mistris
   const nearbyWorkers10km = useMemo(() => {
-    // Only workers strictly within 20km are eligible
-    const within20km = nearbyWorkersWithDist.filter((w) => (w.computedDistance ?? 0) <= 20);
-    if (distanceRange === 10) {
-      return within20km.filter((w) => (w.computedDistance ?? 0) <= 10);
+    if (distanceRange === 'all' || distanceRange >= 100) {
+      return nearbyWorkersWithDist;
     }
-    return within20km;
+
+    const rangeLimit = Number(distanceRange) || 25;
+    const withinRange = nearbyWorkersWithDist.filter((w) => (w.computedDistance ?? 0) <= rangeLimit);
+
+    // Smart fallback: If no workers in narrow radius, show closest verified workers so customer never gets a blank screen
+    if (withinRange.length === 0 && nearbyWorkersWithDist.length > 0) {
+      return nearbyWorkersWithDist;
+    }
+
+    return withinRange;
   }, [nearbyWorkersWithDist, distanceRange]);
 
   const handleProceedToBooking = (worker) => {
@@ -568,6 +612,14 @@ export default function CustomerHomeScreen({
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefreshWorkers}
+            colors={['#4F46E5']}
+            tintColor="#4F46E5"
+          />
+        }
       >
         {/* ─── 1. Header Bar ─── */}
         <View style={styles.header}>
@@ -821,7 +873,7 @@ export default function CustomerHomeScreen({
           )}
         </View>
 
-        {/* Distance Range Filter Selector (<10km / <20km Local Perimeter) */}
+        {/* Distance Range Filter Selector (<10km / <25km / <50km / All Available) */}
         <View style={styles.rangeSelectorRow}>
           <TouchableOpacity
             style={[styles.rangePill, distanceRange === 10 && styles.rangePillActive]}
@@ -830,18 +882,39 @@ export default function CustomerHomeScreen({
           >
             <MapPin size={11} color={distanceRange === 10 ? '#FFFFFF' : '#4F46E5'} />
             <Text style={[styles.rangePillText, distanceRange === 10 && styles.rangePillTextActive]}>
-              {lang === 'hi' ? '10 किमी दायरा' : lang === 'gu' ? '10 કિમી હેઠળ' : lang === 'mr' ? '10 किमी आत' : '< 10 km'}
+              {lang === 'hi' ? '< 10 किमी' : '< 10 km'}
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.rangePill, distanceRange === 20 && styles.rangePillActive]}
-            onPress={() => setDistanceRange(20)}
+            style={[styles.rangePill, distanceRange === 25 && styles.rangePillActive]}
+            onPress={() => setDistanceRange(25)}
             activeOpacity={0.8}
           >
-            <Navigation size={11} color={distanceRange === 20 ? '#FFFFFF' : '#4F46E5'} />
-            <Text style={[styles.rangePillText, distanceRange === 20 && styles.rangePillTextActive]}>
-              {lang === 'hi' ? '20 किमी (अधिकतम सीमा)' : lang === 'gu' ? '20 કિમી (મહત્તમ)' : lang === 'mr' ? '20 किमी (मर्यादा)' : '< 20 km (Max Limit)'}
+            <Navigation size={11} color={distanceRange === 25 ? '#FFFFFF' : '#4F46E5'} />
+            <Text style={[styles.rangePillText, distanceRange === 25 && styles.rangePillTextActive]}>
+              {lang === 'hi' ? '< 25 किमी' : '< 25 km'}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.rangePill, distanceRange === 50 && styles.rangePillActive]}
+            onPress={() => setDistanceRange(50)}
+            activeOpacity={0.8}
+          >
+            <Navigation size={11} color={distanceRange === 50 ? '#FFFFFF' : '#4F46E5'} />
+            <Text style={[styles.rangePillText, distanceRange === 50 && styles.rangePillTextActive]}>
+              {lang === 'hi' ? '< 50 किमी' : '< 50 km'}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.rangePill, distanceRange === 'all' && styles.rangePillActive]}
+            onPress={() => setDistanceRange('all')}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.rangePillText, distanceRange === 'all' && styles.rangePillTextActive]}>
+              {lang === 'hi' ? 'सभी कारीगर' : 'All Mistris'}
             </Text>
           </TouchableOpacity>
         </View>
