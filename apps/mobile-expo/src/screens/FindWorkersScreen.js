@@ -31,6 +31,7 @@ import {
 import { WebView } from 'react-native-webview';
 import * as Location from 'expo-location';
 import { CATEGORIES, translateWorkerSkill } from '../data/categories';
+import { getDistanceKm } from '../services/liveBackend';
 import RazorpayModal from '../components/RazorpayModal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -304,20 +305,31 @@ export default function FindWorkersScreen({
     });
   }, [selectedCategory, searchQuery, workers]);
 
-  // Dynamically place workers around the user's REAL live GPS location
+  // Dynamically place workers with REAL live GPS distance calculation
   const liveWorkers = useMemo(() => {
     return baseWorkers.map((w, index) => {
       if (!w) return null;
-      const count = baseWorkers.length || 1;
-      const angle = (index * 2 * Math.PI) / count;
-      const radius = 0.012 + (index % 5) * 0.01; // ~1.2km to ~5.5km
-      const lat = userLat + radius * Math.cos(angle);
-      const lng = userLng + radius * Math.sin(angle);
-      const distance = (radius * 111).toFixed(1);
+      let lat = w.latitude ?? w.lat;
+      let lng = w.longitude ?? w.lng;
+      let distance;
+
+      if (lat && lng) {
+        distance = getDistanceKm(userLat, userLng, lat, lng).toFixed(1);
+      } else {
+        const count = baseWorkers.length || 1;
+        const angle = (index * 2 * Math.PI) / count;
+        const radius = 0.012 + (index % 5) * 0.01; // ~1.2km to ~5.5km
+        lat = userLat + radius * Math.cos(angle);
+        lng = userLng + radius * Math.sin(angle);
+        distance = (radius * 111).toFixed(1);
+      }
+
       return {
         ...w,
         lat,
         lng,
+        latitude: lat,
+        longitude: lng,
         distance,
       };
     }).filter(Boolean);

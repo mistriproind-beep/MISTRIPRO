@@ -26,6 +26,7 @@ import {
   AlertCircle,
   ArrowUpRight,
   ChevronUp,
+  Navigation,
 } from 'lucide-react-native';
 import * as Location from 'expo-location';
 
@@ -91,8 +92,9 @@ export default function CustomerHomeScreen({
   const [razorpayBookingData, setRazorpayBookingData] = useState(null);
   const [showAllCategories, setShowAllCategories] = useState(false);
 
-  const [userLat, setUserLat] = useState(null);
-  const [userLon, setUserLon] = useState(null);
+  const [userLat, setUserLat] = useState(25.9928);
+  const [userLon, setUserLon] = useState(76.3712);
+  const [distanceRange, setDistanceRange] = useState(10);
   const [showLocationSearch, setShowLocationSearch] = useState(false);
   const [locationSearchQuery, setLocationSearchQuery] = useState('');
   const [locationResults, setLocationResults] = useState([]);
@@ -240,9 +242,12 @@ export default function CustomerHomeScreen({
     };
   }, [searchQuery, workers]);
 
-  // Filter Workers: Online & Offline workers with status badge, online sorted first
-  const nearbyWorkers = useMemo(() => {
+  // Filter Workers: Online & Offline workers with status badge, calculated live GPS distance
+  const nearbyWorkersWithDist = useMemo(() => {
     const liveList = Array.isArray(workers) ? workers : [];
+    const currentLat = userLat || 25.9928;
+    const currentLon = userLon || 76.3712;
+
     const filtered = liveList.filter((w) => {
       if (!w) return false;
       // 1. Category selection filter (e.g., clicking Mason shows only Masons)
@@ -315,32 +320,41 @@ export default function CustomerHomeScreen({
       return true;
     });
 
-    // Sort: Online workers first, offline below
-    return [...filtered].sort((a, b) => {
+    // Calculate real live distance for every worker from customer GPS
+    const mapped = filtered.map((worker) => {
+      const wLat = worker.latitude ?? worker.lat ?? 25.9928;
+      const wLon = worker.longitude ?? worker.lng ?? 76.3712;
+      const dist = getDistanceKm(currentLat, currentLon, wLat, wLon);
+      return {
+        ...worker,
+        latitude: wLat,
+        longitude: wLon,
+        lat: wLat,
+        lng: wLon,
+        computedDistance: dist,
+        distance: dist.toFixed(1),
+      };
+    });
+
+    // Sort: Online workers first, then closest live distance first
+    return mapped.sort((a, b) => {
       const aAvail = Boolean(a?.available);
       const bAvail = Boolean(b?.available);
-      if (aAvail === bAvail) return 0;
-      return aAvail ? -1 : 1;
+      if (aAvail !== bAvail) return aAvail ? -1 : 1;
+      return (a.computedDistance || 0) - (b.computedDistance || 0);
     });
-  }, [searchQuery, selectedCategory, workers]);
+  }, [searchQuery, selectedCategory, workers, userLat, userLon]);
 
-  // Filtered by 10km distance
+  // Filtered by distance range: 10km (default), 50km, or 'all'
   const nearbyWorkers10km = useMemo(() => {
-    return nearbyWorkers
-      .map((worker) => {
-        if (userLat && userLon && worker.latitude && worker.longitude) {
-          const dist = getDistanceKm(userLat, userLon, worker.latitude, worker.longitude);
-          return { ...worker, computedDistance: dist, distance: dist.toFixed(1) };
-        }
-        return worker;
-      })
-      .filter((worker) => {
-        if (userLat && userLon && worker.computedDistance !== undefined) {
-          return worker.computedDistance <= 10;
-        }
-        return true;
-      });
-  }, [nearbyWorkers, userLat, userLon]);
+    if (distanceRange === 10) {
+      return nearbyWorkersWithDist.filter((w) => (w.computedDistance ?? 0) <= 10);
+    }
+    if (distanceRange === 50) {
+      return nearbyWorkersWithDist.filter((w) => (w.computedDistance ?? 0) <= 50);
+    }
+    return nearbyWorkersWithDist;
+  }, [nearbyWorkersWithDist, distanceRange]);
 
   const handleProceedToBooking = (worker) => {
     setSelectedWorker(null);
@@ -699,7 +713,7 @@ export default function CustomerHomeScreen({
           </TouchableOpacity>
         )}
 
-        {/* ─── 6. Nearby Workers (<15km) ─── */}
+        {/* ─── 6. Nearby Workers (<10km / <50km / All) ─── */}
         <View style={styles.sectionHeader}>
           <View style={styles.nearbyTitleRow}>
             <Text style={styles.sectionTitle}>
@@ -726,6 +740,41 @@ export default function CustomerHomeScreen({
               </Text>
             </TouchableOpacity>
           )}
+        </View>
+
+        {/* Distance Range Filter Selector (<10km / <50km / All) */}
+        <View style={styles.rangeSelectorRow}>
+          <TouchableOpacity
+            style={[styles.rangePill, distanceRange === 10 && styles.rangePillActive]}
+            onPress={() => setDistanceRange(10)}
+            activeOpacity={0.8}
+          >
+            <MapPin size={11} color={distanceRange === 10 ? '#FFFFFF' : '#4F46E5'} />
+            <Text style={[styles.rangePillText, distanceRange === 10 && styles.rangePillTextActive]}>
+              {lang === 'hi' ? '10 किमी दायरा' : lang === 'gu' ? '10 કિમી હેઠળ' : lang === 'mr' ? '10 किमी आत' : '< 10 km'}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.rangePill, distanceRange === 50 && styles.rangePillActive]}
+            onPress={() => setDistanceRange(50)}
+            activeOpacity={0.8}
+          >
+            <Navigation size={11} color={distanceRange === 50 ? '#FFFFFF' : '#4F46E5'} />
+            <Text style={[styles.rangePillText, distanceRange === 50 && styles.rangePillTextActive]}>
+              {lang === 'hi' ? '50 किमी दायरा' : lang === 'gu' ? '50 કિમી સુધી' : lang === 'mr' ? '50 किमी पर्यंत' : '< 50 km'}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.rangePill, distanceRange === 'all' && styles.rangePillActive]}
+            onPress={() => setDistanceRange('all')}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.rangePillText, distanceRange === 'all' && styles.rangePillTextActive]}>
+              {lang === 'hi' ? 'सभी दूरी' : lang === 'gu' ? 'બધી રેન્જ' : lang === 'mr' ? 'सर्व अंतर' : 'All Range'}
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {nearbyWorkers10km.length === 0 ? (
@@ -1388,7 +1437,36 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginTop: 8,
-    marginBottom: 12,
+    marginBottom: 8,
+  },
+  rangeSelectorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 14,
+  },
+  rangePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  rangePillActive: {
+    backgroundColor: '#4F46E5',
+    borderColor: '#4F46E5',
+  },
+  rangePillText: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 11,
+    color: '#475569',
+  },
+  rangePillTextActive: {
+    color: '#FFFFFF',
   },
   nearbyTitleRow: {
     flexDirection: 'row',

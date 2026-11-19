@@ -31,6 +31,7 @@ import { supabase } from '../services/supabase';
 import { LiveBackend } from '../services/liveBackend';
 import { DeviceFeedback } from '../services/deviceFeedback';
 import { StorageService } from '../services/storage';
+import * as Location from 'expo-location';
 import { translateWorkerSkill, translateLocationName } from '../data/categories';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -137,6 +138,16 @@ export default function WorkerHomeScreen({
       }
 
       if (val) {
+        try {
+          const { status } = await Location.requestForegroundPermissionsAsync();
+          if (status === 'granted') {
+            const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+            if (loc?.coords?.latitude && loc?.coords?.longitude) {
+              LiveBackend.updateWorkerLiveLocation(target, loc.coords.latitude, loc.coords.longitude);
+            }
+          }
+        } catch (locE) {}
+
         Alert.alert(
           'Online & Available! 🟢',
           'Your profile is now marked ONLINE on customer live maps and directory. Nearby clients can book you now.'
