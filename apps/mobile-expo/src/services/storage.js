@@ -82,11 +82,9 @@ export const StorageService = {
   },
   clearSession: async () => {
     try {
-      // Clear current active session & credentials but preserve permanent account registry & preferences
+      // Clear active runtime session while preserving saved login credentials, account profiles & language preferences
       await AsyncStorage.multiRemove([
         KEYS.USER_SESSION,
-        KEYS.ROLE,
-        KEYS.CREDENTIALS,
         KEYS.IS_DEV,
         KEYS.ONBOARDING_COMPLETED,
       ]);

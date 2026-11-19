@@ -1568,69 +1568,114 @@ function MainApp() {
           setLang(savedLang);
         }
 
-        // 4. Session Check & Auto-provisioning (If already logged in, send directly to Home)
+        // 4. Session Check & Auto-login (If already logged in, send directly to Home)
         let savedSession = await StorageService.getSession();
         let savedCredentials = await StorageService.getCredentials();
         let savedRole = await StorageService.getRole();
 
-        if (savedSession && (savedSession.email || savedSession.mobile || savedSession.phone || savedSession.name || savedSession.id) && savedSession.role) {
-          const effectiveRole = savedSession.role;
-          const userDisplayName = savedSession.name || (effectiveRole === 'CUSTOMER' ? 'Customer' : 'Worker');
+        // Always preload input fields with saved credentials so user NEVER re-types
+        if (savedCredentials?.email && isMounted) {
+          setEmailInput(savedCredentials.email);
+        }
+        if (savedCredentials?.password && isMounted) {
+          setPasswordInput(savedCredentials.password);
+        }
+        if (savedCredentials?.phone && isMounted) {
+          setPhoneInput(savedCredentials.phone);
+        }
+
+        const credTarget =
+          savedSession?.email ||
+          savedSession?.mobile ||
+          savedSession?.phone ||
+          savedCredentials?.email ||
+          savedCredentials?.phone;
+        const localAcct = credTarget ? await StorageService.getAccountProfile(credTarget) : null;
+        const effectiveRole = savedSession?.role || savedRole || localAcct?.role;
+
+        if (effectiveRole && (savedSession || savedCredentials)) {
+          const userDisplayName =
+            savedSession?.name ||
+            localAcct?.name ||
+            (credTarget ? formatNameFromEmail(credTarget) : (effectiveRole === 'CUSTOMER' ? 'Customer' : 'Worker'));
+          const userPhone =
+            savedSession?.mobile ||
+            savedSession?.phone ||
+            localAcct?.phone ||
+            savedCredentials?.phone ||
+            '';
+          const userAddr = savedSession?.address || localAcct?.address || '';
+          const userKyc = savedSession?.kyc_status || localAcct?.kyc_status || 'VERIFIED';
+
           setRole(effectiveRole);
+          await StorageService.setRole(effectiveRole);
+          await StorageService.setSession({
+            id: savedSession?.id || localAcct?.id || 'usr-' + Date.now(),
+            name: userDisplayName,
+            mobile: userPhone,
+            phone: userPhone,
+            email: savedSession?.email || savedCredentials?.email || '',
+            role: effectiveRole,
+            address: userAddr,
+            kyc_status: userKyc,
+          });
 
           if (isMounted) {
             if (effectiveRole === 'WORKER') {
               setWorkerName(userDisplayName);
-              setWorkerMobile(savedSession.mobile || savedSession.phone || '');
-              if (savedSession.address) setWorkerAddress(savedSession.address);
+              setWorkerMobile(userPhone);
+              if (userAddr) setWorkerAddress(userAddr);
               setWorkerProfile((prev) => ({
                 ...prev,
-                id: savedSession.id || prev.id,
-                user_id: savedSession.id || prev.user_id,
+                id: savedSession?.id || prev.id,
+                user_id: savedSession?.id || prev.user_id,
                 name: userDisplayName || prev.name,
-                phone: savedSession.mobile || savedSession.phone || prev.phone,
-                location: savedSession.address || prev.location,
+                phone: userPhone || prev.phone,
+                location: userAddr || prev.location,
               }));
-              setActiveTab('HOME');
-              setCurrentScreen('MAIN');
+              if (userKyc === 'APPROVED' || userKyc === 'VERIFIED') {
+                setActiveTab('HOME');
+                setCurrentScreen('MAIN');
+              } else {
+                setCurrentScreen('WORKER_UNDER_REVIEW');
+              }
             } else {
               setCustName(userDisplayName);
-              setCustMobile(savedSession.mobile || savedSession.phone || '');
-              if (savedSession.address) setCustAddress(savedSession.address);
+              setCustMobile(userPhone);
+              if (userAddr) setCustAddress(userAddr);
               setActiveTab('HOME');
               setCurrentScreen('MAIN');
             }
           }
         } else if (savedCredentials && (savedCredentials.email || savedCredentials.phone)) {
           // Check Supabase Cloud profile table for THIS specific user credentials
-          const credTarget = savedCredentials.email || savedCredentials.phone;
           const existing = await LiveBackend.getProfileByEmailOrPhone(credTarget);
 
           if (existing.found && existing.profile && existing.profile.role) {
             const p = existing.profile;
-            const effectiveRole = p.role;
-            const effectiveName = (p.full_name && p.full_name !== 'Ramesh Sharma')
+            const pRole = p.role;
+            const pName = (p.full_name && p.full_name !== 'Ramesh Sharma')
               ? p.full_name
               : formatNameFromEmail(credTarget);
-            setRole(effectiveRole);
-            await StorageService.setRole(effectiveRole);
+            setRole(pRole);
+            await StorageService.setRole(pRole);
             await StorageService.setSession({
               id: p.id,
               email: savedCredentials.email || '',
               mobile: p.phone || savedCredentials.phone || '',
-              role: effectiveRole,
-              name: effectiveName,
+              role: pRole,
+              name: pName,
               address: p.address || '',
               kyc_status: p.kyc_status || 'VERIFIED',
             });
-            if (effectiveRole === 'CUSTOMER') {
-              setCustName(effectiveName);
+            if (pRole === 'CUSTOMER') {
+              setCustName(pName);
               if (p.phone) setCustMobile(p.phone);
               if (p.address) setCustAddress(p.address);
               setActiveTab('HOME');
               setCurrentScreen('MAIN');
             } else {
-              setWorkerName(effectiveName);
+              setWorkerName(pName);
               if (p.phone) setWorkerMobile(p.phone);
               if (p.address) setWorkerAddress(p.address);
               if (p.kyc_status === 'APPROVED' || p.kyc_status === 'VERIFIED') {
@@ -2060,6 +2105,17 @@ function MainApp() {
         setCurrentScreen('MAIN');
       }, 400);
       return () => clearTimeout(timer);
+    }
+  }, [currentScreen]);
+
+  // Pre-fill saved login credentials automatically when on Sign In screen
+  useEffect(() => {
+    if (currentScreen === 'SIGN_IN') {
+      StorageService.getCredentials().then((creds) => {
+        if (creds?.email) setEmailInput((prev) => prev || creds.email);
+        if (creds?.password) setPasswordInput((prev) => prev || creds.password);
+        if (creds?.phone) setPhoneInput((prev) => prev || creds.phone);
+      }).catch(() => {});
     }
   }, [currentScreen]);
 
@@ -4167,66 +4223,78 @@ function MainApp() {
             </View>
 
             <ScrollView style={{ marginTop: 12 }}>
-              {[
-                {
-                  id: 'INV-2026-089',
-                  workerName: 'Ram Singh Mistri',
-                  skill: 'Mason',
-                  date: '12 Nov 2026',
-                  totalAmount: 1098,
-                  workerFee: 950,
-                  platformFee: 99,
-                  txFee: 49,
-                },
-                {
-                  id: 'INV-2026-064',
-                  workerName: 'Mukesh Sharma',
-                  skill: 'Electrician',
-                  date: '04 Nov 2026',
-                  totalAmount: 994,
-                  workerFee: 850,
-                  platformFee: 99,
-                  txFee: 45,
-                },
-              ].map((inv) => (
-                <View
-                  key={inv.id}
-                  style={{
-                    backgroundColor: '#F8FAFC',
-                    borderRadius: 14,
-                    padding: 14,
-                    marginBottom: 10,
-                    borderWidth: 1,
-                    borderColor: '#E2E8F0',
-                  }}
-                >
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Text style={{ fontFamily: 'Satoshi-Bold', fontSize: 14, color: '#0F172A' }}>{inv.id}</Text>
-                    <Text style={{ fontFamily: 'Satoshi-Bold', fontSize: 14, color: '#16A34A' }}>₹{inv.totalAmount}</Text>
-                  </View>
-                  <Text style={{ fontFamily: 'Satoshi-Medium', fontSize: 12, color: '#64748B', marginTop: 3 }}>
-                    {inv.workerName} • {inv.skill} • {inv.date}
+              {(role === 'CUSTOMER' ? customerBookings : workerBookings).length === 0 ? (
+                <View style={{ padding: 24, alignItems: 'center', justifyContent: 'center' }}>
+                  <FileText size={42} color="#94A3B8" />
+                  <Text style={{ fontFamily: 'Satoshi-Bold', fontSize: 16, color: '#0F172A', marginTop: 12 }}>
+                    No Invoices Yet
                   </Text>
-                  <TouchableOpacity
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 6,
-                      backgroundColor: '#4F46E5',
-                      borderRadius: 10,
-                      paddingVertical: 8,
-                      marginTop: 10,
-                    }}
-                    onPress={() => InvoiceService.downloadInvoicePdf(inv)}
-                  >
-                    <Download size={14} color="#FFFFFF" />
-                    <Text style={{ fontFamily: 'Satoshi-Bold', fontSize: 12, color: '#FFFFFF' }}>
-                      Download Official Tax Invoice PDF
-                    </Text>
-                  </TouchableOpacity>
+                  <Text style={{ fontFamily: 'Satoshi-Medium', fontSize: 13, color: '#64748B', textAlign: 'center', marginTop: 6, lineHeight: 18 }}>
+                    Official GST tax invoices and payment receipts for your bookings will appear here automatically with 1-tap PDF download.
+                  </Text>
                 </View>
-              ))}
+              ) : (
+                (role === 'CUSTOMER' ? customerBookings : workerBookings).map((b) => {
+                  const invId = b.booking_code || `INV-${String(b.id || Date.now()).slice(-6)}`;
+                  const invDate = b.date || b.booking_date || b.created_at || 'Recent';
+                  const invWorker = b.workerName || b.worker_name || 'Assigned Mistri';
+                  const invSkill = b.worker_skill || b.category || 'Skilled Labour';
+                  const invAmt = Number(b.amount || b.bookingFee || 99);
+                  return (
+                    <View
+                      key={b.id || invId}
+                      style={{
+                        backgroundColor: '#F8FAFC',
+                        borderRadius: 14,
+                        padding: 14,
+                        marginBottom: 10,
+                        borderWidth: 1,
+                        borderColor: '#E2E8F0',
+                      }}
+                    >
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Text style={{ fontFamily: 'Satoshi-Bold', fontSize: 14, color: '#0F172A' }}>{invId}</Text>
+                        <Text style={{ fontFamily: 'Satoshi-Bold', fontSize: 14, color: '#16A34A' }}>₹{invAmt}</Text>
+                      </View>
+                      <Text style={{ fontFamily: 'Satoshi-Medium', fontSize: 12, color: '#64748B', marginTop: 3 }}>
+                        {invWorker} • {invSkill} • {invDate}
+                      </Text>
+                      <TouchableOpacity
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 6,
+                          backgroundColor: '#4F46E5',
+                          borderRadius: 10,
+                          paddingVertical: 8,
+                          marginTop: 10,
+                        }}
+                        onPress={() =>
+                          InvoiceService.downloadInvoicePdf({
+                            ...b,
+                            id: b.id || invId,
+                            booking_code: invId,
+                            customer_name: custName || 'Valued Customer',
+                            customer_phone: custMobile || emailInput || '',
+                            site_location: b.siteAddress || custAddress || 'On-site',
+                            worker_name: invWorker,
+                            worker_skill: invSkill,
+                            total_amount: invAmt,
+                            platform_fee: invAmt,
+                            date: invDate,
+                          })
+                        }
+                      >
+                        <Download size={14} color="#FFFFFF" />
+                        <Text style={{ fontFamily: 'Satoshi-Bold', fontSize: 12, color: '#FFFFFF' }}>
+                          Download Official Tax Invoice PDF
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })
+              )}
             </ScrollView>
           </View>
         </View>
@@ -4778,21 +4846,24 @@ function ProfileScreen({
 
           <View style={styles.settingsRowDivider} />
 
-          {/* 3. KYC Status */}
-          <View style={styles.settingsRow}>
-            <View style={[styles.settingsRowIconWrap, { backgroundColor: '#DCFCE7' }]}>
-              <ShieldCheck size={18} color="#15803D" />
-            </View>
-            <View style={styles.settingsRowTextCol}>
-              <Text style={styles.settingsRowLabel}>{t.verifiedKYC}</Text>
-              <Text style={styles.settingsRowSub}>Aadhaar & Bank Verified ✓</Text>
-            </View>
-            <View style={styles.verifiedGreenBadge}>
-              <Text style={styles.verifiedGreenBadgeText}>Active</Text>
-            </View>
-          </View>
-
-          <View style={styles.settingsRowDivider} />
+          {/* 3. KYC Status (Strictly shown only for Workers, NOT Customers) */}
+          {role === 'WORKER' && (
+            <>
+              <View style={styles.settingsRow}>
+                <View style={[styles.settingsRowIconWrap, { backgroundColor: '#DCFCE7' }]}>
+                  <ShieldCheck size={18} color="#15803D" />
+                </View>
+                <View style={styles.settingsRowTextCol}>
+                  <Text style={styles.settingsRowLabel}>{t.verifiedKYC}</Text>
+                  <Text style={styles.settingsRowSub}>Aadhaar & Bank Verified ✓</Text>
+                </View>
+                <View style={styles.verifiedGreenBadge}>
+                  <Text style={styles.verifiedGreenBadgeText}>Active</Text>
+                </View>
+              </View>
+              <View style={styles.settingsRowDivider} />
+            </>
+          )}
 
           {/* 4. Tax Invoices & Receipts */}
           <TouchableOpacity
@@ -4854,21 +4925,29 @@ function ProfileScreen({
         <Text style={styles.versionText}>MISTRI PRO • Build v2.4.0 (Enterprise Pro)</Text>
       </ScrollView>
 
-      {/* EDIT PROFILE MODAL */}
+      {/* EDIT PROFILE MODAL (Keyboard-friendly, no overlap) */}
       <Modal visible={showEditModal} animationType="slide" transparent onRequestClose={() => setShowEditModal(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { paddingBottom: Math.max(insets.bottom + 20, 24) }]}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <View style={[styles.modalCard, { maxHeight: '88%', paddingBottom: Math.max(insets.bottom + 16, 20) }]}>
             <View style={styles.modalHeader}>
               <View>
                 <Text style={styles.modalTitle}>Edit Profile Details</Text>
                 <Text style={styles.modalSubtitle}>Update your name, contact & location</Text>
               </View>
-              <TouchableOpacity onPress={() => setShowEditModal(false)}>
+              <TouchableOpacity onPress={() => setShowEditModal(false)} style={{ padding: 4 }}>
                 <X size={20} color="#0F172A" />
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={{ marginTop: 16 }} showsVerticalScrollIndicator={false}>
+            <ScrollView
+              style={{ marginTop: 12 }}
+              contentContainerStyle={{ paddingBottom: 28 }}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>Full Name</Text>
                 <TextInput
@@ -4933,7 +5012,7 @@ function ProfileScreen({
               </TouchableOpacity>
             </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* CHOOSE LANGUAGE POPUP MODAL (Clean in-place selector, no redirection) */}

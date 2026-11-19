@@ -13,6 +13,7 @@ import {
   Platform,
   StatusBar,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   ShieldCheck,
   CreditCard,
@@ -386,7 +387,7 @@ export default function RazorpayModal({
       presentationStyle="fullScreen"
       onRequestClose={onClose}
     >
-      <View style={styles.fullScreenContainer}>
+      <SafeAreaView style={styles.fullScreenContainer} edges={['top', 'bottom']}>
         <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
         {/* Header */}
@@ -521,7 +522,7 @@ export default function RazorpayModal({
             Secured by Razorpay • UPI, Cards, NetBanking & Wallets
           </Text>
         </View>
-      </View>
+      </SafeAreaView>
     </Modal>
   );
 }
@@ -530,7 +531,6 @@ const styles = StyleSheet.create({
   fullScreenContainer: {
     flex: 1,
     backgroundColor: '#FFFFFF',
-    paddingTop: Platform.OS === 'ios' ? 48 : StatusBar.currentHeight || 20,
   },
   razorpayHeader: {
     flexDirection: 'row',

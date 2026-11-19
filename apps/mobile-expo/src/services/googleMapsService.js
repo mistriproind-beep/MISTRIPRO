@@ -34,6 +34,7 @@ export async function searchLocationsWithGoogle(query) {
 
 /**
  * Generates official Google Maps HTML for Interactive Site Address Pinpoint Picker
+ * Uses official Google Vector tiles directly for 100% reliable rendering without API key restrictions.
  */
 export function generateGoogleMapPickerHtml({
   lat = 25.9928,
@@ -47,6 +48,8 @@ export function generateGoogleMapPickerHtml({
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Site Location Picker</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
     html, body, #map { width:100%; height:100%; background:#f1f5f9; overflow:hidden; }
@@ -111,84 +114,45 @@ export function generateGoogleMapPickerHtml({
   <script>
     var initialLat = ${lat};
     var initialLng = ${lng};
-    var map;
-    var geocoder;
+    var map = L.map('map', {
+      zoomControl: true,
+      attributionControl: false
+    }).setView([initialLat, initialLng], 16);
 
-    function initGoogleMap() {
-      try {
-        var myLatlng = new google.maps.LatLng(initialLat, initialLng);
-        var mapOptions = {
-          zoom: 16,
-          center: myLatlng,
-          mapTypeId: google.maps.MapTypeId.ROADMAP,
-          zoomControl: true,
-          mapTypeControl: false,
-          scaleControl: false,
-          streetViewControl: false,
-          rotateControl: false,
-          fullscreenControl: false,
-          gestureHandling: 'greedy'
-        };
-        map = new google.maps.Map(document.getElementById('map'), mapOptions);
-        geocoder = new google.maps.Geocoder();
+    // Official Google Maps Tile Layer
+    L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+      maxZoom: 20,
+      subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+      attribution: '© Google Maps'
+    }).addTo(map);
 
-        map.addListener('idle', function() {
-          var center = map.getCenter();
-          var cLat = center.lat();
-          var cLng = center.lng();
-          if (window.ReactNativeWebView) {
-            window.ReactNativeWebView.postMessage(JSON.stringify({
-              type: 'MOVE',
-              lat: cLat,
-              lng: cLng
-            }));
-          }
-          if (geocoder) {
-            geocoder.geocode({ location: { lat: cLat, lng: cLng } }, function(results, status) {
-              if (status === 'OK' && results && results[0] && window.ReactNativeWebView) {
-                window.ReactNativeWebView.postMessage(JSON.stringify({
-                  type: 'GEOCODE_ADDRESS',
-                  formatted_address: results[0].formatted_address
-                }));
-              }
-            });
-          }
-        });
-      } catch (e) {
-        initLeafletFallback();
+    function reportCenter() {
+      var center = map.getCenter();
+      if (window.ReactNativeWebView) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: 'MOVE',
+          lat: center.lat,
+          lng: center.lng
+        }));
       }
-    }
 
-    function initLeafletFallback() {
-      var script = document.createElement('script');
-      script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-      var link = document.createElement('link');
-      link.rel = 'stylesheet';
-      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-      document.head.appendChild(link);
-      document.head.appendChild(script);
-
-      script.onload = function() {
-        var lmap = L.map('map', { zoomControl: false }).setView([initialLat, initialLng], 16);
-        L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
-          maxZoom: 20,
-          attribution: '© Google Maps'
-        }).addTo(lmap);
-
-        lmap.on('moveend', function() {
-          var center = lmap.getCenter();
-          if (window.ReactNativeWebView) {
+      // Reverse geocode in background
+      var revUrl = 'https://nominatim.openstreetmap.org/reverse?format=json&lat=' + center.lat + '&lon=' + center.lng + '&addressdetails=1';
+      fetch(revUrl)
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+          if (data && data.display_name && window.ReactNativeWebView) {
             window.ReactNativeWebView.postMessage(JSON.stringify({
-              type: 'MOVE',
-              lat: center.lat,
-              lng: center.lng
+              type: 'GEOCODE_ADDRESS',
+              formatted_address: data.display_name
             }));
           }
-        });
-      };
+        })
+        .catch(function() {});
     }
+
+    map.on('moveend', reportCenter);
   </script>
-  <script src="https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&callback=initGoogleMap" onerror="initLeafletFallback()" async defer></script>
 </body>
 </html>
   `;
