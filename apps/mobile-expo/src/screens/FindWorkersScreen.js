@@ -12,6 +12,7 @@ import {
   Alert,
   Modal,
   AppState,
+  RefreshControl,
 } from 'react-native';
 import {
   MapPin,
@@ -28,11 +29,12 @@ import {
   X,
   ShieldCheck,
   CheckCircle2,
+  List,
 } from 'lucide-react-native';
 import { WebView } from 'react-native-webview';
 import * as Location from 'expo-location';
 import { CATEGORIES, translateWorkerSkill } from '../data/categories';
-import { getDistanceKm } from '../services/liveBackend';
+import LiveBackend, { getDistanceKm } from '../services/liveBackend';
 import RazorpayModal from '../components/RazorpayModal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -80,13 +82,13 @@ function WorkerCard({ worker, isSelected, onSelect, onOpenProfile, onProceedBook
           </View>
           <Text style={styles.workerSkill}>{translateWorkerSkill(worker.skill || worker.category, lang)}</Text>
 
-          {/* Availability Status Badge */}
+          {/* Availability Status Badge - Single Clean Dot */}
           <View style={[styles.cardAvailBadge, worker.available ? styles.cardAvailOnline : styles.cardAvailOffline]}>
             <View style={[styles.cardAvailDot, worker.available ? styles.cardDotOnline : styles.cardDotOffline]} />
             <Text style={[styles.cardAvailText, worker.available ? styles.cardTextOnline : styles.cardTextOffline]}>
               {worker.available
-                ? (lang === 'hi' ? '● ऑनलाइन' : lang === 'gu' ? '● ઓનલાઇન' : lang === 'mr' ? '● ऑनलाइन' : '● Online')
-                : (lang === 'hi' ? '○ अभी उपलब्ध नहीं' : lang === 'gu' ? '○ હાલમાં ઉપલબ્ધ નથી' : lang === 'mr' ? '○ सध्या उपलब्ध नाही' : '○ Not Available Right Now')}
+                ? (lang === 'hi' ? 'ऑनलाइन' : lang === 'gu' ? 'ઓનલાઇન' : lang === 'mr' ? 'ऑनलाइन' : 'Online')
+                : (lang === 'hi' ? 'ऑफलाइन' : lang === 'gu' ? 'ઑફલાઇન' : lang === 'mr' ? 'ऑफलाइन' : 'Offline')}
             </Text>
           </View>
 
@@ -172,6 +174,9 @@ export default function FindWorkersScreen({
   const [userLocation, setUserLocation] = useState(null); // { latitude, longitude, areaName }
   const [isLocLoading, setIsLocLoading] = useState(true);
   const [mapStyle, setMapStyle] = useState('google'); // 'google' | 'voyager'
+  const [viewMode, setViewMode] = useState('list'); // 'list' | 'map'
+  const [localWorkers, setLocalWorkers] = useState(Array.isArray(workers) && workers.length > 0 ? workers : []);
+  const [isSyncing, setIsSyncing] = useState(false);
   const webViewRef = useRef(null);
 
   // Modals for Worker Details & Checkout
@@ -180,16 +185,50 @@ export default function FindWorkersScreen({
   const [showRazorpayModal, setShowRazorpayModal] = useState(false);
   const [razorpayBookingData, setRazorpayBookingData] = useState(null);
 
+  // Sync workers function
+  const syncLiveWorkers = async () => {
+    try {
+      setIsSyncing(true);
+      const data = await LiveBackend.fetchRealWorkers();
+      if (Array.isArray(data) && data.length > 0) {
+        setLocalWorkers(data);
+      }
+    } catch (e) {
+      console.log('Worker sync error in FindWorkersScreen:', e);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  useEffect(() => {
+    if (Array.isArray(workers) && workers.length > 0) {
+      setLocalWorkers(workers);
+    }
+  }, [workers]);
+
   // Auto fetch user's real live GPS coordinates on mount & app re-open
+  // Also auto-fetch all worker locations accurately every 2 hours
   useEffect(() => {
     fetchLiveLocation();
+    syncLiveWorkers();
+
     const sub = AppState.addEventListener('change', (nextAppState) => {
       if (nextAppState === 'active') {
         fetchLiveLocation();
+        syncLiveWorkers();
       }
     });
+
+    const twoHoursMs = 2 * 60 * 60 * 1000;
+    const interval = setInterval(() => {
+      console.log('[FindWorkersScreen] 2-Hour Auto-Sync: Worker Live Location & GPS');
+      fetchLiveLocation();
+      syncLiveWorkers();
+    }, twoHoursMs);
+
     return () => {
       if (sub && sub.remove) sub.remove();
+      clearInterval(interval);
     };
   }, []);
 
@@ -243,7 +282,7 @@ export default function FindWorkersScreen({
 
   // Base filtered list: Shows online & offline workers with status badge (Online sorted first)
   const baseWorkers = useMemo(() => {
-    const liveList = Array.isArray(workers) ? workers : [];
+    const liveList = Array.isArray(localWorkers) && localWorkers.length > 0 ? localWorkers : (Array.isArray(workers) ? workers : []);
     let filtered = liveList.filter(Boolean);
 
     // 1. Category filter
@@ -312,11 +351,11 @@ export default function FindWorkersScreen({
       if (aAvail === bAvail) return 0;
       return aAvail ? -1 : 1;
     });
-  }, [selectedCategory, searchQuery, workers]);
+  }, [selectedCategory, searchQuery, localWorkers, workers]);
 
   // Dynamically place workers with REAL live GPS distance calculation
   const liveWorkers = useMemo(() => {
-    return baseWorkers.map((w, index) => {
+    const list = baseWorkers.map((w, index) => {
       if (!w) return null;
       let lat = w.latitude ?? w.lat;
       let lng = w.longitude ?? w.lng;
@@ -342,6 +381,17 @@ export default function FindWorkersScreen({
         distance,
       };
     }).filter(Boolean);
+
+    // Strictly sort: ALL online workers first (nearest distance first), ALL offline workers strictly at the end
+    return list.sort((a, b) => {
+      const aAvail = Boolean(a.available);
+      const bAvail = Boolean(b.available);
+      if (aAvail && !bAvail) return -1;
+      if (!aAvail && bAvail) return 1;
+      const distA = parseFloat(a.distance) || 999;
+      const distB = parseFloat(b.distance) || 999;
+      return distA - distB;
+    });
   }, [baseWorkers, userLat, userLng]);
 
   const allChips = ['All', ...CATEGORIES.map((c) => c.name)];
@@ -534,8 +584,8 @@ export default function FindWorkersScreen({
       });
 
       var statusBadge = w.available
-        ? '<div style="display:inline-block;padding:2px 6px;border-radius:4px;background:#F0FDF4;color:#15803D;font-weight:700;font-size:10px;margin-bottom:4px;">● Online</div>'
-        : '<div style="display:inline-block;padding:2px 6px;border-radius:4px;background:#F8FAFC;color:#64748B;font-weight:700;font-size:10px;border:1px solid #CBD5E1;margin-bottom:4px;">● Not Available Right Now</div>';
+        ? '<div style="display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:4px;background:#F0FDF4;color:#15803D;font-weight:700;font-size:10px;margin-bottom:4px;"><span style=\\"width:6px;height:6px;border-radius:50%;background:#16A34A;display:inline-block;\\"></span> Online</div>'
+        : '<div style="display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:4px;background:#FEF2F2;color:#DC2626;font-weight:700;font-size:10px;border:1px solid #FECACA;margin-bottom:4px;"><span style=\\"width:6px;height:6px;border-radius:50%;background:#EF4444;display:inline-block;\\"></span> Offline</div>';
 
       var actionBtn = w.available
         ? '<button class="popup-btn" onclick="sendMsg(\\'' + (w.phone || '') + '\\')">📞 Call Mistri</button>'
@@ -601,7 +651,9 @@ export default function FindWorkersScreen({
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeftCol}>
-          <Text style={styles.headerTitle}>Find Workers</Text>
+          <Text style={styles.headerTitle}>
+            {lang === 'hi' ? 'कारीगर खोजें' : lang === 'gu' ? 'કારીગરો શોધો' : lang === 'mr' ? 'कामगार शोधा' : 'Find Workers'}
+          </Text>
           <View style={styles.locationSubRow}>
             <MapPin size={13} color="#2563EB" />
             <Text style={styles.headerSubtitle} numberOfLines={1}>
@@ -611,28 +663,23 @@ export default function FindWorkersScreen({
         </View>
 
         <View style={styles.headerRightActions}>
-          {/* Map style toggle */}
-          <TouchableOpacity
-            style={styles.styleToggleBtn}
-            onPress={() => setMapStyle(mapStyle === 'google' ? 'voyager' : 'google')}
-            activeOpacity={0.8}
-          >
-            <Layers size={13} color="#4F46E5" />
-            <Text style={styles.styleToggleText}>Map Style</Text>
-          </TouchableOpacity>
-
-          {/* Re-center */}
+          {/* Refresh / Re-center GPS & Worker Sync */}
           <TouchableOpacity
             style={styles.recenterBtn}
-            onPress={fetchLiveLocation}
+            onPress={() => {
+              fetchLiveLocation();
+              syncLiveWorkers();
+            }}
             activeOpacity={0.8}
           >
-            {isLocLoading ? (
+            {isLocLoading || isSyncing ? (
               <ActivityIndicator size="small" color="#2563EB" />
             ) : (
               <>
-                <LocateFixed size={13} color="#2563EB" />
-                <Text style={styles.recenterBtnText}>Locate</Text>
+                <RefreshCw size={13} color="#2563EB" />
+                <Text style={styles.recenterBtnText}>
+                  {lang === 'hi' ? 'रिफ्रेश' : lang === 'gu' ? 'રિફ્રેશ' : lang === 'mr' ? 'रिफ्रेश' : 'Sync'}
+                </Text>
               </>
             )}
           </TouchableOpacity>
@@ -643,6 +690,17 @@ export default function FindWorkersScreen({
         style={styles.scroll}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: (insets?.bottom || 34) + 110 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={isLocLoading || isSyncing}
+            onRefresh={() => {
+              fetchLiveLocation();
+              syncLiveWorkers();
+            }}
+            colors={['#4F46E5']}
+            tintColor="#4F46E5"
+          />
+        }
       >
         {/* Search Bar */}
         <View style={styles.searchBarWrap}>
@@ -650,7 +708,15 @@ export default function FindWorkersScreen({
             <Search size={16} color="#94A3B8" style={{ marginRight: 8 }} />
             <TextInput
               style={styles.searchInput}
-              placeholder="Search by worker name, skill, category..."
+              placeholder={
+                lang === 'hi'
+                  ? 'कारीगर, मिस्त्री, कार्य खोजें...'
+                  : lang === 'gu'
+                  ? 'કારીગર, મિસ્ત્રી, કાર્ય શોધો...'
+                  : lang === 'mr'
+                  ? 'कारागीर, मिस्त्री, काम शोधा...'
+                  : 'Search by worker name, skill, category...'
+              }
               placeholderTextColor="#94A3B8"
               value={searchQuery}
               onChangeText={setSearchQuery}
@@ -705,43 +771,84 @@ export default function FindWorkersScreen({
           })}
         </ScrollView>
 
-        {/* ─── LIVE VIBRANT REAL MAP CONTAINER ─── */}
-        <View style={styles.mapOuterWrap}>
-          <View style={styles.mapCard}>
-            <WebView
-              ref={webViewRef}
-              originWhitelist={['*']}
-              source={{ html: mapHtml }}
-              style={styles.mapWebView}
-              javaScriptEnabled={true}
-              domStorageEnabled={true}
-              startInLoadingState={true}
-              renderLoading={() => (
-                <View style={styles.mapLoadingOverlay}>
-                  <ActivityIndicator size="large" color="#2563EB" />
-                  <Text style={styles.mapLoadingText}>Loading Live Clear Map...</Text>
-                </View>
-              )}
-              onMessage={handleWebViewMessage}
-            />
+        {/* View Mode Switcher: Workers List (Default) vs Live Map */}
+        <View style={styles.viewModeRow}>
+          <TouchableOpacity
+            style={[styles.viewModeTab, viewMode === 'list' && styles.viewModeTabActive]}
+            onPress={() => setViewMode('list')}
+            activeOpacity={0.8}
+          >
+            <List size={14} color={viewMode === 'list' ? '#4F46E5' : '#64748B'} />
+            <Text style={[styles.viewModeText, viewMode === 'list' && styles.viewModeTextActive]}>
+              {lang === 'hi'
+                ? `कारीगर सूची (${liveWorkers.filter((w) => w.available).length} ऑनलाइन)`
+                : lang === 'gu'
+                ? `કારીગરો યાદી (${liveWorkers.filter((w) => w.available).length} ઑનલાઇન)`
+                : lang === 'mr'
+                ? `कामगार यादी (${liveWorkers.filter((w) => w.available).length} ऑनलाइन)`
+                : `Workers List (${liveWorkers.filter((w) => w.available).length} Online)`}
+            </Text>
+          </TouchableOpacity>
 
-            {/* Live Map Badge Overlay */}
-            <View style={styles.mapLivePill}>
-              <View style={styles.greenLiveDot} />
-              <Text style={styles.mapLiveText}>
-                Live Radar • {liveWorkers.filter((w) => w.available).length} Online ({liveWorkers.length} Total)
-              </Text>
-            </View>
-          </View>
+          <TouchableOpacity
+            style={[styles.viewModeTab, viewMode === 'map' && styles.viewModeTabActive]}
+            onPress={() => setViewMode('map')}
+            activeOpacity={0.8}
+          >
+            <Compass size={14} color={viewMode === 'map' ? '#4F46E5' : '#64748B'} />
+            <Text style={[styles.viewModeText, viewMode === 'map' && styles.viewModeTextActive]}>
+              {lang === 'hi' ? 'लाइव रडार मैप' : lang === 'gu' ? 'લાઇવ રડાર નકશો' : lang === 'mr' ? 'लाइव्ह रडार नकाशा' : 'Live Radar Map'}
+            </Text>
+          </TouchableOpacity>
         </View>
 
-        {/* Worker List Section */}
+        {/* ─── LIVE VIBRANT REAL MAP CONTAINER (Shown only when Live Radar Map tab is clicked) ─── */}
+        {viewMode === 'map' && (
+          <View style={styles.mapOuterWrap}>
+            <View style={styles.mapCard}>
+              <WebView
+                ref={webViewRef}
+                originWhitelist={['*']}
+                source={{ html: mapHtml }}
+                style={styles.mapWebView}
+                javaScriptEnabled={true}
+                domStorageEnabled={true}
+                startInLoadingState={true}
+                renderLoading={() => (
+                  <View style={styles.mapLoadingOverlay}>
+                    <ActivityIndicator size="large" color="#2563EB" />
+                    <Text style={styles.mapLoadingText}>Loading Live Clear Map...</Text>
+                  </View>
+                )}
+                onMessage={handleWebViewMessage}
+              />
+
+              {/* Live Map Badge Overlay */}
+              <View style={styles.mapLivePill}>
+                <View style={styles.greenLiveDot} />
+                <Text style={styles.mapLiveText}>
+                  Live Radar • {liveWorkers.filter((w) => w.available).length} Online ({liveWorkers.length} Total)
+                </Text>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* Worker List Section - Appears Directly in List under Search & Categories */}
         <View style={styles.listSection}>
           <View style={styles.listHeader}>
             <View>
-              <Text style={styles.listTitle}>Nearby Workers on Map</Text>
+              <Text style={styles.listTitle}>
+                {lang === 'hi' ? 'आसपास के कारीगर' : lang === 'gu' ? 'નજીકના કારીગરો' : lang === 'mr' ? 'जवळचे कामगार' : 'Nearby Mistris'}
+              </Text>
               <Text style={styles.listCount}>
-                Showing {liveWorkers.length} mistris around {(areaLabel || '').split(',')[0]}
+                {lang === 'hi'
+                  ? `${liveWorkers.filter((w) => w.available).length} ऑनलाइन • ${liveWorkers.length} कुल कारीगर`
+                  : lang === 'gu'
+                  ? `${liveWorkers.filter((w) => w.available).length} ઑનલાઇન • ${liveWorkers.length} કુલ કારીગરો`
+                  : lang === 'mr'
+                  ? `${liveWorkers.filter((w) => w.available).length} ऑनलाइन • ${liveWorkers.length} एकूण कामगार`
+                  : `${liveWorkers.filter((w) => w.available).length} online • ${liveWorkers.length} total mistris`}
               </Text>
             </View>
             {(selectedCategory !== 'All' || searchQuery.trim().length > 0) && (
@@ -752,7 +859,9 @@ export default function FindWorkersScreen({
                   setSearchQuery('');
                 }}
               >
-                <Text style={styles.resetFilterText}>Clear Filter</Text>
+                <Text style={styles.resetFilterText}>
+                  {lang === 'hi' ? 'फ़िल्टर हटाएं' : lang === 'gu' ? 'ફિલ્ટર હટાવો' : lang === 'mr' ? 'फिल्टर काढा' : 'Clear Filter'}
+                </Text>
               </TouchableOpacity>
             )}
           </View>
@@ -1418,6 +1527,38 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#94A3B8',
   },
+  viewModeRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    marginTop: 10,
+    marginBottom: 8,
+    gap: 8,
+  },
+  viewModeTab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 9,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  viewModeTabActive: {
+    backgroundColor: '#EEF2FF',
+    borderColor: '#C7D2FE',
+  },
+  viewModeText: {
+    fontFamily: 'Satoshi-Bold',
+    fontSize: 12,
+    color: '#64748B',
+  },
+  viewModeTextActive: {
+    color: '#4F46E5',
+  },
   cardAvailBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1431,11 +1572,13 @@ const styles = StyleSheet.create({
   },
   cardAvailOnline: {
     backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#DCFCE7',
   },
   cardAvailOffline: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FEF2F2',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#FECACA',
   },
   cardAvailDot: {
     width: 6,
@@ -1446,7 +1589,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#16A34A',
   },
   cardDotOffline: {
-    backgroundColor: '#94A3B8',
+    backgroundColor: '#EF4444',
   },
   cardAvailText: {
     fontFamily: 'Satoshi-Bold',
@@ -1456,7 +1599,7 @@ const styles = StyleSheet.create({
     color: '#15803D',
   },
   cardTextOffline: {
-    color: '#64748B',
+    color: '#DC2626',
   },
   modalOfflineNotice: {
     backgroundColor: '#FEF3C7',

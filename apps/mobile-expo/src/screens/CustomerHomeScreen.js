@@ -497,8 +497,8 @@ export default function CustomerHomeScreen({
             <View style={[styles.cardAvailDot, item?.available ? styles.cardDotOnline : styles.cardDotOffline]} />
             <Text style={[styles.cardAvailText, item?.available ? styles.cardTextOnline : styles.cardTextOffline]}>
               {item?.available
-                ? (lang === 'hi' ? '● ऑनलाइन' : lang === 'gu' ? '● ઓનલાઇન' : lang === 'mr' ? '● ऑनलाइन' : '● Online')
-                : (lang === 'hi' ? '○ अभी उपलब्ध नहीं' : lang === 'gu' ? '○ હાલમાં ઉપલબ્ધ નથી' : lang === 'mr' ? '○ सध्या उपलब्ध नाही' : '○ Not Available Right Now')}
+                ? (lang === 'hi' ? 'ऑनलाइन' : lang === 'gu' ? 'ઓનલાઇન' : lang === 'mr' ? 'ऑनलाइन' : 'Online')
+                : (lang === 'hi' ? 'ऑफलाइन' : lang === 'gu' ? 'ઑફલાઇન' : lang === 'mr' ? 'ऑफलाइन' : 'Offline')}
             </Text>
           </View>
           <View style={styles.workerMeta}>
@@ -1792,9 +1792,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#F0FDF4',
   },
   cardAvailOffline: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FEF2F2',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#FECACA',
   },
   cardAvailDot: {
     width: 6,
@@ -1805,7 +1805,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#16A34A',
   },
   cardDotOffline: {
-    backgroundColor: '#94A3B8',
+    backgroundColor: '#EF4444',
   },
   cardAvailText: {
     fontFamily: 'Satoshi-Bold',
@@ -1815,7 +1815,7 @@ const styles = StyleSheet.create({
     color: '#15803D',
   },
   cardTextOffline: {
-    color: '#64748B',
+    color: '#DC2626',
   },
   modalOfflineNotice: {
     backgroundColor: '#FEF3C7',
