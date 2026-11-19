@@ -56,8 +56,8 @@ export default function SettingsPage() {
   const [milestoneBonus, setMilestoneBonus] = useState(200);
 
   // Razorpay Gateway Credentials State
-  const [rzpKeyId, setRzpKeyId] = useState('rzp_test_U1wTVQHlvrLyos');
-  const [rzpKeySecret, setRzpKeySecret] = useState('MRnGqIxKR4JTNxH2M7EHeqWc');
+  const [rzpKeyId, setRzpKeyId] = useState('rzp_test_U1wrThfCLVtNL9');
+  const [rzpKeySecret, setRzpKeySecret] = useState('dihnHCgzXlEPswRiIPZ2GoeG');
   const [rzpMode, setRzpMode] = useState<'live' | 'test'>('test');
   const [rzpMerchantName, setRzpMerchantName] = useState('Mistri Pro Secured Payments');
   const [rzpWebhookSecret, setRzpWebhookSecret] = useState('');
